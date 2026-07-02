@@ -231,6 +231,13 @@ The `DataTable` component already applies this internally. Do NOT add `overflow-
 3. DataTable
 4. DataTablePagination
 
+**Vertical rhythm**: the single root `space-y-6` is the ONLY spacing between header → KPI row → filters → table → pagination — no extra ad-hoc margins between these blocks. If `PageHeader`'s built-in bottom padding doubles the gap, pass `className="pb-0"` to it rather than adjusting neighbors.
+
+**Flat list variant** (no wrapping Card — reference `/finance/product-master`): PageHeader → KpiGrid → filter toolbar → table → DataTablePagination sit directly under the root `space-y-6`. Rules for the flat table:
+- Table wrapper: `rounded-md border` with an **inner** `overflow-x-auto` div — the table scrolls inside the border, not the page
+- First column gets `pl-4` and last column `pr-4` — on **both** head and body cells — so content aligns with the rounded border
+- Every control in the filter toolbar row is `h-9` (see DESIGN.md §4 — Control Height Parity)
+
 ---
 
 ### 4.2 Detail Page (Bento Grid)
@@ -503,6 +510,18 @@ Action bars always use `flex-wrap`:
 ```
 
 On mobile (`<640px`), when the container is narrower, buttons wrap to the next line. The `flex-1` spacer collapses and the "Cancel" button appears below the primary actions — this is correct behavior.
+
+### Header Actions Collapse to Icon-Only
+
+Below `sm` (640px), buttons in the `PageHeader` actions slot collapse to **icon-only**: wrap the label in `<span className="hidden sm:inline">`, keep the icon always visible, and add `aria-label` on the button so icon-only remains accessible. Dropdown chevrons may stay visible. Full pattern in DESIGN.md §5.3 (Header Action Buttons); reference: `/finance/product-master` (Import / Export / New product).
+
+### 375px Responsive Floor
+
+Every list page must be verified at **375px** viewport width:
+
+- Zero horizontal page overflow (header and sidebar never scroll sideways)
+- Filter controls stack (`grid-cols-1` / `flex-col` at base)
+- Tables scroll **inside their own wrapper only** — never the page
 
 ### PageHeader on Mobile
 

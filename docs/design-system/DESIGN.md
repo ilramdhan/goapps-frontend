@@ -264,6 +264,19 @@ When `CardHeader` has a right slot (badge, button), always add `space-y-0` to pr
 | Icon + text inside button | `mr-2 h-4 w-4` on icon |
 | Icon + text inside badge | `mr-1 h-3 w-3` on icon |
 
+### Control Height Parity (filter / toolbar rows)
+
+Every control in a filter/toolbar row is **`h-9` (36px)** — search inputs, comboboxes, selects, the column-visibility trigger, and any adjacent buttons. Never mix `h-8`/`h-10` controls in the same row.
+
+```tsx
+<DebouncedSearchInput className="h-9" ... />
+<ProductTypeMultiCombobox className="h-9" ... />
+<SelectTrigger className="h-9">...</SelectTrigger>
+<ColumnVisibilityMenu className="h-9" ... />  {/* trigger defaults to h-8 — pass h-9 in filter rows */}
+```
+
+Reference implementation: the filter toolbar in `src/app/(dashboard)/finance/product-master/product-master-page-client.tsx`.
+
 ---
 
 ## 5. Components A–Z
@@ -397,6 +410,21 @@ Used for contextual notices that appear inline on a page — not toasts. Two var
   {isPending ? "Saving…" : "Save"}
 </Button>
 ```
+
+#### Header Action Buttons (PageHeader actions slot)
+
+All buttons in a `PageHeader` actions slot use the **same size (default, 36px)**. Below `sm` they collapse to **icon-only**: wrap the label in `hidden sm:inline`, keep the icon always visible, and add `aria-label` so the icon-only button stays accessible. Dropdown chevrons may stay visible on mobile.
+
+```tsx
+<Button onClick={openCreate} aria-label="New product">
+  <Plus className="h-4 w-4" />
+  <span className="hidden sm:inline">New product</span>
+</Button>
+```
+
+- No `mr-2` on the icon here — rely on the Button's built-in `gap-2`, so the hidden label leaves no stray margin on mobile
+- The PageHeader actions slot is already `flex flex-wrap items-center gap-2` — never remove the wrap
+- Reference: `src/app/(dashboard)/finance/product-master/product-master-page-client.tsx` (Import / Export / New product)
 
 #### Action Bar Pattern (Detail Pages)
 
@@ -697,6 +725,15 @@ export function ExampleCombobox({ value, onSelect, placeholder = "Select…", di
 - Always `CommandEmpty` — "No results." message when search returns nothing
 - Never use `<Select>` for data that requires async fetch or search
 
+#### Multi-Select Combobox
+
+For multi-value filters (e.g. product types), use the same Popover + Command shell with these additions — reference `src/components/finance/comboboxes/product-type-multi-combobox.tsx`:
+
+- The popover **stays open** when an item is toggled — do not `setOpen(false)` in `onSelect`
+- Selected state via the Check-icon opacity convention (`opacity-100` selected / `opacity-0` not)
+- The trigger shows a **count badge** ("N selected") when multiple values are selected
+- A "Clear selection" `CommandItem` lives **inside the popover** — **never** nest an interactive element (inline ✕, `<span role="button">`) inside the trigger `<button>`: it's an invalid HTML content model and breaks accessibility
+
 ---
 
 ### 5.7 Date Picker
@@ -906,10 +943,17 @@ Used for complex secondary UI that stays in context without full navigation.
 **Rules:**
 - `showCloseButton={false}` — always suppress default X, add your own
 - `flex flex-col p-0 gap-0` on `SheetContent` — removes shadcn defaults
-- Header and footer `shrink-0` + `bg-background` — prevent content bleeding through
+- Header and footer `shrink-0` + `bg-background` + `border-b`/`border-t` + `px-6 py-4` — prevent content bleeding through
 - `flex-1 overflow-y-auto` on body — only body scrolls
 - `SheetTitle` and `SheetDescription` always present (accessibility — can be `sr-only`)
 - `w-full sm:max-w-2xl` — full width on mobile, capped on desktop
+
+**Read-only detail drawers** (quick-view from a list row) — reference `src/components/finance/cost-product-master/product-detail-drawer.tsx`:
+- Body: `flex-1 overflow-y-auto px-6 py-5 space-y-4`; each content section wrapped in its own `rounded-lg border bg-card p-4` card
+- Sections load **independently**: per-section loading skeleton while fetching, inline muted error text on failure — a failed section never blanks the whole drawer
+- Detail queries pass `enabled` only while the drawer is open — nothing fetches while closed
+- Footer always includes a link to the full detail page
+- Grouped parameter display: group by `displayGroup` ordered by min `displayOrder` within each group — named groups first, ungrouped last (the algorithm lives in `src/components/finance/cost-results/cost-breakdown-modal.tsx` — reuse it, don't reinvent)
 
 ---
 
@@ -1156,6 +1200,8 @@ See §5.19.
 - Place `<KpiGrid>` directly under `<PageHeader>`, before the main list card
 - Use `href` to make KPI cards link to a filtered list view when possible
 - `cols` prop: 2 for simple pages, 3–4 for dashboards
+- **Count widgets use the neutral `default` variant** — reserve `success`/`warning`/`destructive` for semantic alerts (failed jobs, pending reviews), never for plain category counts like Active/Inactive (reference: `/finance/product-master` KPI row)
+- `KpiGrid` handles odd card counts on mobile automatically (the last card spans the full 2-col row) — do not add manual `col-span` overrides on children
 
 ---
 
@@ -1507,25 +1553,50 @@ Pass `tableId` to enable the column visibility menu (⚙ button top-right):
 />
 ```
 
+For **custom tables** (not `DataTable`), any table with **more than 6 columns** gets `useColumnVisibility(tableId, columns)` + `<ColumnVisibilityMenu>` (both in `src/components/shared/data-table/`):
+
+- `tableId` convention: `<module>-<entity>` (e.g. `finance-product-master`)
+- The identity/key column is `canHide: false` — users can never hide it
+- Hoist the hook to the page component (see RULES.md Mistake 9) and pass `visibility` down to the table
+- When the menu trigger sits in an h-9 filter row, pass `className="h-9"` (trigger defaults to h-8)
+- Reference: `useProductMasterTableColumns()` in `src/components/finance/cost-product-master/product-master-table.tsx`
+
 #### Sortable Columns
 
-Column sorting is handled at the **backend** level via filter state. In the filter component:
+Column sorting is always **server-side**, flowing through `filters.sortBy` / `filters.sortOrder` into the list hook:
+
+- Sort keys must match the proto `sort_by` `buf.validate` `in`-list values — never invent frontend-only keys
+- Every sort change (like every filter change) resets `page: 1`
+- **`useUrlState` only tracks keys present in `defaultValues`** — `sortBy`/`sortOrder` MUST be listed in the page's `defaultFilters`, or header clicks are silently dropped (documented bug pattern; see RULES.md Mistake 12)
+
+For **column-header click sort**, use the shared **`SortableHeader`** (`src/components/shared/data-table/sortable-header.tsx`) — never build ad-hoc sort buttons inside headers:
+
+- fa-sort-style stacked-triangle SVG indicator: both triangles muted when inactive; the active direction's triangle filled
+- The **whole `TableHead`** is the click target — `cursor-pointer select-none`, **no hover background**
+- Accessibility built in: `aria-sort`, `tabIndex={0}`, Enter/Space keyboard activation
 
 ```tsx
-// In filter component
-<Select value={currentSort} onValueChange={handleSortChange}>
-  <SelectTrigger className="w-[150px]">
-    <SelectValue placeholder="Sort by" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-    <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-    <SelectItem value="created_at-desc">Newest First</SelectItem>
-  </SelectContent>
-</Select>
+<SortableHeader
+  label="Product Code"
+  sortKey="product_code"          // must be a proto-validated sort_by value
+  currentSortBy={sortBy}
+  currentSortOrder={sortOrder}
+  onSort={onSort}
+/>
 ```
 
-For **column-header click sort**, add `sortKey` to column definition and handle in parent:
+Direction cycling is owned by the page client — asc ↔ desc on the active column, a new column always starts asc:
+
+```tsx
+function handleSort(sortKey: string) {
+  const nextOrder = filters.sortBy === sortKey && filters.sortOrder === "asc" ? "desc" : "asc"
+  setFilters({ ...filters, sortBy: sortKey, sortOrder: nextOrder, page: 1 })
+}
+```
+
+Reference implementation: `product-master-table.tsx` + `product-master-page-client.tsx` (`/finance/product-master`).
+
+In `DataTable` columns, add `sortKey` to the column definition and handle in the parent:
 ```tsx
 {
   id: "name",
@@ -1534,6 +1605,14 @@ For **column-header click sort**, add `sortKey` to column definition and handle 
   accessorKey: "name",
 }
 ```
+
+#### Row-Click Navigation
+
+When list rows navigate to a detail page:
+
+- `onClick` on the `TableRow` + `cursor-pointer`
+- The actions cell must call `stopPropagation` so action buttons don't trigger navigation
+- Do **not** also render a `<Link>` on the identity column — it stays plain text (no link-inside-clickable-row)
 
 #### Row Actions
 

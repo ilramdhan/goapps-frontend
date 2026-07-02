@@ -888,6 +888,7 @@ const [filters, setFilters] = useUrlState<ListUOMsParams>({
 - Uses `router.replace()` (no history per keystroke)
 - Browser back/forward auto-restores filter state
 - Always reset `page: 1` when any non-pagination filter changes
+- **Only keys present in `defaultValues` are tracked** — pages with server-side sorting MUST include `sortBy`/`sortOrder` in `defaultValues` or sort changes are silently dropped (see RULES.md Mistake 12)
 
 ### 10.4 Cache Settings
 
