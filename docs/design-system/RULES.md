@@ -118,6 +118,23 @@ I need a side panel that stays in context
 I need to pick from a long/async list in a form
 → Build a Combobox (DESIGN.md §5.6) — NEVER a Select with 50+ items
 
+I need a multi-value filter (e.g. several product types at once)
+→ Multi-Select Combobox (DESIGN.md §5.6) — popover stays open on toggle,
+   count badge in trigger, "Clear selection" CommandItem INSIDE the popover
+   (never a nested interactive element inside the trigger button)
+
+I need sortable column headers on a custom table
+→ <SortableHeader> from src/components/shared/data-table/sortable-header.tsx (DESIGN.md §5.24)
+→ NEVER ad-hoc sort buttons inside TableHead
+
+I need show/hide columns on a custom table (>6 columns)
+→ useColumnVisibility("<module>-<entity>", columns) + <ColumnVisibilityMenu> (DESIGN.md §5.24)
+→ Identity/key column gets canHide: false
+
+I need list rows that navigate to a detail page
+→ onClick on TableRow + cursor-pointer; stopPropagation on the actions cell;
+   identity column stays plain text — no <Link> inside a clickable row (DESIGN.md §5.24)
+
 I need to show multi-line read-only text
 → <p className="text-sm whitespace-pre-wrap"> (NOT a Textarea)
 
@@ -185,6 +202,10 @@ For every component/page generated, verify:
 - [ ] Dialog max-width uses `sm:max-w-[Npx]` (full-width on mobile, capped on desktop)
 - [ ] Drawer uses `w-full sm:max-w-2xl`
 - [ ] No hardcoded px widths on main content containers (they should flex/fill)
+- [ ] **Control height parity**: every control in a filter/toolbar row is `h-9` (36px) — search input, comboboxes, selects, column-visibility trigger, adjacent buttons; never mix h-8/h-10 in one row (DESIGN.md §4)
+- [ ] **PageHeader action buttons**: all same size (default, 36px); below `sm` they collapse to icon-only — `hidden sm:inline` on the label + `aria-label` on the button (DESIGN.md §5.3)
+- [ ] **375px floor**: page verified at 375px — zero horizontal page overflow, filters stack, tables scroll inside their wrapper only (LAYOUT.md §8)
+- [ ] KpiGrid with an odd card count needs no manual fix — the last card auto-spans the 2-col mobile row
 
 ---
 
@@ -221,6 +242,10 @@ For every component/page generated, verify:
 | `<ScrollableDialogContent>` for 6+ fields | Regular `<DialogContent>` that overflows |
 | `<DataTablePagination totalItems={Number(...)} />` | `totalItems={response.totalItems}` (string) |
 | Extend `status-colors.ts` for new statuses | Inline `<Badge className="bg-green-...">` |
+| `<SortableHeader>` for header-click sort | Ad-hoc `<Button>` sort toggles inside `TableHead` |
+| Row nav: `onClick` on `TableRow` + `stopPropagation` on actions cell | `<Link>` on the identity column inside a clickable row |
+| `KpiCard` neutral (`default`) variant for count widgets | `success`/`warning` variants for plain category counts |
+| "Clear selection" `CommandItem` inside the multi-combobox popover | `<span role="button">` (inline ✕) nested in the trigger button |
 
 ### Forms
 
@@ -581,7 +606,27 @@ Every page directory **must** have a `loading.tsx`. If you create a new page, cr
 
 ---
 
-### Mistake 12: Typography.ts cardTitle — stale value
+### Mistake 12: Sort state not in useUrlState defaultValues
+
+`useUrlState` only tracks keys that are present in `defaultValues`. If a page adds server-side sorting but `sortBy`/`sortOrder` are missing from `defaultFilters`, header clicks are **silently dropped** — the URL never updates and the list never re-sorts.
+
+```tsx
+// ✗ Wrong — sortBy/sortOrder missing → sort clicks silently ignored
+const defaultFilters: ListParams = { page: 1, pageSize: 20, search: "" }
+
+// ✓ Correct — sortBy/sortOrder must be listed even when empty
+const defaultFilters: ListParams = {
+  page: 1, pageSize: 20, search: "",
+  sortBy: "",
+  sortOrder: undefined,
+}
+```
+
+Also: sort keys must match the proto `sort_by` validated values, and every sort change resets `page: 1`. See DESIGN.md §5.24 (Sortable Columns).
+
+---
+
+### Mistake 13: Typography.ts cardTitle — stale value
 
 The file `src/lib/ui/typography.ts` has a conflicting `cardTitle` definition. The **correct value** is:
 ```ts

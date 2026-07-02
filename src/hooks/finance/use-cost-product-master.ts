@@ -20,6 +20,9 @@ async function fetchList(params: ListCostProductMastersParams) {
   const qs = new URLSearchParams()
   if (params.search) qs.set("search", params.search)
   if (params.productTypeId) qs.set("productTypeId", String(params.productTypeId))
+  if (params.productTypeIds && params.productTypeIds.length > 0) {
+    qs.set("productTypeIds", params.productTypeIds.join(","))
+  }
   if (params.shadeCode) qs.set("shadeCode", params.shadeCode)
   if (params.activeFilter) qs.set("activeFilter", params.activeFilter)
   if (params.sortBy) qs.set("sortBy", params.sortBy)

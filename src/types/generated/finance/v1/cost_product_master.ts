@@ -113,7 +113,7 @@ export interface DeactivateCostProductMasterResponse {
 }
 
 export interface ListCostProductMastersRequest {
-  /** matches product_code OR product_name OR erp_item_code */
+  /** matches product_code OR product_name OR erp_item_code OR oracle sys id (flex_02) */
   search: string;
   productTypeId: number;
   shadeCode: string;
@@ -121,6 +121,8 @@ export interface ListCostProductMastersRequest {
   pagination: PaginationRequest | undefined;
   sortBy: string;
   sortOrder: string;
+  /** additional type filter, unioned with product_type_id */
+  productTypeIds: number[];
 }
 
 export interface ListCostProductMastersResponse {
@@ -1825,6 +1827,7 @@ function createBaseListCostProductMastersRequest(): ListCostProductMastersReques
     pagination: undefined,
     sortBy: "",
     sortOrder: "",
+    productTypeIds: [],
   };
 }
 
@@ -1851,6 +1854,11 @@ export const ListCostProductMastersRequest: MessageFns<ListCostProductMastersReq
     if (message.sortOrder !== "") {
       writer.uint32(58).string(message.sortOrder);
     }
+    writer.uint32(66).fork();
+    for (const v of message.productTypeIds) {
+      writer.int32(v);
+    }
+    writer.join();
     return writer;
   },
 
@@ -1917,6 +1925,24 @@ export const ListCostProductMastersRequest: MessageFns<ListCostProductMastersReq
           message.sortOrder = reader.string();
           continue;
         }
+        case 8: {
+          if (tag === 64) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 66) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1955,6 +1981,11 @@ export const ListCostProductMastersRequest: MessageFns<ListCostProductMastersReq
         : isSet(object.sort_order)
         ? globalThis.String(object.sort_order)
         : "",
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
     };
   },
 
@@ -1981,6 +2012,9 @@ export const ListCostProductMastersRequest: MessageFns<ListCostProductMastersReq
     if (message.sortOrder !== "") {
       obj.sortOrder = message.sortOrder;
     }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
     return obj;
   },
 
@@ -1998,6 +2032,7 @@ export const ListCostProductMastersRequest: MessageFns<ListCostProductMastersReq
       : undefined;
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
     return message;
   },
 };

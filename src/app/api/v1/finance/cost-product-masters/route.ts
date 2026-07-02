@@ -2,6 +2,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCostProductMasterClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
 
+/** Parses a CSV of product type ids (e.g. "1,2,3") into a positive-int array; empty = no filter. */
+function parseProductTypeIds(raw: string): number[] {
+  return raw
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,6 +19,10 @@ export async function GET(request: NextRequest) {
       {
         search: searchParams.get("search") || "",
         productTypeId: Number(searchParams.get("productTypeId") || searchParams.get("product_type_id")) || 0,
+        // Multi-select type filter — unioned with the legacy single productTypeId server-side.
+        productTypeIds: parseProductTypeIds(
+          searchParams.get("productTypeIds") || searchParams.get("product_type_ids") || "",
+        ),
         shadeCode: searchParams.get("shadeCode") || searchParams.get("shade_code") || "",
         activeFilter: searchParams.get("activeFilter") || searchParams.get("active_filter") || "",
         sortBy: searchParams.get("sortBy") || searchParams.get("sort_by") || "",

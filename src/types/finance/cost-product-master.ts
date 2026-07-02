@@ -22,6 +22,8 @@ export interface CostProductMaster {
 export interface ListCostProductMastersParams {
   search?: string
   productTypeId?: number
+  /** Multi-select type filter; unioned with productTypeId server-side. Empty = no filter. */
+  productTypeIds?: number[]
   shadeCode?: string
   activeFilter?: "all" | "active" | "inactive" | ""
   sortBy?: string

@@ -1,4 +1,5 @@
 export { ProductTypeCombobox } from "./product-type-combobox"
+export { ProductTypeMultiCombobox } from "./product-type-multi-combobox"
 export { RmTypeCombobox } from "./rm-type-combobox"
 export { ProductMasterCombobox } from "./product-master-combobox"
 export { RequestTypeCombobox } from "./request-type-combobox"

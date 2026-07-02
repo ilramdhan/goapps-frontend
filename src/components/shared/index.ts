@@ -4,6 +4,9 @@
 export {
   DataTable,
   DataTablePagination,
+  ColumnVisibilityMenu,
+  SortableHeader,
+  useColumnVisibility,
   type ColumnDef,
   type RowAction,
   type DataTableProps,
