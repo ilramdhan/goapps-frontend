@@ -3,6 +3,7 @@
 import { Settings2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -21,6 +22,8 @@ interface Props<TData> {
   onToggle: (columnId: string) => void
   onSetAll: (visible: boolean) => void
   onReset: () => void
+  /** Extra classes for the trigger button (e.g. "h-9" to match an h-9 filter row). */
+  className?: string
 }
 
 /** Column-visibility dropdown shown above the table when DataTable.tableId is set. */
@@ -30,6 +33,7 @@ export function ColumnVisibilityMenu<TData>({
   onToggle,
   onSetAll,
   onReset,
+  className,
 }: Props<TData>) {
   const toggleable = columns.filter((c) => c.canHide !== false)
   if (toggleable.length === 0) return null
@@ -37,7 +41,7 @@ export function ColumnVisibilityMenu<TData>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5">
+        <Button variant="outline" size="sm" className={cn("h-8 gap-1.5", className)} aria-label="Toggle columns">
           <Settings2 className="h-4 w-4" />
           <span className="hidden sm:inline">Columns</span>
         </Button>
