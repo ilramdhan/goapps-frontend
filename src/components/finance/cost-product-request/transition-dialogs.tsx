@@ -190,9 +190,36 @@ export function ClassificationAndFeasibilityDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {/* Feasibility section — always first */}
+          <div className="space-y-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Feasibility</div>
+            <p className="text-sm text-muted-foreground">
+              FEASIBLE moves the request to ROUTING_DEFINED. NOT_FEASIBLE sends it to REJECTED — note is required.
+            </p>
+            <RadioGroup
+              value={decision}
+              onValueChange={(v) => setDecision(v as "FEASIBLE" | "NOT_FEASIBLE")}
+              className="flex gap-6"
+            >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="FEASIBLE" />
+                Feasible
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="NOT_FEASIBLE" />
+                Not feasible
+              </label>
+            </RadioGroup>
+            <div className="space-y-2">
+              <Label>Note {isInfeasible ? "*" : "(optional)"}</Label>
+              <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Classification section — only shown when FEASIBLE */}
           {!isInfeasible && (
             <>
-              {/* Classification section */}
+              <Separator />
               <div className="space-y-3">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">Classification</div>
                 <p className="text-sm text-muted-foreground">
@@ -228,36 +255,8 @@ export function ClassificationAndFeasibilityDialog({
                   <p className="text-xs text-muted-foreground">Classification saved — read-only.</p>
                 )}
               </div>
-
-              <Separator />
             </>
           )}
-
-          {/* Feasibility section */}
-          <div className="space-y-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Feasibility</div>
-            <p className="text-sm text-muted-foreground">
-              FEASIBLE moves the request to ROUTING_DEFINED. NOT_FEASIBLE sends it to REJECTED — note is required.
-            </p>
-            <RadioGroup
-              value={decision}
-              onValueChange={(v) => setDecision(v as "FEASIBLE" | "NOT_FEASIBLE")}
-              className="flex gap-6"
-            >
-              <label className="flex items-center gap-2 cursor-pointer">
-                <RadioGroupItem value="FEASIBLE" />
-                Feasible
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <RadioGroupItem value="NOT_FEASIBLE" />
-                Not feasible
-              </label>
-            </RadioGroup>
-            <div className="space-y-2">
-              <Label>Note {isInfeasible ? "*" : "(optional)"}</Label>
-              <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
-            </div>
-          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
