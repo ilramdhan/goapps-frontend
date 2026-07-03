@@ -14,7 +14,6 @@ interface FillTrackingTableProps {
    */
   currentUserDepts?: string[];
   onClaim?: (taskId: number) => void;
-  onApprove?: (taskId: number) => void;
   onReject?: (taskId: number) => void;
 }
 
@@ -24,7 +23,6 @@ export function FillTrackingTable({
   isSuperAdmin = false,
   currentUserDepts = [],
   onClaim,
-  onApprove,
   onReject,
 }: FillTrackingTableProps) {
   if (tasks.length === 0) {
@@ -57,7 +55,6 @@ export function FillTrackingTable({
               isSuperAdmin={isSuperAdmin}
               currentUserDepts={currentUserDepts}
               onClaim={onClaim}
-              onApprove={onApprove}
               onReject={onReject}
             />
           ))}

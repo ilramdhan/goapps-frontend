@@ -3,6 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+import { costProductRequestKeys } from "./use-cost-product-request"
+
 export function useLinkExistingRoute() {
   const qc = useQueryClient()
   return useMutation({
@@ -18,7 +20,8 @@ export function useLinkExistingRoute() {
     },
     onSuccess: (_data, { requestId }) => {
       toast.success("Route linked")
-      qc.invalidateQueries({ queryKey: ["finance", "cost-product-request", requestId] })
+      qc.invalidateQueries({ queryKey: costProductRequestKeys.detail(requestId) })
+      qc.invalidateQueries({ queryKey: costProductRequestKeys.all })
       qc.invalidateQueries({ queryKey: ["finance", "cost-route"] })
     },
     onError: (err: Error) => toast.error(err.message),
@@ -40,7 +43,9 @@ export function useUnlinkRoute() {
     },
     onSuccess: (_data, { requestId }) => {
       toast.success("Route unlinked")
-      qc.invalidateQueries({ queryKey: ["finance", "cost-product-request", requestId] })
+      qc.invalidateQueries({ queryKey: costProductRequestKeys.detail(requestId) })
+      qc.invalidateQueries({ queryKey: costProductRequestKeys.all })
+      qc.invalidateQueries({ queryKey: ["finance", "cost-route"] })
     },
     onError: (err: Error) => toast.error(err.message),
   })

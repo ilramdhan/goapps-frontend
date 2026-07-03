@@ -15,6 +15,7 @@ import {
 import { EmptyState } from "@/components/common/empty-state"
 import { useFillTasks, useSubmitFillTask } from "@/hooks/finance/use-fill-assignment"
 import { useRouteGraph } from "@/hooks/finance/use-cost-route"
+import { getProductsAtLevel } from "@/types/finance/cost-route"
 
 import { FillParamProductSection } from "./FillParamProductSection"
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge"
@@ -31,10 +32,10 @@ function DrawerContent({ requestId, taskId, onClose }: { requestId: number; task
   const task = useMemo(() => tasks.find((t) => t.taskId === taskId), [tasks, taskId])
   const { data: graph, isLoading: graphLoading } = useRouteGraph(task?.routeHeadId)
 
-  const productsAtLevel = useMemo(() => {
-    if (!graph || !task) return []
-    return graph.seqs.filter((s) => s.routeLevel === task.routeLevel)
-  }, [graph, task])
+  const productsAtLevel = useMemo(
+    () => getProductsAtLevel(graph, task?.routeLevel),
+    [graph, task],
+  )
 
   const submitM = useSubmitFillTask(requestId)
   const [savedProducts, setSavedProducts] = useState<Set<number>>(new Set())

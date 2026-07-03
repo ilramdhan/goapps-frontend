@@ -144,3 +144,18 @@ export function normalizeRouteGraph(raw: Record<string, unknown>): RouteGraph {
     seqs: seqs.map((s) => normalizeCostRouteSeq(s as Record<string, unknown>)),
   }
 }
+
+/**
+ * Returns the route-graph sequences (products) sitting at a given route
+ * level, or an empty array if the graph/level isn't available yet. Shared
+ * by the fill-entry flow (FillParamEntryPage, FillParamDrawer) and the fill
+ * tracking cards (FillTaskRow, FillTrackingCompact) so the "products at this
+ * level" filter logic lives in exactly one place.
+ */
+export function getProductsAtLevel(
+  graph: RouteGraph | null | undefined,
+  level: number | undefined,
+): CostRouteSeq[] {
+  if (!graph || level === undefined) return []
+  return graph.seqs.filter((s) => s.routeLevel === level)
+}
