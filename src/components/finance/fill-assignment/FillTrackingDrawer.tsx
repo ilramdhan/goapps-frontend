@@ -1,12 +1,11 @@
 "use client"
 
-import { ListChecks, X } from "lucide-react"
+import { ArrowLeft, ListChecks } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -63,12 +62,10 @@ function DrawerContent({
                 : `${tasks.length} fill task${tasks.length !== 1 ? "s" : ""}`}
           </SheetDescription>
         </div>
-        <SheetClose asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
-        </SheetClose>
+        <Button variant="ghost" size="sm" className="gap-1.5 text-xs shrink-0" onClick={onClose}>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </Button>
       </div>
 
       {/* Scrollable content */}

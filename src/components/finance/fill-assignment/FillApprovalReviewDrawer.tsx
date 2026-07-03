@@ -1,13 +1,12 @@
 "use client"
 
 import { useMemo } from "react"
-import { ArrowLeft, CheckCircle2, Loader2, X } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -61,13 +60,36 @@ function ApprovalReviewProductSection({
 }) {
   const { data: applicable = [], isLoading } = useProductRequiredParams(productSysId)
 
-  const rows = useMemo(() => {
+  // Build rows: intersect visibleParams with applicable, then group+sort by displayGroup/displayOrder
+  const groupedRows = useMemo(() => {
     const byParamId = new Map(applicable.map((p) => [p.paramId, p]))
-    return visibleParams
+    const matched = visibleParams
       .map((vp) => byParamId.get(vp.paramId))
       .filter((p): p is RequiredParamEntry => Boolean(p))
+
+    const groupMinOrder: Record<string, number> = {}
+    const grouped: Record<string, RequiredParamEntry[]> = {}
+    for (const p of matched) {
+      const g = p.displayGroup
+      if (!grouped[g]) {
+        grouped[g] = []
+        groupMinOrder[g] = p.displayOrder
+      } else {
+        groupMinOrder[g] = Math.min(groupMinOrder[g], p.displayOrder)
+      }
+      grouped[g].push(p)
+    }
+    return Object.keys(grouped)
+      .sort((a, b) => {
+        if (!a && !b) return 0
+        if (!a) return 1
+        if (!b) return -1
+        return (groupMinOrder[a] ?? 9999) - (groupMinOrder[b] ?? 9999)
+      })
+      .map((g) => ({ group: g, entries: grouped[g] }))
   }, [applicable, visibleParams])
 
+  const totalRows = groupedRows.reduce((sum, { entries }) => sum + entries.length, 0)
   const title = productCode ?? productName ?? `Product ${productSysId}`
 
   if (isLoading) {
@@ -83,22 +105,31 @@ function ApprovalReviewProductSection({
         )}
       </div>
       <div className="divide-y">
-        {rows.length === 0 ? (
+        {totalRows === 0 ? (
           <p className="px-4 py-3 text-sm text-muted-foreground">
             No summary parameters apply to this product.
           </p>
         ) : (
-          rows.map((p) => (
-            <div key={p.paramId} className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-medium truncate">{p.paramName || p.paramCode}</span>
-                {p.uomCode && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 shrink-0 font-normal">
-                    {p.uomCode}
-                  </Badge>
-                )}
-              </div>
-              <span className="text-sm text-muted-foreground shrink-0">{formatParamValue(p)}</span>
+          groupedRows.map(({ group, entries }) => (
+            <div key={group || "__ungrouped"}>
+              {group && (
+                <div className="px-4 py-2 border-b bg-muted/20">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{group}</p>
+                </div>
+              )}
+              {entries.map((p) => (
+                <div key={p.paramId} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium truncate">{p.paramName || p.paramCode}</span>
+                    {p.uomCode && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 shrink-0 font-normal">
+                        {p.uomCode}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground shrink-0">{formatParamValue(p)}</span>
+                </div>
+              ))}
             </div>
           ))
         )}
@@ -161,12 +192,6 @@ function DrawerContent({
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to request
           </Button>
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </SheetClose>
         </div>
       </div>
 
