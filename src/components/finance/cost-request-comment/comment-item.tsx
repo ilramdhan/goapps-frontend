@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { MentionContent } from "@/components/common/mentionable-textarea"
+import { UserAvatar } from "@/components/common/user-avatar"
 import { UserName } from "@/components/common/user-name"
 import { usePermissionContext } from "@/providers/permission-provider"
 import {
@@ -32,7 +33,6 @@ import {
 import type { CostRequestComment } from "@/types/finance/cost-request-comment"
 
 import { AttachmentList } from "./attachment-list"
-import { UserInitials } from "./comments-panel"
 
 interface Props {
   comment: CostRequestComment
@@ -75,7 +75,12 @@ export function CommentItem({ comment, currentUserId }: Props) {
 
   return (
     <div className={`flex gap-3 ${isAuthor ? "" : "flex-row-reverse"} ${comment.isHidden ? "opacity-60" : ""}`}>
-      <UserInitials userId={comment.authorUserId} className="mt-0.5 shrink-0" />
+      <UserAvatar
+        userId={comment.authorUserId}
+        colorHash
+        className="h-7 w-7 mt-0.5 shrink-0"
+        fallbackClassName="text-xs font-semibold"
+      />
       <div className="min-w-0 max-w-[75%] rounded-md border bg-card p-3 space-y-2">
       <div className={`flex items-center gap-2 text-xs ${isAuthor ? "" : "flex-row-reverse"}`}>
         <span className="font-medium"><UserName userId={comment.authorUserId} compact /></span>

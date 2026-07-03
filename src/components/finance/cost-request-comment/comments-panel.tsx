@@ -9,8 +9,8 @@ import { Loader2, Paperclip, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MentionableTextarea } from "@/components/common/mentionable-textarea"
+import { UserAvatar } from "@/components/common/user-avatar"
 import { useAuth } from "@/providers/auth-provider"
-import { useUser as useIamUser } from "@/hooks/iam/use-users"
 import { useCreateRequestComment, useRequestComments } from "@/hooks/finance/use-cost-request-comment"
 import { useUploadAttachment } from "@/hooks/finance/use-cost-attachment"
 
@@ -20,36 +20,6 @@ interface Props {
   requestId: number
   /** When true the request is terminal: hide the composer (read-only thread). */
   readOnly?: boolean
-}
-
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-orange-100 text-orange-700",
-  "bg-pink-100 text-pink-700",
-  "bg-cyan-100 text-cyan-700",
-]
-
-function avatarColor(userId: string): string {
-  const hash = (userId || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
-}
-
-export function UserInitials({ userId, className = "" }: { userId: string; className?: string }) {
-  const { data: resp } = useIamUser(userId || "")
-  const fullName: string = resp?.data?.detail?.fullName || ""
-  const initials = fullName
-    ? fullName.trim().split(/\s+/).map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
-    : (userId || "?").charAt(0).toUpperCase()
-  return (
-    <div
-      className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold ${avatarColor(userId)} ${className}`}
-      title={fullName || userId}
-    >
-      {initials}
-    </div>
-  )
 }
 
 function wrapRichtext(plain: string): string {
@@ -154,7 +124,12 @@ export function CommentsPanel({ requestId, readOnly = false }: Props) {
           </div>
         ) : (
           <div className="flex gap-3 pt-2 border-t items-start">
-            <UserInitials userId={currentUserId} className="mt-1 shrink-0" />
+            <UserAvatar
+              userId={currentUserId}
+              colorHash
+              className="h-7 w-7 mt-1 shrink-0"
+              fallbackClassName="text-xs font-semibold"
+            />
             <div className="flex-1 space-y-2 min-w-0">
               <MentionableTextarea
                 rows={3}
