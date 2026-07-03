@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Clock, Pencil, X } from "lucide-react"
+import { ArrowLeft, Clock, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { UserName } from "@/components/common/user-name"
 import { OverrideParamsDrawer } from "./override-params-drawer"
@@ -185,12 +185,6 @@ export function ParamDetailDrawer({ open, onClose, requestId, product, canEdit, 
               <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={onClose}>
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </Button>
-              <SheetClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
-                </Button>
-              </SheetClose>
             </div>
           </div>
 
