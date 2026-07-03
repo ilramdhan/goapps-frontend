@@ -154,3 +154,13 @@ export function fillTaskProgress(task: FillTask): number {
   if (task.totalParams === 0) return 0
   return Math.round((task.filledParams / task.totalParams) * 100)
 }
+
+/**
+ * Returns the most recent approval-history entry matching `decision`
+ * (e.g. "APPROVED"), or undefined if none exists. `task.approvals` is
+ * always ordered newest-first by the backend (ListApprovals), so the first
+ * match is the latest one.
+ */
+export function findApproval(task: FillTask, decision: string): FillApproval | undefined {
+  return task.approvals.find((a) => a.decision === decision)
+}

@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 import { type FillTask } from "@/types/finance/fill-assignment";
+import { useRouteGraph } from "@/hooks/finance/use-cost-route";
+import { getProductsAtLevel } from "@/types/finance/cost-route";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge";
 import { FillTaskProgressBar } from "./FillTaskProgressBar";
-import { UserName } from "@/components/common/user-name";
-import { DeptName } from "@/components/common/dept-name";
+import { FillTaskIdentity } from "./FillTaskIdentity";
+import { FillApprovalReviewDrawer } from "./FillApprovalReviewDrawer";
 
 interface FillTaskRowProps {
   task: FillTask;
@@ -20,7 +24,6 @@ interface FillTaskRowProps {
    */
   currentUserDepts?: string[];
   onClaim?: (taskId: number) => void;
-  onApprove?: (taskId: number) => void;
   onReject?: (taskId: number) => void;
 }
 
@@ -30,12 +33,15 @@ export function FillTaskRow({
   isSuperAdmin = false,
   currentUserDepts = [],
   onClaim,
-  onApprove,
   onReject,
 }: FillTaskRowProps) {
   const isActive = task.status === "FILL_TASK_STATUS_ACTIVE";
   const isFilling = task.status === "FILL_TASK_STATUS_FILLING";
   const isApprovalPending = task.status === "FILL_TASK_STATUS_APPROVAL_PENDING";
+  const [approvalDrawerOpen, setApprovalDrawerOpen] = useState(false);
+
+  const { data: graph } = useRouteGraph(task.routeHeadId || undefined);
+  const productsAtLevel = getProductsAtLevel(graph, task.routeLevel);
 
   const isUserFiller =
     task.fillerType === "FILL_ACTOR_TYPE_USER" &&
@@ -65,16 +71,29 @@ export function FillTaskRow({
 
   return (
     <tr className="border-b" data-testid={`fill-task-level-${task.routeLevel}`}>
-      <td className="py-3 px-4 text-sm font-medium">Level {task.routeLevel}</td>
+      <td className="py-3 px-4 text-sm font-medium">
+        <div className="space-y-1">
+          <div>Level {task.routeLevel}</div>
+          {productsAtLevel.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {productsAtLevel.map((s) => (
+                <Badge
+                  key={s.productSysId}
+                  variant="outline"
+                  className="font-mono text-[10px] font-normal"
+                >
+                  {s.productCode || `#${s.productSysId}`}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </td>
       <td className="py-3 px-4">
         <FillTaskStatusBadge status={task.status} />
       </td>
       <td className="py-3 px-4 text-sm text-muted-foreground">
-        {task.fillerType === "FILL_ACTOR_TYPE_USER"
-          ? <UserName userId={task.fillerValue} />
-          : task.fillerType === "FILL_ACTOR_TYPE_DEPT"
-            ? <DeptName deptCode={task.fillerValue} />
-            : task.fillerValue || "—"}
+        <FillTaskIdentity task={task} />
       </td>
       <td className="py-3 px-4 min-w-[160px]">
         <FillTaskProgressBar task={task} />
@@ -102,11 +121,9 @@ export function FillTaskRow({
           )}
           {canApproveReject && (
             <>
-              {onApprove && (
-                <Button size="sm" onClick={() => onApprove(task.taskId)}>
-                  Approve
-                </Button>
-              )}
+              <Button size="sm" onClick={() => setApprovalDrawerOpen(true)}>
+                Approve
+              </Button>
               {onReject && (
                 <Button
                   size="sm"
@@ -120,6 +137,14 @@ export function FillTaskRow({
           )}
         </div>
       </td>
+      {canApproveReject && (
+        <FillApprovalReviewDrawer
+          requestId={task.requestId}
+          taskId={task.taskId}
+          open={approvalDrawerOpen}
+          onOpenChange={setApprovalDrawerOpen}
+        />
+      )}
     </tr>
   );
 }

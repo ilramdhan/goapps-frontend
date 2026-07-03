@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -8,6 +9,8 @@ import {
   type FillTask,
   type LevelAssignmentConfig,
 } from "@/types/finance/fill-assignment";
+import { useParameters } from "@/hooks/finance/use-parameter";
+import type { Parameter } from "@/types/finance/parameter";
 
 // Query keys
 export const fillAssignmentKeys = {
@@ -65,6 +68,26 @@ export function useFillTasks(requestId: number) {
     enabled: requestId > 0,
     staleTime: 30_000,
   });
+}
+
+// Approval-visible parameter subset — for the FillApprovalReviewDrawer (item #4).
+//
+// Reuses the existing ListParameters RPC/BFF route (no dedicated backend endpoint,
+// per the P4-T2 scope decision) with a large pageSize and filters/sorts client-side.
+// Piggybacks on `useParameters`'s own query-key/cache, so toggling a param's
+// visibility in Parameter Master (which invalidates ["finance", "parameter"]) also
+// invalidates this list — no separate cache-invalidation wiring needed.
+export function useApprovalVisibleParams() {
+  const { data, isLoading, isError } = useParameters({ page: 1, pageSize: 100 });
+
+  const params = useMemo(() => {
+    const all: Parameter[] = data?.data ?? [];
+    return all
+      .filter((p) => p.isApprovalVisible)
+      .sort((a, b) => a.approvalDisplayOrder - b.approvalDisplayOrder);
+  }, [data]);
+
+  return { data: params, isLoading, isError };
 }
 
 // --- Config mutations ---
