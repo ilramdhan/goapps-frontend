@@ -168,6 +168,10 @@ export interface Parameter {
   lookupFillGroupCode: string;
   /** Column name in the master entity to read value from (e.g., "mc_speed"). */
   lookupSourceColumn: string;
+  /** Whether this parameter is shown in the approval review drawer summary. */
+  isApprovalVisible: boolean;
+  /** Render order within the approval review drawer summary. */
+  approvalDisplayOrder: number;
 }
 
 /** CreateParameterRequest is the request for creating a new parameter. */
@@ -315,7 +319,15 @@ export interface UpdateParameterRequest {
     | string
     | undefined;
   /** New source column (optional). Set to empty string to clear. */
-  lookupSourceColumn?: string | undefined;
+  lookupSourceColumn?:
+    | string
+    | undefined;
+  /** New is_approval_visible flag (optional). */
+  isApprovalVisible?:
+    | boolean
+    | undefined;
+  /** New approval display order (optional). */
+  approvalDisplayOrder?: number | undefined;
 }
 
 /** UpdateParameterResponse is the response for updating a parameter. */
@@ -475,6 +487,8 @@ function createBaseParameter(): Parameter {
     notes: "",
     lookupFillGroupCode: "",
     lookupSourceColumn: "",
+    isApprovalVisible: false,
+    approvalDisplayOrder: 0,
   };
 }
 
@@ -548,6 +562,12 @@ export const Parameter: MessageFns<Parameter> = {
     }
     if (message.lookupSourceColumn !== "") {
       writer.uint32(258).string(message.lookupSourceColumn);
+    }
+    if (message.isApprovalVisible !== false) {
+      writer.uint32(264).bool(message.isApprovalVisible);
+    }
+    if (message.approvalDisplayOrder !== 0) {
+      writer.uint32(272).int32(message.approvalDisplayOrder);
     }
     return writer;
   },
@@ -743,6 +763,22 @@ export const Parameter: MessageFns<Parameter> = {
           message.lookupSourceColumn = reader.string();
           continue;
         }
+        case 33: {
+          if (tag !== 264) {
+            break;
+          }
+
+          message.isApprovalVisible = reader.bool();
+          continue;
+        }
+        case 34: {
+          if (tag !== 272) {
+            break;
+          }
+
+          message.approvalDisplayOrder = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -861,6 +897,16 @@ export const Parameter: MessageFns<Parameter> = {
         : isSet(object.lookup_source_column)
         ? globalThis.String(object.lookup_source_column)
         : "",
+      isApprovalVisible: isSet(object.isApprovalVisible)
+        ? globalThis.Boolean(object.isApprovalVisible)
+        : isSet(object.is_approval_visible)
+        ? globalThis.Boolean(object.is_approval_visible)
+        : false,
+      approvalDisplayOrder: isSet(object.approvalDisplayOrder)
+        ? globalThis.Number(object.approvalDisplayOrder)
+        : isSet(object.approval_display_order)
+        ? globalThis.Number(object.approval_display_order)
+        : 0,
     };
   },
 
@@ -935,6 +981,12 @@ export const Parameter: MessageFns<Parameter> = {
     if (message.lookupSourceColumn !== "") {
       obj.lookupSourceColumn = message.lookupSourceColumn;
     }
+    if (message.isApprovalVisible !== false) {
+      obj.isApprovalVisible = message.isApprovalVisible;
+    }
+    if (message.approvalDisplayOrder !== 0) {
+      obj.approvalDisplayOrder = Math.round(message.approvalDisplayOrder);
+    }
     return obj;
   },
 
@@ -968,6 +1020,8 @@ export const Parameter: MessageFns<Parameter> = {
     message.notes = object.notes ?? "";
     message.lookupFillGroupCode = object.lookupFillGroupCode ?? "";
     message.lookupSourceColumn = object.lookupSourceColumn ?? "";
+    message.isApprovalVisible = object.isApprovalVisible ?? false;
+    message.approvalDisplayOrder = object.approvalDisplayOrder ?? 0;
     return message;
   },
 };
@@ -1632,6 +1686,8 @@ function createBaseUpdateParameterRequest(): UpdateParameterRequest {
     notes: undefined,
     lookupFillGroupCode: undefined,
     lookupSourceColumn: undefined,
+    isApprovalVisible: undefined,
+    approvalDisplayOrder: undefined,
   };
 }
 
@@ -1693,6 +1749,12 @@ export const UpdateParameterRequest: MessageFns<UpdateParameterRequest> = {
     }
     if (message.lookupSourceColumn !== undefined) {
       writer.uint32(154).string(message.lookupSourceColumn);
+    }
+    if (message.isApprovalVisible !== undefined) {
+      writer.uint32(160).bool(message.isApprovalVisible);
+    }
+    if (message.approvalDisplayOrder !== undefined) {
+      writer.uint32(168).int32(message.approvalDisplayOrder);
     }
     return writer;
   },
@@ -1856,6 +1918,22 @@ export const UpdateParameterRequest: MessageFns<UpdateParameterRequest> = {
           message.lookupSourceColumn = reader.string();
           continue;
         }
+        case 20: {
+          if (tag !== 160) {
+            break;
+          }
+
+          message.isApprovalVisible = reader.bool();
+          continue;
+        }
+        case 21: {
+          if (tag !== 168) {
+            break;
+          }
+
+          message.approvalDisplayOrder = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1958,6 +2036,16 @@ export const UpdateParameterRequest: MessageFns<UpdateParameterRequest> = {
         : isSet(object.lookup_source_column)
         ? globalThis.String(object.lookup_source_column)
         : undefined,
+      isApprovalVisible: isSet(object.isApprovalVisible)
+        ? globalThis.Boolean(object.isApprovalVisible)
+        : isSet(object.is_approval_visible)
+        ? globalThis.Boolean(object.is_approval_visible)
+        : undefined,
+      approvalDisplayOrder: isSet(object.approvalDisplayOrder)
+        ? globalThis.Number(object.approvalDisplayOrder)
+        : isSet(object.approval_display_order)
+        ? globalThis.Number(object.approval_display_order)
+        : undefined,
     };
   },
 
@@ -2020,6 +2108,12 @@ export const UpdateParameterRequest: MessageFns<UpdateParameterRequest> = {
     if (message.lookupSourceColumn !== undefined) {
       obj.lookupSourceColumn = message.lookupSourceColumn;
     }
+    if (message.isApprovalVisible !== undefined) {
+      obj.isApprovalVisible = message.isApprovalVisible;
+    }
+    if (message.approvalDisplayOrder !== undefined) {
+      obj.approvalDisplayOrder = Math.round(message.approvalDisplayOrder);
+    }
     return obj;
   },
 
@@ -2047,6 +2141,8 @@ export const UpdateParameterRequest: MessageFns<UpdateParameterRequest> = {
     message.notes = object.notes ?? undefined;
     message.lookupFillGroupCode = object.lookupFillGroupCode ?? undefined;
     message.lookupSourceColumn = object.lookupSourceColumn ?? undefined;
+    message.isApprovalVisible = object.isApprovalVisible ?? undefined;
+    message.approvalDisplayOrder = object.approvalDisplayOrder ?? undefined;
     return message;
   },
 };

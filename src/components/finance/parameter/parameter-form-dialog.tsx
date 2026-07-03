@@ -69,6 +69,8 @@ interface ParameterFormValues {
   displayOrder: number
   displayGroup: string
   notes: string
+  isApprovalVisible: boolean
+  approvalDisplayOrder: number
 }
 
 const parameterFormSchema = z.object({
@@ -107,6 +109,8 @@ const parameterFormSchema = z.object({
   displayOrder: z.coerce.number().int().gte(0),
   displayGroup: z.string().max(50),
   notes: z.string().max(500),
+  isApprovalVisible: z.boolean(),
+  approvalDisplayOrder: z.coerce.number().int().gte(0),
 })
 
 interface ParameterFormDialogProps {
@@ -159,6 +163,8 @@ export function ParameterFormDialog({
       displayOrder: 0,
       displayGroup: "",
       notes: "",
+      isApprovalVisible: false,
+      approvalDisplayOrder: 0,
     },
   })
 
@@ -185,6 +191,8 @@ export function ParameterFormDialog({
           displayOrder: parameter.displayOrder ?? 0,
           displayGroup: parameter.displayGroup || "",
           notes: parameter.notes || "",
+          isApprovalVisible: parameter.isApprovalVisible ?? false,
+          approvalDisplayOrder: parameter.approvalDisplayOrder ?? 0,
         })
       } else {
         form.reset({
@@ -207,6 +215,8 @@ export function ParameterFormDialog({
           displayOrder: 0,
           displayGroup: "",
           notes: "",
+          isApprovalVisible: false,
+          approvalDisplayOrder: 0,
         })
       }
     }
@@ -237,6 +247,8 @@ export function ParameterFormDialog({
             displayOrder: values.displayOrder,
             displayGroup: values.displayGroup,
             notes: values.notes,
+            isApprovalVisible: values.isApprovalVisible,
+            approvalDisplayOrder: values.approvalDisplayOrder,
           },
         })
       } else {
@@ -274,6 +286,7 @@ export function ParameterFormDialog({
   const { data: lookupMasters = [] } = useLookupMasters(true)
   const watchedCategory = form.watch("paramCategory")
   const watchedFillGroup = form.watch("lookupFillGroupCode")
+  const watchedIsApprovalVisible = form.watch("isApprovalVisible")
 
   // Fetch MASTER_LOOKUP trigger params for the fill-group combobox (child params only)
   const { data: triggerParams } = useQuery({
@@ -782,6 +795,59 @@ export function ParameterFormDialog({
                     </FormItem>
                   )}
                 />
+
+                {isEditing && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="isApprovalVisible"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel>Visible in Approval Summary</FormLabel>
+                            <FormDescription>
+                              Shown to the approver on the read-only review drawer before approving a
+                              fill task.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? false}
+                              onCheckedChange={field.onChange}
+                              disabled={isPending}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {watchedIsApprovalVisible && (
+                      <FormField
+                        control={form.control}
+                        name="approvalDisplayOrder"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Approval Display Order</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                {...field}
+                                value={field.value ?? 0}
+                                onChange={(e) => field.onChange(Number(e.target.value || 0))}
+                                disabled={isPending}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Render order within the approval review drawer.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
