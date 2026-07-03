@@ -148,6 +148,10 @@ export function ClassificationAndFeasibilityDialog({
       await submitFeasibility()
       return
     }
+    if (isInfeasible) {
+      await submitFeasibility()
+      return
+    }
     setPhase("classifying")
     setError(null)
     try {
@@ -167,7 +171,7 @@ export function ClassificationAndFeasibilityDialog({
 
   const canSubmitClassification = classificationLocked || !isOverride || !!overrideReason.trim()
   const canSubmitFeasibility = !isInfeasible || !!note.trim()
-  const canSubmit = canSubmitClassification && canSubmitFeasibility
+  const canSubmit = (isInfeasible || canSubmitClassification) && canSubmitFeasibility
 
   return (
     <Dialog
@@ -186,44 +190,48 @@ export function ClassificationAndFeasibilityDialog({
         </DialogHeader>
 
         <div className="space-y-5">
-          {/* Classification section */}
-          <div className="space-y-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Classification</div>
-            <p className="text-sm text-muted-foreground">
-              Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an override
-              requires a reason.
-            </p>
-            <RadioGroup
-              value={verified}
-              onValueChange={(v) => setVerified(v as ProductClassification)}
-              className="flex gap-6"
-            >
-              <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
-                <RadioGroupItem value="existing" disabled={classificationLocked} />
-                Existing
-              </label>
-              <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
-                <RadioGroupItem value="new" disabled={classificationLocked} />
-                New
-              </label>
-            </RadioGroup>
-            {isOverride && (
-              <div className="space-y-2">
-                <Label>Override reason *</Label>
-                <Textarea
-                  rows={3}
-                  value={overrideReason}
-                  disabled={classificationLocked}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                />
+          {!isInfeasible && (
+            <>
+              {/* Classification section */}
+              <div className="space-y-3">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Classification</div>
+                <p className="text-sm text-muted-foreground">
+                  Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an override
+                  requires a reason.
+                </p>
+                <RadioGroup
+                  value={verified}
+                  onValueChange={(v) => setVerified(v as ProductClassification)}
+                  className="flex gap-6"
+                >
+                  <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
+                    <RadioGroupItem value="existing" disabled={classificationLocked} />
+                    Existing
+                  </label>
+                  <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
+                    <RadioGroupItem value="new" disabled={classificationLocked} />
+                    New
+                  </label>
+                </RadioGroup>
+                {isOverride && (
+                  <div className="space-y-2">
+                    <Label>Override reason *</Label>
+                    <Textarea
+                      rows={3}
+                      value={overrideReason}
+                      disabled={classificationLocked}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                    />
+                  </div>
+                )}
+                {classificationLocked && (
+                  <p className="text-xs text-muted-foreground">Classification saved — read-only.</p>
+                )}
               </div>
-            )}
-            {classificationLocked && (
-              <p className="text-xs text-muted-foreground">Classification saved — read-only.</p>
-            )}
-          </div>
 
-          <Separator />
+              <Separator />
+            </>
+          )}
 
           {/* Feasibility section */}
           <div className="space-y-3">
