@@ -187,11 +187,32 @@ export function RoutingPanel({
               </Button>
             )}
             {!readOnly && canUnlink && (
-              <Button variant="outline" size="sm" onClick={() => unlinkM.mutate({ requestId })}>
-                Unlink
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isLocked || unlinkM.isPending}
+                        onClick={() => unlinkM.mutate({ requestId })}
+                      >
+                        Unlink
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isLocked && (
+                    <TooltipContent>Unlock the route before unlinking.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
+          {!readOnly && canUnlink && isLocked && (
+            <p className="text-xs text-muted-foreground">
+              Unlock the route before unlinking.
+            </p>
+          )}
 
           {/* Lock management — only visible to route managers */}
           {canManageLock && (
