@@ -39,7 +39,6 @@ import {
 } from "./transition-dialogs"
 import {
   useApproveRequest,
-  useCancelRequest,
   useConfirmRequest,
   useMarkParameterComplete,
   useMarkParameterPending,
@@ -67,7 +66,7 @@ interface Props {
   hasFillTracking?: boolean
 }
 
-type DialogKind = "reject" | "cancel" | "reviewDecide" | "close" | "confirmAction" | null
+type DialogKind = "reject" | "reviewDecide" | "close" | "confirmAction" | null
 
 export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, hasFillTracking = false }: Props) {
   useCPRRealtimeSync(request.requestId)
@@ -80,7 +79,6 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
   const reviseM = useReviseRequest()
   const reopenM = useReopenRequest()
   const rejectM = useRejectRequest()
-  const cancelM = useCancelRequest()
   const closeM = useCloseRequest()
   const markPendingM = useMarkParameterPending()
   const markCompleteM = useMarkParameterComplete()
@@ -248,9 +246,6 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
             <div className="flex-1" />
             <Button variant="outline" onClick={() => setDialog("close")}>
               Close
-            </Button>
-            <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDialog("cancel")}>
-              <Ban className="mr-2 h-4 w-4" /> Cancel
             </Button>
           </>
         )}
@@ -471,17 +466,6 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
         pending={rejectM.isPending}
         onConfirm={(reason) => {
           rejectM.mutate({ requestId, body: { reason } }, { onSuccess: () => setDialog(null) })
-        }}
-      />
-      <ReasonDialog
-        open={dialog === "cancel"}
-        onOpenChange={(o) => setDialog(o ? "cancel" : null)}
-        title="Cancel request"
-        description="Cancelling closes the request with sub-status = cancelled. Provide a reason."
-        confirmLabel="Cancel request"
-        pending={cancelM.isPending}
-        onConfirm={(reason) => {
-          cancelM.mutate({ requestId, body: { reason } }, { onSuccess: () => setDialog(null) })
         }}
       />
       <ClassificationAndFeasibilityDialog

@@ -146,9 +146,9 @@ describe("RequestDetailPanel — DRAFT status", () => {
     expect(screen.queryByRole("button", { name: /^submit$/i })).not.toBeInTheDocument()
   })
 
-  it("shows Cancel and Close when owner", () => {
+  it("shows Close when owner", () => {
     renderPanel(baseRequest({ status: "DRAFT" }), ["finance.product.request.create"])
-    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument()
   })
 })
