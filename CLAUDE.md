@@ -502,19 +502,20 @@ Centered dashed-border box. Use whenever a list or section has no data.
 - Resolves UUID → full name via `useUser()` hook (TanStack Query, cached)
 - Never display raw UUIDs to users
 
-### 6.7 UserInitials (avatar)
+### 6.7 UserAvatar (photo or initials)
 
-**File**: `src/components/finance/cost-request-comment/comments-panel.tsx` (exported)
+**File**: `src/components/common/user-avatar.tsx`
 
 ```tsx
-import { UserInitials } from "@/components/finance/cost-request-comment/comments-panel"
+import { UserAvatar } from "@/components/common/user-avatar"
 
-<UserInitials userId={comment.authorUserId} className="mt-0.5 shrink-0" />
+<UserAvatar userId={comment.authorUserId} colorHash className="mt-0.5 shrink-0" />
 ```
 
-- Resolves full name via `useUser()` → derives initials ("Ilham Ramadhan" → "IR")
-- Deterministic color per userId (hash-based from 6-color palette)
+- Resolves full name + `profilePictureUrl` via `useUser()` → renders the real photo (`AvatarImage`) when set, else falls back to initials ("Ilham Ramadhan" → "IR")
+- `colorHash` prop enables the deterministic color-per-userId fallback (hash-based from 6-color palette); omit it to use the plain shadcn muted fallback (used by `nav-user.tsx`/`profile-header.tsx`)
 - Falls back to first char of userId if name not yet resolved
+- Supersedes the former `UserInitials` component (removed 2026-07-03) — same hook, same deterministic-color logic, now also renders a real photo when available
 
 ### 6.8 ScrollableDialog (tall forms)
 
@@ -1147,11 +1148,11 @@ const STATUS_OPTIONS = [
 |----------|---------------------|
 | Display full name | `<UserName userId={id} />` |
 | Display full name (compact, no @username) | `<UserName userId={id} compact />` |
-| Avatar circle with initials | `<UserInitials userId={id} />` |
+| Avatar circle with photo or initials | `<UserAvatar userId={id} colorHash />` |
 | Department / org unit name | `<DeptName deptCode={code} />` |
 
-- `UserName` and `UserInitials` both call `useUser(userId)` internally — TanStack Query caches the result, so the same user appearing 10× in a list triggers only one network request
-- `UserInitials` derives initials from full name word boundaries: "Ilham Ramadhan" → "IR", single word → "I"
+- `UserName` and `UserAvatar` both call `useUser(userId)` internally — TanStack Query caches the result, so the same user appearing 10× in a list triggers only one network request
+- `UserAvatar` derives initials from full name word boundaries: "Ilham Ramadhan" → "IR", single word → "I"; renders the real photo instead when `profilePictureUrl` is set
 - Colors are deterministic per userId (hash mod 6 palette) — same user always gets same color
 
 ---

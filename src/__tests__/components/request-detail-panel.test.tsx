@@ -17,8 +17,6 @@ vi.mock("@/hooks/finance/use-cost-product-request", () => {
     useReviseRequest:          stub,
     useReopenRequest:          stub,
     useUseExistingCosting:     stub,
-    useVerifyClassification:   stub,
-    useDecideFeasibility:      stub,
     useRejectRequest:          stub,
     useCancelRequest:          stub,
     useCloseRequest:           stub,
@@ -70,12 +68,11 @@ vi.mock(
 vi.mock(
   "@/components/finance/cost-product-request/transition-dialogs",
   () => ({
-    CloseDialog:                () => null,
-    ConfirmActionDialog:        () => null,
-    FeasibilityDialog:          () => null,
-    ReasonDialog:               () => null,
-    UseExistingCostingDialog:   () => null,
-    VerifyClassificationDialog: () => null,
+    ClassificationAndFeasibilityDialog: () => null,
+    CloseDialog:                        () => null,
+    ConfirmActionDialog:                () => null,
+    ReasonDialog:                       () => null,
+    UseExistingCostingDialog:           () => null,
   }),
 )
 
@@ -187,30 +184,30 @@ describe("RequestDetailPanel — UNDER_REVIEW status", () => {
     mockHasPermission.mockReset()
   })
 
-  it("shows Decide feasibility when user has resolve permission", () => {
+  it("shows Review & decide when user has resolve permission", () => {
     renderPanel(baseRequest({ status: "UNDER_REVIEW" }), ["finance.product.request.resolve"])
-    expect(screen.getByRole("button", { name: /decide feasibility/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /review & decide/i })).toBeInTheDocument()
   })
 
-  it("hides Decide feasibility when user lacks resolve permission", () => {
+  it("hides Review & decide when user lacks resolve permission", () => {
     renderPanel(baseRequest({ status: "UNDER_REVIEW" }), [])
-    expect(screen.queryByRole("button", { name: /decide feasibility/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /review & decide/i })).not.toBeInTheDocument()
   })
 
-  it("shows Use existing costing when verifiedClassification is existing", () => {
+  it("hides Use existing costing even when verifiedClassification is existing (item #1: hidden from UI)", () => {
     renderPanel(
       baseRequest({ status: "UNDER_REVIEW", verifiedClassification: "existing" }),
       ["finance.product.request.resolve"],
     )
-    expect(screen.getByRole("button", { name: /use existing costing/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /use existing costing/i })).not.toBeInTheDocument()
   })
 
-  it("shows Use existing costing when productClassification is existing and verifiedClassification is unset", () => {
+  it("hides Use existing costing even when productClassification is existing and verifiedClassification is unset", () => {
     renderPanel(
       baseRequest({ status: "UNDER_REVIEW", productClassification: "existing", verifiedClassification: undefined }),
       ["finance.product.request.resolve"],
     )
-    expect(screen.getByRole("button", { name: /use existing costing/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /use existing costing/i })).not.toBeInTheDocument()
   })
 
   it("hides Use existing costing when classification is new", () => {
