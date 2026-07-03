@@ -409,6 +409,8 @@ export interface ParamValueEntry {
   valueFlag: boolean;
   uomCode: string;
   isRequired: boolean;
+  displayGroup: string;
+  displayOrder: number;
 }
 
 /** FillLevelSummary groups params for one fill task level of a product. */
@@ -6198,6 +6200,8 @@ function createBaseParamValueEntry(): ParamValueEntry {
     valueFlag: false,
     uomCode: "",
     isRequired: false,
+    displayGroup: "",
+    displayOrder: 0,
   };
 }
 
@@ -6232,6 +6236,12 @@ export const ParamValueEntry: MessageFns<ParamValueEntry> = {
     }
     if (message.isRequired !== false) {
       writer.uint32(80).bool(message.isRequired);
+    }
+    if (message.displayGroup !== "") {
+      writer.uint32(90).string(message.displayGroup);
+    }
+    if (message.displayOrder !== 0) {
+      writer.uint32(96).int32(message.displayOrder);
     }
     return writer;
   },
@@ -6323,6 +6333,22 @@ export const ParamValueEntry: MessageFns<ParamValueEntry> = {
           message.isRequired = reader.bool();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.displayGroup = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.displayOrder = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6384,6 +6410,16 @@ export const ParamValueEntry: MessageFns<ParamValueEntry> = {
         : isSet(object.is_required)
         ? globalThis.Boolean(object.is_required)
         : false,
+      displayGroup: isSet(object.displayGroup)
+        ? globalThis.String(object.displayGroup)
+        : isSet(object.display_group)
+        ? globalThis.String(object.display_group)
+        : "",
+      displayOrder: isSet(object.displayOrder)
+        ? globalThis.Number(object.displayOrder)
+        : isSet(object.display_order)
+        ? globalThis.Number(object.display_order)
+        : 0,
     };
   },
 
@@ -6419,6 +6455,12 @@ export const ParamValueEntry: MessageFns<ParamValueEntry> = {
     if (message.isRequired !== false) {
       obj.isRequired = message.isRequired;
     }
+    if (message.displayGroup !== "") {
+      obj.displayGroup = message.displayGroup;
+    }
+    if (message.displayOrder !== 0) {
+      obj.displayOrder = Math.round(message.displayOrder);
+    }
     return obj;
   },
 
@@ -6437,6 +6479,8 @@ export const ParamValueEntry: MessageFns<ParamValueEntry> = {
     message.valueFlag = object.valueFlag ?? false;
     message.uomCode = object.uomCode ?? "";
     message.isRequired = object.isRequired ?? false;
+    message.displayGroup = object.displayGroup ?? "";
+    message.displayOrder = object.displayOrder ?? 0;
     return message;
   },
 };

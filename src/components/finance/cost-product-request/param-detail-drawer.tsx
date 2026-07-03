@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { ArrowLeft, Clock, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
@@ -27,6 +27,73 @@ interface Props {
   product: ProductParamSummary
   canEdit: boolean
   routeLocked: boolean
+}
+
+function ParamGroupedList({ params }: { params: ParamValueEntry[] }) {
+  const groups = useMemo(() => {
+    const groupMinOrder: Record<string, number> = {}
+    for (const p of params) {
+      const g = p.displayGroup ?? ""
+      const cur = groupMinOrder[g]
+      if (cur === undefined || p.displayOrder < cur) {
+        groupMinOrder[g] = p.displayOrder
+      }
+    }
+    const sorted = Object.keys(groupMinOrder).sort((a, b) => {
+      if (a === "" && b !== "") return 1
+      if (b === "" && a !== "") return -1
+      return (groupMinOrder[a] ?? 0) - (groupMinOrder[b] ?? 0)
+    })
+    return sorted.map((g) => ({
+      name: g,
+      params: params
+        .filter((p) => (p.displayGroup ?? "") === g)
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.paramCode.localeCompare(b.paramCode)),
+    }))
+  }, [params])
+
+  return (
+    <div className="space-y-3">
+      {groups.map((group, i) => (
+        <div key={group.name || "__ungrouped__"}>
+          {group.name && (
+            <div className={`flex items-center gap-2 mb-1 ${i > 0 ? "mt-1" : ""}`}>
+              <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-wider shrink-0">
+                {group.name}
+              </span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          )}
+          <div className="space-y-0.5">
+            {group.params.map((p) => (
+              <div key={p.paramCode} className="flex items-baseline gap-2">
+                <span
+                  className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground"
+                  title={p.paramCode}
+                >
+                  {p.paramCode}
+                </span>
+                {p.hasValue ? (
+                  <span className="font-mono text-[11px]">
+                    {p.dataType === "NUMBER"
+                      ? p.valueNumeric
+                      : p.dataType === "BOOLEAN"
+                        ? p.valueFlag
+                          ? "true"
+                          : "false"
+                        : p.valueText}
+                    {p.uomCode ? ` ${p.uomCode}` : ""}
+                  </span>
+                ) : (
+                  <span className="font-medium text-destructive text-[11px]">——</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function taskBadge(status: string) {
@@ -106,32 +173,7 @@ function LevelSection({
         </div>
       </div>
 
-      <div className="space-y-0.5">
-        {level.params.map((p) => (
-          <div key={p.paramCode} className="flex items-baseline gap-2">
-            <span
-              className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground"
-              title={p.paramCode}
-            >
-              {p.paramCode}
-            </span>
-            {p.hasValue ? (
-              <span className="font-mono text-[11px]">
-                {p.dataType === "NUMBER"
-                  ? p.valueNumeric
-                  : p.dataType === "BOOLEAN"
-                    ? p.valueFlag
-                      ? "true"
-                      : "false"
-                    : p.valueText}
-                {p.uomCode ? ` ${p.uomCode}` : ""}
-              </span>
-            ) : (
-              <span className="font-medium text-destructive text-[11px]">——</span>
-            )}
-          </div>
-        ))}
-      </div>
+      <ParamGroupedList params={level.params} />
 
       {level.filledByUserId && (
         <p className="text-[10px] text-muted-foreground">
