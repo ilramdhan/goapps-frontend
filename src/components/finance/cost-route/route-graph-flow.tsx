@@ -88,8 +88,10 @@ type RmNodeData = {
 const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
   return (
     <div
-      className={`rounded-md border bg-card px-3 py-2 shadow-sm ${
-        data.isFG ? "border-emerald-400 bg-emerald-50" : "border-blue-300"
+      className={`rounded-md border px-3 py-2 shadow-sm text-card-foreground ${
+        data.isFG
+          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-700"
+          : "border-blue-400 bg-card dark:border-blue-700"
       }`}
       style={{ minWidth: 180 }}
     >
@@ -98,7 +100,7 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
         L{data.level} · seq {data.seq}
         {data.isFG ? " · FG" : ""}
       </div>
-      <div className="text-sm font-medium">
+      <div className="text-sm font-medium text-foreground">
         {data.productCode || "(no code)"}
       </div>
       {data.productName ? (
@@ -112,8 +114,10 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
 const RmNode = ({ data }: NodeProps<Node<RmNodeData>>) => {
   return (
     <div
-      className={`rounded-md border bg-background px-2 py-1 text-xs shadow-sm ${
-        data.kind === "GROUP" ? "border-purple-300 bg-purple-50" : "border-amber-300 bg-amber-50"
+      className={`rounded-md border px-2 py-1 text-xs shadow-sm text-foreground ${
+        data.kind === "GROUP"
+          ? "border-purple-400 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-700"
+          : "border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700"
       }`}
       style={{ minWidth: 130, maxWidth: 200 }}
     >
@@ -121,7 +125,7 @@ const RmNode = ({ data }: NodeProps<Node<RmNodeData>>) => {
         <Badge variant="outline" className="px-1 py-0 text-[9px]">
           {data.kind}
         </Badge>
-        <span className="truncate font-mono">{data.label}</span>
+        <span className="truncate font-mono text-foreground">{data.label}</span>
       </div>
       <Handle type="source" position={Position.Right} />
     </div>

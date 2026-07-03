@@ -15,7 +15,9 @@ import { isValidProductRmEdge } from "@/components/finance/cost-route/dag-rules"
 import {
   ArrowLeft,
   CheckCircle2,
+  GitFork,
   Loader2,
+  Lock,
   Plus,
   Save,
   Trash2,
@@ -29,6 +31,7 @@ import { DuplicateRouteDialog } from "@/components/finance/cost-route/duplicate-
 import { LinkedRequestsPopover } from "@/components/finance/cost-route/linked-requests-popover"
 import { RouteGraphEditPanel } from "@/components/finance/cost-route/route-graph-edit-panel"
 import { RouteGraphFlow } from "@/components/finance/cost-route/route-graph-flow"
+import { StatusBadge } from "@/components/common/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -40,7 +43,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/shared"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -84,6 +88,7 @@ export function RouteGraphEditor({ headId }: Props) {
   >({ open: false })
   const [forkOpen, setForkOpen] = useState(false)
   const [rmDialog, setRmDialog] = useState<{ seqIdx: number } | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [view, setView] = useState<"visual" | "cards">("visual")
   // Inline edit-panel selection — only one of these is set at a time.
   const [selectedSeqId, setSelectedSeqId] = useState<number | null>(null)
@@ -190,8 +195,7 @@ export function RouteGraphEditor({ headId }: Props) {
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
       if (!base) return prev
-      base.seqs = base.seqs.filter((_, i) => i !== seqIdx)
-      return { ...base, seqs: [...base.seqs] }
+      return { ...base, seqs: base.seqs.filter((_, i) => i !== seqIdx) }
     })
     setDirty(true)
   }
@@ -224,10 +228,12 @@ export function RouteGraphEditor({ headId }: Props) {
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
       if (!base) return prev
-      const seq = base.seqs[seqIdx]
-      if (!seq) return base
-      seq.rms = seq.rms.filter((_, i) => i !== rmIdx)
-      return { ...base, seqs: [...base.seqs] }
+      const updatedSeqs = base.seqs.map((seq, i) =>
+        i === seqIdx
+          ? { ...seq, rms: seq.rms.filter((_, j) => j !== rmIdx) }
+          : seq,
+      )
+      return { ...base, seqs: updatedSeqs }
     })
     setDirty(true)
   }
@@ -288,13 +294,20 @@ export function RouteGraphEditor({ headId }: Props) {
   // scroll to the right card.
   const stageCardRefs = useRef<Map<number, HTMLDivElement | null>>(new Map())
   const handleStageClick = useCallback((seqId: number) => {
+    if (seqId === 0) {
+      toast.info("Save the route first to edit this element.")
+      return
+    }
     setSelectedRmId(null)
     setSelectedSeqId(seqId)
   }, [])
 
   // Click edge → open inline edit panel for that RM.
   const handleEdgeClick = useCallback((rmId: number) => {
-    if (rmId === 0) return // unsaved RM — wait until save
+    if (rmId === 0) {
+      toast.info("Save the route first to edit this element.")
+      return
+    }
     setSelectedSeqId(null)
     setSelectedRmId(rmId)
   }, [])
@@ -371,19 +384,22 @@ export function RouteGraphEditor({ headId }: Props) {
             {head?.productName ? <span className="ml-2 text-base font-normal text-muted-foreground">{head.productName}</span> : null}
           </h1>
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge>{head?.routingStatus}</Badge>
+            <StatusBadge status={head?.routingStatus} type="route" size="sm" />
             <span>version v{head?.version}</span>
             {head?.promotedFromDraftId ? <span>· promoted from a routing draft</span> : null}
           </div>
           {!locked && (
-            <div className="mt-2">
+            <details className="mt-2">
+              <summary className="cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground transition-colors">
+                {head?.notes ? "Edit notes" : "Add notes (optional)"}
+              </summary>
               <Textarea
                 placeholder="Routing notes (optional)…"
-                className="h-14 resize-none text-xs"
+                className="mt-1.5 h-14 resize-none text-xs"
                 value={head?.notes ?? ""}
                 onChange={(e) => setHeadNotes(e.target.value)}
               />
-            </div>
+            </details>
           )}
           {locked && head?.notes && (
             <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">{head.notes}</p>
@@ -398,7 +414,7 @@ export function RouteGraphEditor({ headId }: Props) {
             disabledReason="Mark route COMPLETE before calculating"
           />
           <Button variant="outline" size="sm" onClick={() => setForkOpen(true)}>
-            🔱 Fork
+            <GitFork className="mr-1 h-4 w-4" /> Fork
           </Button>
           {!locked && (
             <Button onClick={() => setStageDialogState({ open: true })} variant="outline">
@@ -417,13 +433,9 @@ export function RouteGraphEditor({ headId }: Props) {
           )}
           {!locked && (
             <Button
-              onClick={() => {
-                if (confirm("Delete this route head? Cannot be undone via UI.")) {
-                  deleteM.mutate({ headId })
-                }
-              }}
+              onClick={() => setDeleteConfirmOpen(true)}
               variant="ghost"
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="mr-1 h-4 w-4" /> Delete
             </Button>
@@ -432,8 +444,9 @@ export function RouteGraphEditor({ headId }: Props) {
       </div>
 
       {locked && (
-        <div className="absolute inset-x-0 top-0 z-10 rounded-t-md bg-amber-100 border-b border-amber-200 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300">
-          🔒 Route is LOCKED — editing disabled. Manage lock from the product request detail page.
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+          <Lock className="h-4 w-4 shrink-0" />
+          Route is <strong>LOCKED</strong> — editing disabled. Manage lock from the product request detail page.
         </div>
       )}
 
@@ -573,14 +586,22 @@ export function RouteGraphEditor({ headId }: Props) {
                           key={`${rm.rmId}-${rmIdx}`}
                           className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1 text-xs"
                         >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <Badge variant="outline" className="text-[10px]">
+                          <div className="flex min-w-0 items-center gap-2 flex-1">
+                            <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-medium border ${
+                              rm.rmType === "GROUP"
+                                ? "border-purple-400 text-purple-700 dark:text-purple-300"
+                                : rm.rmType === "PRODUCT"
+                                ? "border-emerald-400 text-emerald-700 dark:text-emerald-300"
+                                : "border-amber-400 text-amber-700 dark:text-amber-300"
+                            }`}>
                               {rm.rmType}
-                            </Badge>
-                            <span className="truncate font-mono">
-                              {rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || `product`}
                             </span>
-                            <span className="shrink-0 text-muted-foreground">×{rm.routeRmRatio}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-mono">
+                                {rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || "—"}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">×{rm.routeRmRatio}</div>
+                            </div>
                           </div>
                           {!locked && (
                             <Button
@@ -673,6 +694,20 @@ export function RouteGraphEditor({ headId }: Props) {
         onClose={() => setForkOpen(false)}
         sourceHeadId={headId}
         sourceProductCode={head?.productCode}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this route?"
+        description="This route head and all its stages will be permanently deleted. This cannot be undone."
+        variant="destructive"
+        confirmText="Delete"
+        isLoading={deleteM.isPending}
+        onConfirm={() => {
+          deleteM.mutate({ headId })
+          setDeleteConfirmOpen(false)
+        }}
       />
 
       {rmDialog && (
