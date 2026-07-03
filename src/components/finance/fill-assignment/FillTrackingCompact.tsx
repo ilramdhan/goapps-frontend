@@ -119,13 +119,19 @@ export function FillTrackingCompact({ requestId }: Props) {
                     {productsAtLevel.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {productsAtLevel.map((s) => (
-                          <Badge
-                            key={s.productSysId}
-                            variant="outline"
-                            className="font-mono text-[10px] font-normal"
-                          >
-                            {s.productCode || `#${s.productSysId}`}
-                          </Badge>
+                          <div key={s.productSysId} className="flex flex-col min-w-0">
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px] font-normal"
+                            >
+                              {s.productCode || `#${s.productSysId}`}
+                            </Badge>
+                            {s.productName && (
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[140px] mt-0.5 px-0.5">
+                                {s.productName}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
