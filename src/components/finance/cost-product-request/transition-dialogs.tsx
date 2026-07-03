@@ -3,6 +3,7 @@
 // transition-dialogs — small per-transition modal helpers (reason / decision / substatus inputs).
 import { useMemo, useState } from "react"
 import { Check, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -13,7 +14,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Separator } from "@/components/ui/separator"
 import { useCostProductMaster, useCostProductMasters } from "@/hooks/finance/use-cost-product-master"
+import { useDecideFeasibility, useVerifyClassification } from "@/hooks/finance/use-cost-product-request"
 import { cn } from "@/lib/utils"
 import type { ClosedSubstatus, ProductClassification } from "@/types/finance/cost-product-request"
 
@@ -61,140 +64,213 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
   )
 }
 
-// ----- VerifyClassificationDialog -------------------------------------------------------
-interface VerifyProps {
+// ----- ClassificationAndFeasibilityDialog -------------------------------------------------
+// Merges the former VerifyClassificationDialog + FeasibilityDialog into a single screen
+// (item #2, 2026-07-03 CPR UX batch). Submits sequentially — classification first, then
+// feasibility — reusing the two existing mutations/RPCs unchanged. See design.md §2.
+//
+// Local state machine: "idle" (both sections editable) -> "classifying" (step 1 in flight)
+// -> "classified" (step 1 saved; either about to auto-run step 2, or step 2 failed and the
+// user is retrying just feasibility, with classification now read-only) -> "deciding" (step 2
+// in flight) -> "done" (both succeeded, dialog closes). `error` carries the latest inline
+// message; it is distinct from the toasts the underlying hooks already fire on their own
+// success/failure.
+type ReviewPhase = "idle" | "classifying" | "classified" | "deciding" | "done"
+
+interface ClassificationAndFeasibilityProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  requestId: number
+  /** productClassification — the system/marketing-predicted value. */
   currentClassification: ProductClassification
-  pending?: boolean
-  onConfirm: (verified: ProductClassification, overrideReason: string) => void
+  /** request.verifiedClassification, if already set — used to pre-fill instead of the prediction. */
+  initialVerifiedClassification?: ProductClassification
 }
 
-export function VerifyClassificationDialog({ open, onOpenChange, currentClassification, pending, onConfirm }: VerifyProps) {
-  const [verified, setVerified] = useState<ProductClassification>(currentClassification)
-  const [overrideReason, setOverrideReason] = useState("")
-  const isOverride = verified !== currentClassification
+export function ClassificationAndFeasibilityDialog({
+  open,
+  onOpenChange,
+  requestId,
+  currentClassification,
+  initialVerifiedClassification,
+}: ClassificationAndFeasibilityProps) {
+  const verifyM = useVerifyClassification()
+  const feasibilityM = useDecideFeasibility()
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o)
-        if (!o) {
-          setVerified(currentClassification)
-          setOverrideReason("")
-        }
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Verify classification</DialogTitle>
-          <DialogDescription>
-            Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an override
-            requires a reason.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <RadioGroup
-            value={verified}
-            onValueChange={(v) => setVerified(v as ProductClassification)}
-            className="flex gap-6"
-          >
-            <label className="flex items-center gap-2 cursor-pointer">
-              <RadioGroupItem value="existing" />
-              Existing
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <RadioGroupItem value="new" />
-              New
-            </label>
-          </RadioGroup>
-          {isOverride && (
-            <div className="space-y-2">
-              <Label>Override reason *</Label>
-              <Textarea rows={3} value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} />
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={(isOverride && !overrideReason.trim()) || pending}
-            onClick={() => onConfirm(verified, isOverride ? overrideReason.trim() : "")}
-          >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirm
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+  const [phase, setPhase] = useState<ReviewPhase>("idle")
+  const [error, setError] = useState<string | null>(null)
+
+  const [verified, setVerified] = useState<ProductClassification>(
+    initialVerifiedClassification ?? currentClassification,
   )
-}
-
-// ----- FeasibilityDialog -----------------------------------------------------------------
-interface FeasibilityProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  pending?: boolean
-  onConfirm: (decision: "FEASIBLE" | "NOT_FEASIBLE", note: string) => void
-}
-
-export function FeasibilityDialog({ open, onOpenChange, pending, onConfirm }: FeasibilityProps) {
+  const [overrideReason, setOverrideReason] = useState("")
   const [decision, setDecision] = useState<"FEASIBLE" | "NOT_FEASIBLE">("FEASIBLE")
   const [note, setNote] = useState("")
+
+  const isOverride = verified !== currentClassification
   const isInfeasible = decision === "NOT_FEASIBLE"
+  // Once classification has been saved (either mid-flow or after a step-2 failure we're
+  // retrying), lock the classification section so a retry never re-submits it.
+  const classificationLocked = phase === "classified" || phase === "deciding"
+  const pending = verifyM.isPending || feasibilityM.isPending
+
+  function resetAll() {
+    setPhase("idle")
+    setError(null)
+    setVerified(initialVerifiedClassification ?? currentClassification)
+    setOverrideReason("")
+    setDecision("FEASIBLE")
+    setNote("")
+  }
+
+  async function submitFeasibility() {
+    setPhase("deciding")
+    try {
+      await feasibilityM.mutateAsync({
+        requestId,
+        decision,
+        note: isInfeasible ? note.trim() : "",
+      })
+      setPhase("done")
+      setError(null)
+      toast.success("Classification & feasibility recorded")
+      onOpenChange(false)
+    } catch {
+      // Classification already saved — only feasibility needs a retry.
+      setPhase("classified")
+      setError("Classification saved. Feasibility decision failed — please retry.")
+    }
+  }
+
+  async function handleSubmit() {
+    if (classificationLocked) {
+      // Retry path after a step-2 failure: classification is already saved.
+      await submitFeasibility()
+      return
+    }
+    setPhase("classifying")
+    setError(null)
+    try {
+      await verifyM.mutateAsync({
+        requestId,
+        verifiedClassification: verified,
+        overrideReason: isOverride ? overrideReason.trim() : "",
+      })
+    } catch {
+      setPhase("idle")
+      setError("Failed to save classification — please check the details and try again.")
+      return
+    }
+    setPhase("classified")
+    await submitFeasibility()
+  }
+
+  const canSubmitClassification = classificationLocked || !isOverride || !!overrideReason.trim()
+  const canSubmitFeasibility = !isInfeasible || !!note.trim()
+  const canSubmit = canSubmitClassification && canSubmitFeasibility
 
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o)
-        if (!o) {
-          setDecision("FEASIBLE")
-          setNote("")
-        }
+        if (!o) resetAll()
       }}
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Decide feasibility</DialogTitle>
+          <DialogTitle>Review &amp; decide</DialogTitle>
           <DialogDescription>
-            FEASIBLE moves the request to ROUTING_DEFINED. NOT_FEASIBLE sends it to REJECTED — note is required.
+            Confirm the product classification and decide feasibility for this request.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <RadioGroup
-            value={decision}
-            onValueChange={(v) => setDecision(v as "FEASIBLE" | "NOT_FEASIBLE")}
-            className="flex gap-6"
-          >
-            <label className="flex items-center gap-2 cursor-pointer">
-              <RadioGroupItem value="FEASIBLE" />
-              Feasible
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <RadioGroupItem value="NOT_FEASIBLE" />
-              Not feasible
-            </label>
-          </RadioGroup>
-          <div className="space-y-2">
-            <Label>Note {isInfeasible ? "*" : "(optional)"}</Label>
-            <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+
+        <div className="space-y-5">
+          {/* Classification section */}
+          <div className="space-y-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Classification</div>
+            <p className="text-sm text-muted-foreground">
+              Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an override
+              requires a reason.
+            </p>
+            <RadioGroup
+              value={verified}
+              onValueChange={(v) => setVerified(v as ProductClassification)}
+              className="flex gap-6"
+            >
+              <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
+                <RadioGroupItem value="existing" disabled={classificationLocked} />
+                Existing
+              </label>
+              <label className={cn("flex items-center gap-2", classificationLocked ? "opacity-60" : "cursor-pointer")}>
+                <RadioGroupItem value="new" disabled={classificationLocked} />
+                New
+              </label>
+            </RadioGroup>
+            {isOverride && (
+              <div className="space-y-2">
+                <Label>Override reason *</Label>
+                <Textarea
+                  rows={3}
+                  value={overrideReason}
+                  disabled={classificationLocked}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                />
+              </div>
+            )}
+            {classificationLocked && (
+              <p className="text-xs text-muted-foreground">Classification saved — read-only.</p>
+            )}
           </div>
+
+          <Separator />
+
+          {/* Feasibility section */}
+          <div className="space-y-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Feasibility</div>
+            <p className="text-sm text-muted-foreground">
+              FEASIBLE moves the request to ROUTING_DEFINED. NOT_FEASIBLE sends it to REJECTED — note is required.
+            </p>
+            <RadioGroup
+              value={decision}
+              onValueChange={(v) => setDecision(v as "FEASIBLE" | "NOT_FEASIBLE")}
+              className="flex gap-6"
+            >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="FEASIBLE" />
+                Feasible
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="NOT_FEASIBLE" />
+                Not feasible
+              </label>
+            </RadioGroup>
+            <div className="space-y-2">
+              <Label>Note {isInfeasible ? "*" : "(optional)"}</Label>
+              <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
           <Button
             variant={isInfeasible ? "destructive" : "default"}
-            disabled={(isInfeasible && !note.trim()) || pending}
-            onClick={() => onConfirm(decision, note.trim())}
+            disabled={!canSubmit || pending}
+            onClick={() => {
+              handleSubmit().catch(() => {
+                // Both mutateAsync calls already have their own try/catch above; this guards
+                // against any unexpected rejection so the promise is never left unhandled.
+                setError("Something went wrong — please try again.")
+              })
+            }}
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isInfeasible ? "Reject as infeasible" : "Approve"}
+            {classificationLocked ? "Retry feasibility" : isInfeasible ? "Reject as infeasible" : "Save & continue"}
           </Button>
         </DialogFooter>
       </DialogContent>
