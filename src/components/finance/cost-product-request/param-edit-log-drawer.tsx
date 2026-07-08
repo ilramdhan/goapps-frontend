@@ -1,8 +1,8 @@
 "use client"
 
-import { ArrowLeft, X } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useParamEditLog } from "@/hooks/finance/use-param-summary"
 
@@ -53,12 +53,6 @@ export function ParamEditLogDrawer({ open, onClose, requestId, routeLevel, produ
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={onClose}>
               <ArrowLeft className="h-3.5 w-3.5" /> Back
             </Button>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </Button>
-            </SheetClose>
           </div>
         </div>
 

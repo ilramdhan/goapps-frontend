@@ -8,8 +8,10 @@ type SpecBody = {
   rawMaterialType?: string
   productDescription?: string
   shadeId?: number | string
-  shadeCustomText?: string
+  shadeCode?: string
+  shadeName?: string
   paperTubeTypeId?: number | string
+  tubeType?: number
   weightPerBobbinKg?: string
   boxType?: string
 }
@@ -20,8 +22,10 @@ function normalizeSpec(spec: SpecBody | undefined | null) {
     rawMaterialType: spec.rawMaterialType ?? "",
     productDescription: spec.productDescription ?? "",
     shadeId: Number(spec.shadeId ?? 0) || 0,
-    shadeCustomText: spec.shadeCustomText ?? "",
+    shadeCode: spec.shadeCode ?? "",
+    shadeName: spec.shadeName ?? "",
     paperTubeTypeId: Number(spec.paperTubeTypeId ?? 0) || 0,
+    tubeType: Number(spec.tubeType ?? 0) || 0,
     weightPerBobbinKg: spec.weightPerBobbinKg ?? "",
     boxType: spec.boxType ?? "",
   }
@@ -73,6 +77,7 @@ export async function POST(request: NextRequest) {
         urgencyLevel: body.urgencyLevel ?? body.urgency_level ?? "",
         neededByDate: body.neededByDate ?? body.needed_by_date ?? "",
         spec: normalizeSpec(body.spec),
+        referenceProductSysId: Number(body.referenceProductSysId ?? body.reference_product_sys_id ?? 0) || 0,
       },
       metadata,
     )

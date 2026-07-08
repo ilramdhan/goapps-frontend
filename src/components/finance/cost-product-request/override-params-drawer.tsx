@@ -1,13 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Loader2, X } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -118,12 +117,6 @@ export function OverrideParamsDrawer({
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={onClose}>
               <ArrowLeft className="h-3.5 w-3.5" /> Back
             </Button>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </Button>
-            </SheetClose>
           </div>
         </div>
 

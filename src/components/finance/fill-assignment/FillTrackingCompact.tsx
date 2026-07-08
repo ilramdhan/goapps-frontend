@@ -6,17 +6,19 @@ import { AlertTriangle } from "lucide-react";
 import {
   useFillTasks,
   useClaimFillTask,
-  useApproveFillTask,
   useRejectFillTask,
 } from "@/hooks/finance/use-fill-assignment";
 import { useUser } from "@/providers/auth-provider";
-import { UserName } from "@/components/common/user-name";
-import { DeptName } from "@/components/common/dept-name";
+import { useRouteGraph } from "@/hooks/finance/use-cost-route";
+import { getProductsAtLevel } from "@/types/finance/cost-route";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge";
 import { FillTaskProgressBar } from "./FillTaskProgressBar";
+import { FillTaskIdentity } from "./FillTaskIdentity";
 import { FillParamDrawer } from "./FillParamDrawer";
+import { FillApprovalReviewDrawer } from "./FillApprovalReviewDrawer";
 
 interface Props {
   requestId: number;
@@ -25,6 +27,7 @@ interface Props {
 export function FillTrackingCompact({ requestId }: Props) {
   const user = useUser();
   const [drawerTaskId, setDrawerTaskId] = useState<number | null>(null);
+  const [approvalDrawerTaskId, setApprovalDrawerTaskId] = useState<number | null>(null);
   const currentUserId = user?.userId ?? "";
   const isSuperAdmin = user?.roles?.includes("SUPER_ADMIN") ?? false;
   const currentUserDepts: string[] = [user?.departmentCode, user?.sectionCode].filter(
@@ -33,8 +36,11 @@ export function FillTrackingCompact({ requestId }: Props) {
 
   const { data: tasks = [], isLoading } = useFillTasks(requestId);
   const claim = useClaimFillTask(requestId);
-  const approve = useApproveFillTask(requestId);
   const reject = useRejectFillTask(requestId);
+
+  // All fill tasks for a request share the same route head (generated in one
+  // batch), so a single graph fetch covers every task's "products at level".
+  const { data: graph } = useRouteGraph(tasks[0]?.routeHeadId || undefined);
 
   if (!isLoading && tasks.length === 0) return null;
 
@@ -95,6 +101,7 @@ export function FillTrackingCompact({ requestId }: Props) {
                   isApprovalPending && (isSuperAdmin || isUserApprover || isDeptApprover);
 
                 const hasActions = canClaim || canSubmit || canApproveReject;
+                const productsAtLevel = getProductsAtLevel(graph, task.routeLevel);
 
                 return (
                   <li
@@ -108,15 +115,30 @@ export function FillTrackingCompact({ requestId }: Props) {
                       <FillTaskStatusBadge status={task.status} />
                     </div>
 
-                    {/* Filler */}
+                    {/* Products at this level */}
+                    {productsAtLevel.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {productsAtLevel.map((s) => (
+                          <div key={s.productSysId} className="flex flex-col min-w-0">
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px] font-normal"
+                            >
+                              {s.productCode || `#${s.productSysId}`}
+                            </Badge>
+                            {s.productName && (
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[140px] mt-0.5 px-0.5">
+                                {s.productName}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Filler / approver identity */}
                     <div className="text-xs text-muted-foreground">
-                      {task.fillerType === "FILL_ACTOR_TYPE_USER" ? (
-                        <UserName userId={task.fillerValue} />
-                      ) : task.fillerType === "FILL_ACTOR_TYPE_DEPT" ? (
-                        <DeptName deptCode={task.fillerValue} />
-                      ) : (
-                        task.fillerValue || "—"
-                      )}
+                      <FillTaskIdentity task={task} />
                       <span className="ml-2 opacity-60">{task.slaFillHours}h SLA</span>
                     </div>
 
@@ -150,7 +172,7 @@ export function FillTrackingCompact({ requestId }: Props) {
                             <Button
                               size="sm"
                               className="h-7 text-xs"
-                              onClick={() => approve.mutate({ taskId: task.taskId })}
+                              onClick={() => setApprovalDrawerTaskId(task.taskId)}
                             >
                               Approve
                             </Button>
@@ -178,6 +200,12 @@ export function FillTrackingCompact({ requestId }: Props) {
         taskId={drawerTaskId}
         open={drawerTaskId !== null}
         onOpenChange={(o) => { if (!o) setDrawerTaskId(null) }}
+      />
+      <FillApprovalReviewDrawer
+        requestId={requestId}
+        taskId={approvalDrawerTaskId}
+        open={approvalDrawerTaskId !== null}
+        onOpenChange={(o) => { if (!o) setApprovalDrawerTaskId(null) }}
       />
     </Card>
   );

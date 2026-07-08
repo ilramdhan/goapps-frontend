@@ -7,15 +7,15 @@ import { AlertTriangle, Lock, Loader2, Unlock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { UserName } from "@/components/common/user-name"
-import { CreateRoutingWizard } from "@/components/finance/cost-product-request/create-routing-wizard"
 import { DuplicateRouteDialog } from "@/components/finance/cost-route/duplicate-route-dialog"
-import { PickExistingRouteDialog } from "@/components/finance/cost-product-request/pick-existing-route-dialog"
+import { RoutingResolver } from "@/components/finance/cost-product-request/routing-resolver"
 import { UnlockPasswordDialog } from "./unlock-password-dialog"
 import { useCompleteRoute, useLockRoute, useRouteGraph, useUnlockRoute } from "@/hooks/finance/use-cost-route"
 import { useLinkedRequests } from "@/hooks/finance/use-duplicate-route"
-import { useLinkExistingRoute, useUnlinkRoute } from "@/hooks/finance/use-link-route"
+import { useUnlinkRoute } from "@/hooks/finance/use-link-route"
 import { useParamSummary } from "@/hooks/finance/use-param-summary"
 
 interface Props {
@@ -39,13 +39,11 @@ export function RoutingPanel({
   canManageLock = false,
   showCompleteAction = false,
 }: Props) {
-  const [pickOpen, setPickOpen] = useState(false)
-  const [wizardOpen, setWizardOpen] = useState(false)
+  const [resolverOpen, setResolverOpen] = useState(false)
   const [dupOpen, setDupOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<"lock" | "unlock" | null>(null)
   const [passwordError, setPasswordError] = useState<string | undefined>()
 
-  const linkM = useLinkExistingRoute()
   const unlinkM = useUnlinkRoute()
   const completeRouteM = useCompleteRoute()
   const lockM = useLockRoute()
@@ -97,33 +95,26 @@ export function RoutingPanel({
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  No routing defined yet. Choose how to build the cost basis:
+                  No routing defined yet. Attach a product to build the cost basis.
                 </p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <Button variant="outline" onClick={() => setPickOpen(true)}>
-                    📋 Pick existing product
-                  </Button>
-                  <Button variant="default" onClick={() => setWizardOpen(true)}>
-                    🆕 Create new routing
-                  </Button>
-                </div>
+                <Button variant="default" onClick={() => setResolverOpen(true)}>
+                  Attach product routing
+                </Button>
               </>
             )}
           </CardContent>
         </Card>
-        <PickExistingRouteDialog
-          open={pickOpen}
-          onClose={() => setPickOpen(false)}
-          onPick={(headId) => {
-            linkM.mutate({ requestId, routeHeadId: headId })
-            setPickOpen(false)
-          }}
-        />
-        <CreateRoutingWizard
-          open={wizardOpen}
-          requestId={requestId}
-          onClose={() => setWizardOpen(false)}
-        />
+        <Dialog open={resolverOpen} onOpenChange={setResolverOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Attach product routing</DialogTitle>
+            </DialogHeader>
+            <RoutingResolver
+              requestId={requestId}
+              onResolved={() => setResolverOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </>
     )
   }
@@ -187,11 +178,32 @@ export function RoutingPanel({
               </Button>
             )}
             {!readOnly && canUnlink && (
-              <Button variant="outline" size="sm" onClick={() => unlinkM.mutate({ requestId })}>
-                Unlink
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isLocked || unlinkM.isPending}
+                        onClick={() => unlinkM.mutate({ requestId })}
+                      >
+                        Unlink
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isLocked && (
+                    <TooltipContent>Unlock the route before unlinking.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
+          {!readOnly && canUnlink && isLocked && (
+            <p className="text-xs text-muted-foreground">
+              Unlock the route before unlinking.
+            </p>
+          )}
 
           {/* Lock management — only visible to route managers */}
           {canManageLock && (

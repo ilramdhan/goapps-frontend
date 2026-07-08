@@ -1,9 +1,10 @@
 "use client"
 
-// RequestFormDialog — three-section product request form (FR-1).
-// Section 2 (Product Specification) only appears when classification = new.
-// NO UUID input anywhere — uses RequestTypeCombobox + PaperTubeTypeCombobox.
-import { useEffect, useMemo } from "react"
+// RequestFormDialog — two-section product request form (FR-1).
+// Section 2 (Product specification & pricing) is always visible; description+tube are
+// all-or-nothing, everything else in the section is independently optional.
+// NO UUID input anywhere — uses RequestTypeCombobox + a fixed Paper/Plastic Select.
+import { useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -23,30 +24,31 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { PaperTubeTypeCombobox, RequestTypeCombobox } from "@/components/finance/comboboxes"
-import { useCostRequestTypes } from "@/hooks/finance/use-cost-request-type"
+import { ProductMasterCombobox, RequestTypeCombobox } from "@/components/finance/comboboxes"
 import { useCreateCostProductRequest, useUpdateCostProductRequest } from "@/hooks/finance/use-cost-product-request"
-import type { CostProductRequest, ProductClassification, RawMaterialType, UrgencyLevel } from "@/types/finance/cost-product-request"
+import { TUBE_TYPE_OPTIONS, TubeType } from "@/types/finance/cost-product-request"
+import type { CostProductRequest, SpecInput, UrgencyLevel } from "@/types/finance/cost-product-request"
 
 const schema = z.object({
   requestTypeId: z.number().int().positive("Pick a request type"),
   title: z.string().min(1, "Required").max(255, "Max 255 chars"),
-  description: z.string().max(10000, "Max 10000 chars"),
   customerName: z.string().min(1, "Required").max(255, "Max 255 chars"),
   customerCode: z.string().max(50, "Max 50 chars"),
-  productClassification: z.enum(["existing", "new"]),
   urgencyLevel: z.enum(["low", "medium", "high"]),
   neededByDate: z.string().max(10, "YYYY-MM-DD").regex(/^$|^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
   targetVolume: z.string().max(30, "Max 30 chars"),
   targetPriceRange: z.string().max(50, "Max 50 chars"),
-  // Spec — only required when classification = new, validated below.
-  specRawMaterial: z.enum(["POY_BOUGHTOUT", "CHIPS_SD", "CHIPS_BRT", "CHIPS_RECYCLE", ""]).optional(),
+  // Reference product (product-request-workflow-revamp D4) — optional hint pointing
+  // at a similar existing product master; 0/undefined means unset.
+  referenceProductSysId: z.number().int().nonnegative().optional(),
+  // Spec — optional, all-or-nothing validated below in onSubmit.
   specProductDescription: z.string().max(5000, "Max 5000 chars").optional(),
-  specShadeCustomText: z.string().max(100, "Max 100 chars").optional(),
-  specPaperTubeTypeId: z.number().int().nonnegative().optional(),
-  specWeightPerBobbinKg: z.string().max(20, "Max 20 chars").optional(),
-  specBoxType: z.enum(["JUMBO", "NORMAL", "PALLET", ""]).optional(),
+  // Shade code/name are independently optional — not part of the all-or-nothing group.
+  specShadeCode: z.string().max(100, "Max 100 chars").optional(),
+  specShadeName: z.string().max(100, "Max 100 chars").optional(),
+  // Fixed Paper/Plastic classification (product-request-workflow-revamp D3) —
+  // replaces the old master-data paper tube combobox. UNSPECIFIED = not picked.
+  specTubeType: z.nativeEnum(TubeType).optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -60,46 +62,28 @@ interface Props {
 const DEFAULTS: FormValues = {
   requestTypeId: 0,
   title: "",
-  description: "",
   customerName: "",
   customerCode: "",
-  productClassification: "existing",
   urgencyLevel: "medium",
   neededByDate: "",
   targetVolume: "",
   targetPriceRange: "",
-  specRawMaterial: "",
+  referenceProductSysId: undefined,
   specProductDescription: "",
-  specShadeCustomText: "",
-  specPaperTubeTypeId: 0,
-  specWeightPerBobbinKg: "",
-  specBoxType: "",
+  specShadeCode: "",
+  specShadeName: "",
+  specTubeType: TubeType.TUBE_TYPE_UNSPECIFIED,
 }
 
 export function RequestFormDialog({ open, onOpenChange, request }: Props) {
   const isEditing = !!request && request.status === "DRAFT"
   const createMutation = useCreateCostProductRequest()
   const updateMutation = useUpdateCostProductRequest()
-  const { data: requestTypes } = useCostRequestTypes()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as never,
     defaultValues: DEFAULTS,
   })
-
-  const productClassification = form.watch("productClassification")
-  const requestTypeId = form.watch("requestTypeId")
-  const selectedType = useMemo(
-    () => (requestTypes ?? []).find((t) => t.typeId === requestTypeId),
-    [requestTypes, requestTypeId],
-  )
-
-  // DEVELOPMENT always implies new classification (FR-1).
-  useEffect(() => {
-    if (selectedType?.code === "DEVELOPMENT" && form.getValues("productClassification") !== "new") {
-      form.setValue("productClassification", "new")
-    }
-  }, [selectedType, form])
 
   useEffect(() => {
     if (!open) return
@@ -107,20 +91,17 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
       form.reset({
         requestTypeId: request.requestTypeId,
         title: request.title,
-        description: request.description || "",
         customerName: request.customerName,
         customerCode: request.customerCode || "",
-        productClassification: request.productClassification,
         urgencyLevel: request.urgencyLevel,
         neededByDate: request.neededByDate || "",
         targetVolume: request.targetVolume || "",
         targetPriceRange: request.targetPriceRange || "",
-        specRawMaterial: (request.spec?.rawMaterialType as RawMaterialType) || "",
+        referenceProductSysId: request.referenceProductSysId || undefined,
         specProductDescription: request.spec?.productDescription || "",
-        specShadeCustomText: request.spec?.shadeCustomText || "",
-        specPaperTubeTypeId: request.spec?.paperTubeTypeId || 0,
-        specWeightPerBobbinKg: request.spec?.weightPerBobbinKg || "",
-        specBoxType: (request.spec?.boxType as "JUMBO" | "NORMAL" | "PALLET") || "",
+        specShadeCode: request.spec?.shadeCode || "",
+        specShadeName: request.spec?.shadeName || "",
+        specTubeType: request.spec?.tubeType || TubeType.TUBE_TYPE_UNSPECIFIED,
       })
     } else {
       form.reset(DEFAULTS)
@@ -128,56 +109,53 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
   }, [open, request, form])
 
   async function onSubmit(values: FormValues) {
-    // Cross-field rule: spec required iff classification = new.
-    if (values.productClassification === "new") {
-      if (!values.specRawMaterial) {
-        form.setError("specRawMaterial", { message: "Required for new products" })
-        return
+    // Cross-field rule: spec is all-or-nothing — either every field is filled, or none are.
+    // Shade code/name are excluded from this group — both are independently optional.
+    const specFieldEntries: Array<[keyof FormValues, string]> = [
+      ["specProductDescription", "Fill in all spec fields, or leave all blank"],
+      ["specTubeType", "Fill in all spec fields, or leave all blank"],
+    ]
+    const isEmpty = (v: unknown) =>
+      v === undefined || v === null || v === "" || v === 0 || v === TubeType.TUBE_TYPE_UNSPECIFIED
+    const filledCount = specFieldEntries.filter(([key]) => !isEmpty(values[key])).length
+    if (filledCount > 0 && filledCount < specFieldEntries.length) {
+      for (const [key, message] of specFieldEntries) {
+        if (isEmpty(values[key])) {
+          form.setError(key, { message })
+        }
       }
-      if (!values.specProductDescription) {
-        form.setError("specProductDescription", { message: "Required for new products" })
-        return
-      }
-      if (!values.specPaperTubeTypeId) {
-        form.setError("specPaperTubeTypeId", { message: "Required for new products" })
-        return
-      }
-      if (!values.specWeightPerBobbinKg) {
-        form.setError("specWeightPerBobbinKg", { message: "Required for new products" })
-        return
-      }
-      if (!values.specBoxType) {
-        form.setError("specBoxType", { message: "Required for new products" })
-        return
-      }
-      if (!values.specShadeCustomText) {
-        form.setError("specShadeCustomText", { message: "Required (use 'natural' if unpigmented)" })
-        return
-      }
+      return
     }
+    // Shade code/name never gate whether a spec is sent — they're independently
+    // optional extras included alongside the description+tube all-or-nothing group.
+    const hasSpec = filledCount === specFieldEntries.length
     const payload = {
       requestTypeId: values.requestTypeId,
       title: values.title,
-      description: values.description,
+      description: values.specProductDescription || "",
       customerName: values.customerName,
       customerCode: values.customerCode,
-      productClassification: values.productClassification as ProductClassification,
+      productClassification: isEditing && request ? request.productClassification : "pending",
       urgencyLevel: values.urgencyLevel as UrgencyLevel,
       neededByDate: values.neededByDate,
       targetVolume: values.targetVolume,
       targetPriceRange: values.targetPriceRange,
-      spec:
-        values.productClassification === "new"
-          ? {
-              rawMaterialType: values.specRawMaterial as RawMaterialType,
-              productDescription: values.specProductDescription!,
-              shadeId: 0, // master shade not picked — using free-text fallback
-              shadeCustomText: values.specShadeCustomText,
-              paperTubeTypeId: values.specPaperTubeTypeId!,
-              weightPerBobbinKg: values.specWeightPerBobbinKg!,
-              boxType: values.specBoxType as "JUMBO" | "NORMAL" | "PALLET",
-            }
-          : undefined,
+      referenceProductSysId: values.referenceProductSysId,
+      spec: hasSpec
+        ? {
+            // rawMaterialType/weightPerBobbinKg/boxType removed from the form (D1) — send
+            // empty so historical rows' columns stay unpopulated on new writes.
+            rawMaterialType: "" as SpecInput["rawMaterialType"],
+            productDescription: values.specProductDescription || "",
+            shadeId: 0, // master shade not picked — using free-text fallback
+            shadeCode: values.specShadeCode,
+            shadeName: values.specShadeName,
+            paperTubeTypeId: 0,
+            tubeType: values.specTubeType ?? TubeType.TUBE_TYPE_UNSPECIFIED,
+            weightPerBobbinKg: "",
+            boxType: "" as SpecInput["boxType"],
+          }
+        : undefined,
     }
     try {
       if (isEditing && request) {
@@ -199,8 +177,8 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
         <ScrollableDialogHeader>
           <DialogTitle>{isEditing ? `Edit ${request?.requestNo}` : "New product request"}</DialogTitle>
           <DialogDescription>
-            Section 2 (Product specification) becomes required when classification = new. DEVELOPMENT
-            requests are forced to new.
+            Product specification is optional — leave it blank, or fill in every field if you have the
+            details.
           </DialogDescription>
         </ScrollableDialogHeader>
         <Form {...form}>
@@ -292,37 +270,6 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                   )}
                 />
               </div>
-              <FormField
-                control={form.control}
-                name="productClassification"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product classification *</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex gap-6"
-                      >
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <RadioGroupItem value="existing" />
-                          Existing product
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <RadioGroupItem value="new" />
-                          New product
-                        </label>
-                      </RadioGroup>
-                    </FormControl>
-                    {selectedType?.code === "DEVELOPMENT" && (
-                      <FormDescription>
-                        DEVELOPMENT request type forces classification = new.
-                      </FormDescription>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -339,58 +286,37 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                 />
                 <div />
               </div>
+            </section>
+
+            {/* SECTION 2 — Product Specification & Pricing (always visible; description+tube
+                all-or-nothing, everything else independently optional) */}
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Section 2 — Product specification & pricing
+              </h3>
               <FormField
                 control={form.control}
-                name="description"
+                name="specProductDescription"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Product description</FormLabel>
                     <FormControl>
-                      <Textarea {...field} rows={3} />
+                      <Textarea {...field} rows={3} placeholder="Free text describing the requested product" />
                     </FormControl>
+                    <FormDescription>Optional — fill in if known.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </section>
-
-            {/* SECTION 2 — Product Specification (conditional) */}
-            {productClassification === "new" && (
-              <section className="space-y-4 rounded-md border bg-muted/30 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Section 2 — Product specification
-                </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="specRawMaterial"
+                  name="specShadeCode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Raw material type *</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick one" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="POY_BOUGHTOUT">POY Boughtout</SelectItem>
-                          <SelectItem value="CHIPS_SD">Chips SD</SelectItem>
-                          <SelectItem value="CHIPS_BRT">Chips BRT</SelectItem>
-                          <SelectItem value="CHIPS_RECYCLE">Chips Recycle</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="specProductDescription"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product description *</FormLabel>
+                      <FormLabel>Shade code</FormLabel>
                       <FormControl>
-                        <Textarea {...field} rows={3} placeholder="Free text describing the requested product" />
+                        <Input {...field} placeholder="e.g. NL, Z114S" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -398,81 +324,70 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                 />
                 <FormField
                   control={form.control}
-                  name="specShadeCustomText"
+                  name="specShadeName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shade *</FormLabel>
+                      <FormLabel>Shade name</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. natural / biru langit / NL" />
+                        <Input {...field} placeholder="e.g. Natural, Jet Black" />
                       </FormControl>
-                      <FormDescription>
-                        Use the master shade name if known, otherwise free-text. Use {`"natural"`} for unpigmented.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="specPaperTubeTypeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Paper tube *</FormLabel>
-                        <FormControl>
-                          <PaperTubeTypeCombobox
-                            value={field.value || undefined}
-                            onChange={(id) => field.onChange(id)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="specWeightPerBobbinKg"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Weight per bobbin (kg) *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="e.g. 4.5" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="specBoxType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Box type *</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick one" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="JUMBO">Jumbo</SelectItem>
-                          <SelectItem value="NORMAL">Normal</SelectItem>
-                          <SelectItem value="PALLET">Pallet</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </section>
-            )}
-
-            {/* SECTION 3 — Pricing Context */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Section 3 — Pricing context
-              </h3>
+              </div>
+              <FormDescription>
+                Shade code/name are optional and independent of each other. Use {`"natural"`} for unpigmented.
+              </FormDescription>
+              <FormField
+                control={form.control}
+                name="specTubeType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tube</FormLabel>
+                    <Select
+                      value={String(field.value ?? TubeType.TUBE_TYPE_UNSPECIFIED)}
+                      onValueChange={(v) => field.onChange(Number(v) as TubeType)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select tube type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {TUBE_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Optional — fill in if known.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="referenceProductSysId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reference product (optional)</FormLabel>
+                    <FormControl>
+                      <ProductMasterCombobox
+                        value={field.value || undefined}
+                        onChange={(productSysId) => field.onChange(productSysId)}
+                        placeholder="Search product by code or name…"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      If this request is similar to an existing product, pick it — its routing will be
+                      suggested during review.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}

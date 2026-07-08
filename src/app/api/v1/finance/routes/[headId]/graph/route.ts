@@ -49,6 +49,9 @@ function normalizeGraphForSave(graph: unknown): unknown {
                 rmProductSysId: n0(r.rmProductSysId),
                 uomId: n0(r.uomId),
                 routeRmRatio: n0(r.routeRmRatio) || 1,
+                // double position fields — undefined throws in ts-proto BinaryWriter.
+                positionX: n0(r.positionX),
+                positionY: n0(r.positionY),
               }
             }),
           }

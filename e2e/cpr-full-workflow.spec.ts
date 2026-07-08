@@ -30,23 +30,23 @@ import {
   loginAs,
   logout,
   createDraftRequest,
-  findRequestInList,
   gotoRequestDetail,
-  submitRequest,
+  submitAndDecide,
+  submitViaApi,
+  startReviewViaApi,
   startReview,
   decideFeasibility,
-  useExistingCosting,
+  useExistingCostingViaApi,
+  findAnyProductSysId,
   rejectRequest,
   reviseRequest,
   cancelRequest,
-  createProductAndRoute,
   promoteRoute,
   openFillTrackingTab,
   claimFillTask,
   submitFillTask,
   approveFillTask,
   rejectFillTask,
-  markParametersComplete,
   expectStatus,
   expectButtonVisible,
   expectButtonHidden,
@@ -84,11 +84,10 @@ test.describe("E2E-01: Full new product workflow", () => {
     await expectButtonVisible(page, /^edit$/i)
     await expectButtonHidden(page, /^submit$/i)
     // Routing buttons must NOT appear at DRAFT
-    await expectButtonHidden(page, /create new routing/i)
-    await expectButtonHidden(page, /pick existing product/i)
+    await expectButtonHidden(page, /attach product routing/i)
   })
 
-  test("1.3 marketingmgr sees Submit and submits", async ({ page }) => {
+  test("1.3 marketingmgr sees Submit, decides classification+feasibility inline", async ({ page }) => {
     await loginAs(page, "marketingmgr")
     await gotoRequestDetail(page, createdRequestId)
 
@@ -96,36 +95,10 @@ test.describe("E2E-01: Full new product workflow", () => {
     await expectButtonHidden(page, /^edit$/i)
     await expectButtonVisible(page, /^submit$/i)
 
-    await submitRequest(page)
-    // Status should be SUBMITTED after submit
-    await expectStatus(page, "SUBMITTED")
-  })
-
-  test("1.4 marketing01 cannot see Start Review button at SUBMITTED", async ({ page }) => {
-    await loginAs(page, "marketing01")
-    await gotoRequestDetail(page, createdRequestId)
-
-    await expectStatus(page, "SUBMITTED")
-    await expectButtonHidden(page, /start review/i)
-    await expectButtonHidden(page, /reject/i)
-  })
-
-  test("1.5 finance01 starts review and decides FEASIBLE", async ({ page }) => {
-    await loginAs(page, "finance01")
-    await gotoRequestDetail(page, createdRequestId)
-
-    await expectButtonVisible(page, /start review/i)
-    await startReview(page)
-    await expectStatus(page, "UNDER_REVIEW")
-
-    // "Verify Classification" button should NOT appear (design decision: removed)
-    await expectButtonHidden(page, /verify classification/i)
-
-    // Use Existing Costing button should be visible (no longer needs pre-verification)
-    await expectButtonVisible(page, /use existing costing/i)
-
-    // Decide FEASIBLE → new product
-    await decideFeasibility(page, "FEASIBLE", "Product specifications are clear")
+    // B3 merge: Submit opens ClassificationAndFeasibilityDialog(mode="submit"), which
+    // folds Submit + StartReview + VerifyClassification + DecideFeasibility + LinkRoute
+    // into one SubmitAndDecide RPC — final status is ROUTING_DEFINED (FEASIBLE path).
+    await submitAndDecide(page)
     await expectStatus(page, "ROUTING_DEFINED")
   })
 
@@ -134,34 +107,16 @@ test.describe("E2E-01: Full new product workflow", () => {
     await gotoRequestDetail(page, createdRequestId)
 
     await expectStatus(page, "ROUTING_DEFINED")
-    // Routing panel should be visible for engineers
+    // Routing panel should be visible for engineers, already resolved by 1.3's submitAndDecide
     const routingPanel = page.locator('[data-testid="routing-panel"]')
     await expect(routingPanel).toBeVisible()
-
-    await expectButtonVisible(page, /create new routing/i)
-  })
-
-  test("1.7 production01 creates product master and routing", async ({ page }) => {
-    await loginAs(page, "production01")
-    await gotoRequestDetail(page, createdRequestId)
-
-    const routeId = await createProductAndRoute(page, `E2E FG Product ${Date.now()}`)
-    expect(routeId).toBeTruthy()
-
-    // Should be in route editor — navigate back to request after
-    await gotoRequestDetail(page, createdRequestId)
-    await expectStatus(page, "ROUTING_DEFINED")
   })
 
   test("1.8 production01 promotes route → PARAMETER_PENDING + fill tasks created", async ({ page }) => {
     await loginAs(page, "production01")
     await gotoRequestDetail(page, createdRequestId)
 
-    // Route must be linked — find the link button or already-linked route
-    const routePanel = page.locator('[data-testid="routing-panel"]')
-    await expect(routePanel).toBeVisible()
-
-    // Try to promote if route is already linked and complete
+    // Route already linked by 1.3's submitAndDecide() — go straight to promotion.
     await promoteRoute(page)
     await expectStatus(page, "PARAMETER_PENDING")
 
@@ -243,7 +198,7 @@ test.describe("E2E-02: Existing product path (Use Existing Costing)", () => {
   const requestTitle = `E2E-02 Existing Product ${Date.now()}`
   let requestId: string
 
-  test("2.1 Create and submit request", async ({ page }) => {
+  test("2.1 Create request and submit via API (setup only — not the thing under test)", async ({ page }) => {
     await loginAs(page, "marketing01")
     requestId = await createDraftRequest(page, {
       title: requestTitle,
@@ -253,42 +208,27 @@ test.describe("E2E-02: Existing product path (Use Existing Costing)", () => {
     })
     await expectStatus(page, "DRAFT")
 
-    await logout(page)
-    await loginAs(page, "marketingmgr")
-    await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    // Use Existing Costing is a review-phase action, reachable from UNDER_REVIEW regardless
+    // of how classification/feasibility were decided — API-bypass Submit + StartReview here
+    // since the dialog flow itself is already covered by E2E-01's submitAndDecide() test.
+    await submitViaApi(page, requestId)
+    await startReviewViaApi(page, requestId)
+    await page.reload()
+    await expectStatus(page, "UNDER_REVIEW")
   })
 
-  test("2.2 finance01 uses existing costing path — no verify step needed", async ({ page }) => {
+  test("2.2 finance01 uses existing costing via API — bypasses removed UI", async ({ page }) => {
+    // UseExistingCostingDialog has no live call site in request-detail-panel.tsx anymore
+    // (DialogKind no longer has a "useExisting" variant) — the RPC/BFF route is still
+    // reachable directly, so this test drives it via API rather than asserting on dead UI.
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
-
-    await startReview(page)
     await expectStatus(page, "UNDER_REVIEW")
 
-    // "Use Existing Costing" should be directly visible (no Verify Classification needed)
-    await expectButtonVisible(page, /use existing costing/i)
-
-    // Use existing costing with a product from CSTFG26BLK0001 (seeded product)
-    await page.getByRole("button", { name: /use existing costing/i }).click()
-    await page.waitForSelector('[role="dialog"]', { state: "visible" })
-
-    // Try to find the existing product
-    const searchInput = page.getByPlaceholder(/search|product/i).first()
-    await searchInput.fill("CSTFG")
-    await page.waitForTimeout(600) // debounce
-
-    const option = page.getByRole("option").first()
-    const hasOption = await option.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasOption) {
-      await option.click()
-      await page.getByRole("button", { name: /confirm|select|use/i }).last().click()
-      await page.waitForLoadState("load")
-      await expectStatus(page, "QUOTE_READY")
-    } else {
-      // No existing product in test env — skip to QUOTE_READY manually would need admin
-      test.skip()
-    }
+    const productSysId = await findAnyProductSysId(page)
+    await useExistingCostingViaApi(page, requestId, productSysId)
+    await page.reload()
+    await expectStatus(page, "QUOTE_READY")
   })
 
   test("2.3 QUOTE_READY: routing buttons not visible", async ({ page }) => {
@@ -296,8 +236,8 @@ test.describe("E2E-02: Existing product path (Use Existing Costing)", () => {
     await gotoRequestDetail(page, requestId)
 
     await expectStatus(page, "QUOTE_READY")
-    await expectButtonHidden(page, /create new routing/i)
-    await expectButtonHidden(page, /decide feasibility/i)
+    await expectButtonHidden(page, /attach product routing/i)
+    await expectButtonHidden(page, /review.*decide/i)
     // Fill tracking tab should NOT be present (no fill tasks for existing path)
     const fillTab = page.getByRole("tab", { name: /fill tracking/i })
     await expect(fillTab).not.toBeVisible()
@@ -318,10 +258,8 @@ test.describe("E2E-03: Reject and revise flow", () => {
       classification: "existing",
       urgency: "NORMAL",
     })
-    await logout(page)
-    await loginAs(page, "marketingmgr")
-    await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    // API-bypass — this suite tests reject/revise, not the submit dialog itself.
+    await submitViaApi(page, requestId)
     await page.close()
   })
 
@@ -393,19 +331,16 @@ test.describe("E2E-04: Permission gates", () => {
   })
 
   test("4.2 After submit: marketing01 cannot see reviewer buttons", async ({ page }) => {
-    // Submit as marketingmgr first
-    await loginAs(page, "marketingmgr")
-    await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    // API-bypass — this test is about button visibility for marketing01, not the submit dialog.
+    await submitViaApi(page, requestId)
 
     // Now check as marketing01
-    await logout(page)
     await loginAs(page, "marketing01")
     await gotoRequestDetail(page, requestId)
 
     await expectStatus(page, "SUBMITTED")
     await expectButtonHidden(page, /start review/i)
-    await expectButtonHidden(page, /decide feasibility/i)
+    await expectButtonHidden(page, /review.*decide/i)
     await expectButtonHidden(page, /reject/i)
   })
 
@@ -415,14 +350,15 @@ test.describe("E2E-04: Permission gates", () => {
 
     await expectStatus(page, "SUBMITTED")
     await expectButtonHidden(page, /start review/i)
-    await expectButtonHidden(page, /decide feasibility/i)
+    await expectButtonHidden(page, /review.*decide/i)
     await expectButtonHidden(page, /submit/i)
     // Routing panel only appears at ROUTING_DEFINED — not at SUBMITTED
     await expect(page.locator('[data-testid="routing-panel"]')).not.toBeVisible()
   })
 
   test("4.4 production01 at ROUTING_DEFINED: routing panel visible", async ({ page }) => {
-    // Get to ROUTING_DEFINED first
+    // Get to ROUTING_DEFINED first — "review" mode path via startReview + decideFeasibility
+    // (distinct from E2E-01's "submit" mode path via submitAndDecide).
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
     await startReview(page)
@@ -436,22 +372,18 @@ test.describe("E2E-04: Permission gates", () => {
     await expectStatus(page, "ROUTING_DEFINED")
     const routingPanel = page.locator('[data-testid="routing-panel"]')
     await expect(routingPanel).toBeVisible()
-    await expectButtonVisible(page, /create new routing/i)
+    // Already resolved by decideFeasibility's inline RoutingResolver — no "attach" button left.
+    await expectButtonHidden(page, /attach product routing/i)
   })
 
-  test("4.5 finance01 at ROUTING_DEFINED: no routing create button (not engineer)", async ({ page }) => {
+  test("4.5 finance01 at ROUTING_DEFINED: no routing attach button (not engineer)", async ({ page }) => {
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
 
-    // finance01 has CPR_REVIEWER but NOT CPR_ENGINEER, so no create routing
+    // Routing is already resolved by 4.4 — the "Attach product routing" button only ever
+    // appears when unresolved, so this always evaluates hidden regardless of role.
     await expectStatus(page, "ROUTING_DEFINED")
-    // Only reviewer actions: Close, Cancel (no routing create for non-engineers)
-    // NOTE: finance01 might have route.view but not route.create
-    // This depends on role assignment — adjust if finance01 also gets CPR_ENGINEER
-    const createRoutingBtn = page.getByRole("button", { name: /create new routing/i })
-    const hasButton = await createRoutingBtn.isVisible({ timeout: 1000 }).catch(() => false)
-    // If finance01 has CPR_ADMIN which includes route.create, this test may need adjustment
-    expect(typeof hasButton).toBe("boolean") // just verify the test runs
+    await expectButtonHidden(page, /attach product routing/i)
   })
 })
 
@@ -514,45 +446,21 @@ test.describe("E2E-07: Fill task claim → submit → approve", () => {
       urgency: "NORMAL",
     })
 
-    // Submit
-    await logout(page)
-    await loginAs(page, "marketingmgr")
-    await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    // Submit (as marketingmgr) — API-bypass, this suite tests fill tasks, not the submit dialog.
+    await submitViaApi(page, requestId)
 
-    // Review and decide FEASIBLE
-    await logout(page)
+    // Review and decide FEASIBLE — decideFeasibility's inline RoutingResolver already
+    // resolves + links routing as part of this step (see resolveRoutingInline).
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
     await startReview(page)
-    await decideFeasibility(page, "FEASIBLE", "Feasible")
+    await decideFeasibility(page, "FEASIBLE", "Feasible", { newProductName: `E2E-07 Product ${Date.now()}` })
     await expectStatus(page, "ROUTING_DEFINED")
 
-    // Create routing as production01
+    // Promote to PARAMETER_PENDING as production01 — routing already linked above.
     await logout(page)
     await loginAs(page, "production01")
     await gotoRequestDetail(page, requestId)
-
-    // If a pre-existing route is available, link it
-    const linkRouteBtn = page.getByRole("button", { name: /link.*route|use.*existing.*route/i })
-    const hasLinkBtn = await linkRouteBtn.isVisible({ timeout: 2000 }).catch(() => false)
-    if (hasLinkBtn) {
-      await linkRouteBtn.click()
-      await page.waitForSelector('[role="dialog"]', { state: "visible" })
-      // Select first available route
-      const firstRoute = page.getByRole("row").nth(1)
-      await firstRoute.click()
-      const confirmBtn = page.getByRole("button", { name: /confirm|link|select/i }).last()
-      await confirmBtn.click()
-      await page.waitForLoadState("load")
-    } else {
-      // Create new route
-      await createProductAndRoute(page, `E2E-07 Product ${Date.now()}`)
-      // Navigate back
-      await gotoRequestDetail(page, requestId)
-    }
-
-    // Promote to PARAMETER_PENDING
     await promoteRoute(page)
     await expectStatus(page, "PARAMETER_PENDING")
   })
@@ -701,27 +609,17 @@ test.describe("E2E-FULL: Complete workflow smoke test", () => {
     })
     await expectStatus(page, "DRAFT")
 
-    // Step 2: Submit (as marketingmgr)
-    await logout(page)
-    await loginAs(page, "marketingmgr")
-    await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
-    await expectStatus(page, "SUBMITTED")
+    // Step 2: Submit (API-bypass — smoke test targets the overall status chain)
+    await submitViaApi(page, requestId)
 
     // Step 3: Review
-    await logout(page)
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
     await startReview(page)
     await expectStatus(page, "UNDER_REVIEW")
 
-    // Verify classification button absent
-    await expectButtonHidden(page, /verify classification/i)
-    // Use Existing Costing button present without pre-verification
-    await expectButtonVisible(page, /use existing costing/i)
-
-    // Step 4: Decide FEASIBLE
-    await decideFeasibility(page, "FEASIBLE", "OK")
+    // Step 4: Decide FEASIBLE — inline RoutingResolver resolves + links routing.
+    await decideFeasibility(page, "FEASIBLE", "OK", { newProductName: `E2E-FULL Product ${Date.now()}` })
     await expectStatus(page, "ROUTING_DEFINED")
 
     // Step 5: Verify routing panel visible for engineer
@@ -823,7 +721,8 @@ test.describe("E2E-12: A6 — Approval trace history timeline", () => {
       urgency: "NORMAL",
     })
     await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    await submitViaApi(page, requestId)
+    await page.reload()
     await expectStatus(page, "SUBMITTED")
 
     // Expand history section.
@@ -841,10 +740,10 @@ test.describe("E2E-12: A6 — Approval trace history timeline", () => {
       urgency: "NORMAL",
     })
     await gotoRequestDetail(page, requestId)
-    await submitRequest(page)
+    await submitViaApi(page, requestId)
+    await page.reload()
     await expectStatus(page, "SUBMITTED")
 
-    await logout(page)
     await loginAs(page, "finance01")
     await gotoRequestDetail(page, requestId)
     await startReview(page)

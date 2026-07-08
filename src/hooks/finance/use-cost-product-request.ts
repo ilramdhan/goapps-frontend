@@ -4,18 +4,27 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { fillAssignmentKeys } from "@/hooks/finance/use-fill-assignment"
+import { apiClient, buildQueryString, downloadFileFromBytes } from "@/lib/api"
 import {
   type ClosedSubstatus,
   type CostProductRequest,
   type CreateCostProductRequestPayload,
+  type ExportCostProductRequestsParams,
+  type ExportCostProductRequestsResponse,
+  type ImportCostProductRequestsResponse,
+  type GetCostProductRequestImportTemplateResponse,
   type ListCostProductRequestsParams,
   type ProductClassification,
   type UpdateCostProductRequestPayload,
+  ExportCostProductRequestsResponseParser,
+  ImportCostProductRequestsResponseParser,
+  GetCostProductRequestImportTemplateResponseParser,
   normalizeCostProductRequest,
 } from "@/types/finance/cost-product-request"
 
 const KEYS = {
   all: ["finance", "cost-product-request"] as const,
+  lists: () => ["finance", "cost-product-request", "list"] as const,
   list: (p: ListCostProductRequestsParams) => ["finance", "cost-product-request", "list", p] as const,
   detail: (id: number) => ["finance", "cost-product-request", "detail", id] as const,
 }
@@ -234,6 +243,39 @@ export function useDecideFeasibility() {
   })
 }
 
+// useSubmitAndDecide is the B3 merged action — replaces the standalone Submit +
+// Start review click sequence. It performs Submit + StartReview + VerifyClassification +
+// DecideFeasibility + (if FEASIBLE) LinkRoute server-side in one call, gated by a single
+// `finance.product.request.review` permission (design.md §3 B3). Used by
+// ClassificationAndFeasibilityDialog when opened from a DRAFT request.
+export function useSubmitAndDecide() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      requestId: number
+      verifiedClassification: ProductClassification
+      overrideReason?: string
+      decision: "FEASIBLE" | "NOT_FEASIBLE"
+      note?: string
+      referenceProductHeadId?: number
+    }) => {
+      const result = await postJson(`/api/v1/finance/cost-product-requests/${input.requestId}/submit-and-decide`, {
+        verifiedClassification: input.verifiedClassification,
+        overrideReason: input.overrideReason || "",
+        decision: input.decision,
+        note: input.note || "",
+        referenceProductHeadId: input.referenceProductHeadId || 0,
+      })
+      return result.data
+    },
+    onSuccess: () => {
+      toast.success("Submitted and decided")
+      qc.invalidateQueries({ queryKey: KEYS.all })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export function useCloseRequest() {
   const qc = useQueryClient()
   return useMutation({
@@ -269,6 +311,103 @@ export function useAssignRequest() {
 }
 
 export const costProductRequestKeys = KEYS
+
+// =============================================================================
+// Export/Import/Template (design.md §4 Area D6, P4-T4) — mirrors use-uom.ts's
+// useExportUOMs/useImportUOMs/useDownloadTemplate (apiClient-based style),
+// not this file's own postJson/fetch style, per plan.md's explicit mirror
+// instruction for the 3 new hooks.
+// =============================================================================
+
+/**
+ * Hook for exporting cost product requests to Excel.
+ */
+export function useExportCostProductRequests() {
+  return useMutation({
+    mutationFn: async (params: ExportCostProductRequestsParams = {}): Promise<ExportCostProductRequestsResponse> => {
+      const queryString = buildQueryString(params as Record<string, unknown>)
+      const rawResponse = await apiClient.get<unknown>(`/api/v1/finance/cost-product-requests/export${queryString}`)
+      return ExportCostProductRequestsResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: (response) => {
+      if (response.base?.isSuccess && response.fileContent.length > 0) {
+        downloadFileFromBytes(response.fileContent, response.fileName || "product-requests-export.xlsx")
+        toast.success("Export completed successfully")
+      } else {
+        toast.error(response.base?.message || "Failed to export product requests")
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to export product requests")
+    },
+  })
+}
+
+/**
+ * Import request data for cost product requests.
+ */
+interface ImportCostProductRequestsData {
+  fileContent: Uint8Array
+  fileName: string
+  duplicateAction: string
+}
+
+/**
+ * Hook for importing cost product requests from Excel. Create-only in v1
+ * (design.md §4 D6): every row creates a new DRAFT request, so
+ * updatedCount/skippedCount are always 0.
+ */
+export function useImportCostProductRequests() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: ImportCostProductRequestsData): Promise<ImportCostProductRequestsResponse> => {
+      const rawResponse = await apiClient.post<unknown>("/api/v1/finance/cost-product-requests/import", {
+        fileContent: Array.from(data.fileContent), // Convert Uint8Array to array for JSON
+        fileName: data.fileName,
+        duplicateAction: data.duplicateAction,
+      })
+      return ImportCostProductRequestsResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: (response) => {
+      qc.invalidateQueries({ queryKey: costProductRequestKeys.lists() })
+      if (response.base?.isSuccess) {
+        const { successCount, updatedCount, skippedCount, failedCount } = response
+        toast.success(
+          `Import completed: ${successCount} created, ${updatedCount} updated, ${skippedCount} skipped, ${failedCount} failed`
+        )
+      } else {
+        toast.error(response.base?.message || "Failed to import product requests")
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to import product requests")
+    },
+  })
+}
+
+/**
+ * Hook for downloading the cost product request import template.
+ */
+export function useDownloadCostProductRequestTemplate() {
+  return useMutation({
+    mutationFn: async (): Promise<GetCostProductRequestImportTemplateResponse> => {
+      const rawResponse = await apiClient.get<unknown>("/api/v1/finance/cost-product-requests/template")
+      return GetCostProductRequestImportTemplateResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: (response) => {
+      if (response.base?.isSuccess && response.fileContent.length > 0) {
+        downloadFileFromBytes(response.fileContent, response.fileName || "product-request-import-template.xlsx")
+        toast.success("Template downloaded successfully")
+      } else {
+        toast.error(response.base?.message || "Failed to download template")
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to download template")
+    },
+  })
+}
 
 // -- Approval Trace History --------------------------------------------------
 

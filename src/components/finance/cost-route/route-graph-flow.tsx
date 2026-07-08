@@ -14,13 +14,15 @@
 //   • RM→Stage:    ITEM and GROUP RMs render as small RM nodes to the left
 //     of their stage, connected by an edge labelled with their ratio.
 //
-// Interactions (gated by `locked`):
-//   • Drag a stage node → onNodePositionChange(seqId, x, y)
-//   • Connect stage→stage → onConnectStages(sourceSeqId, targetSeqId)
-//   • Click stage node → onStageClick(seqId)
-//   • Click edge (PRODUCT/ITEM/GROUP RM) → onEdgeClick(rmId)
+// Interactions (gated by `locked`) — all keyed by stable client uid, not DB id:
+//   • Drag a stage node → onStagePositionChange(seqUid, x, y)
+//   • Drag an RM node   → onRmPositionChange(rmUid, x, y)
+//   • Connect stage→stage → onConnectStages(sourceSeqUid, targetSeqUid)
+//   • Click stage node → onStageClick(seqUid)
+//   • Click edge (PRODUCT/ITEM/GROUP RM) → onEdgeClick(rmUid)
 
 import { useCallback, useMemo, useRef } from "react"
+import { useTheme } from "next-themes"
 import {
   Background,
   Controls,
@@ -49,21 +51,23 @@ interface Props {
   graph: RouteGraph
   locked?: boolean
   onAddStage?: () => void
-  /** User finished dragging a stage node to (x,y). */
-  onNodePositionChange?: (seqId: number, x: number, y: number) => void
+  /** User finished dragging a stage node to (x,y). Keyed on the client uid. */
+  onStagePositionChange?: (seqUid: string, x: number, y: number) => void
+  /** User finished dragging an ITEM/GROUP RM node to (x,y). Keyed on the client uid. */
+  onRmPositionChange?: (rmUid: string, x: number, y: number) => void
   /** User drew an edge between two stage nodes (source = upstream, target = downstream). */
-  onConnectStages?: (sourceSeqId: number, targetSeqId: number) => void
+  onConnectStages?: (sourceSeqUid: string, targetSeqUid: string) => void
   /** User clicked a stage node. */
-  onStageClick?: (seqId: number) => void
+  onStageClick?: (seqUid: string) => void
   /** User clicked an edge that maps to a CostRouteRm (PRODUCT / ITEM / GROUP). */
-  onEdgeClick?: (rmId: number) => void
+  onEdgeClick?: (rmUid: string) => void
   /**
    * User started dragging from a node handle and dropped on the empty React
-   * Flow pane (not on another node). Source seq + which handle was used.
+   * Flow pane (not on another node). Source seq uid + which handle was used.
    * `handleType === "source"` = bottom handle (downstream side).
    * `handleType === "target"` = top handle (upstream side).
    */
-  onDropOnPane?: (sourceSeqId: number, handleType: "source" | "target") => void
+  onDropOnPane?: (sourceSeqUid: string, handleType: "source" | "target") => void
 }
 
 // ============================================================================
@@ -71,6 +75,7 @@ interface Props {
 // ============================================================================
 
 type StageNodeData = {
+  uid: string
   level: number
   seq: number
   productCode?: string
@@ -80,6 +85,7 @@ type StageNodeData = {
 }
 
 type RmNodeData = {
+  uid: string
   label: string
   kind: "ITEM" | "GROUP"
   [key: string]: unknown
@@ -88,8 +94,10 @@ type RmNodeData = {
 const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
   return (
     <div
-      className={`rounded-md border bg-card px-3 py-2 shadow-sm ${
-        data.isFG ? "border-emerald-400 bg-emerald-50" : "border-blue-300"
+      className={`rounded-md border px-3 py-2 shadow-sm text-card-foreground ${
+        data.isFG
+          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-700"
+          : "border-blue-400 bg-card dark:border-blue-700"
       }`}
       style={{ minWidth: 180 }}
     >
@@ -98,7 +106,7 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
         L{data.level} · seq {data.seq}
         {data.isFG ? " · FG" : ""}
       </div>
-      <div className="text-sm font-medium">
+      <div className="text-sm font-medium text-foreground">
         {data.productCode || "(no code)"}
       </div>
       {data.productName ? (
@@ -112,16 +120,18 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
 const RmNode = ({ data }: NodeProps<Node<RmNodeData>>) => {
   return (
     <div
-      className={`rounded-md border bg-background px-2 py-1 text-xs shadow-sm ${
-        data.kind === "GROUP" ? "border-purple-300 bg-purple-50" : "border-amber-300 bg-amber-50"
+      className={`rounded-md border px-2 py-1 text-xs shadow-sm text-foreground ${
+        data.kind === "GROUP"
+          ? "border-purple-400 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-700"
+          : "border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700"
       }`}
       style={{ minWidth: 130, maxWidth: 200 }}
     >
       <div className="flex items-center gap-1">
-        <Badge variant="outline" className="px-1 py-0 text-[9px]">
+        <Badge variant="outline" className="px-1 py-0 text-[9px] text-foreground border-current/40">
           {data.kind}
         </Badge>
-        <span className="truncate font-mono">{data.label}</span>
+        <span className="truncate font-mono text-foreground">{data.label}</span>
       </div>
       <Handle type="source" position={Position.Right} />
     </div>
@@ -142,19 +152,19 @@ const RM_W = 180
 const RM_GAP_X = 30
 const RM_GAP_Y = 50
 
-// Node ID conventions — must be reversible so we can pluck seqId back out in
-// callbacks. Stage nodes use the actual seqId (only when persisted, > 0). For
-// new unsaved stages (seqId === 0) we synthesise a stable id from level+seq.
+// Node ID conventions — keyed on the stable client uid (not the DB id, which
+// is 0 until save). This makes new/unsaved elements clickable + editable, and
+// keeps node/edge ids collision-free so deleting one RM removes exactly one.
 function stageNodeId(seq: CostRouteSeq): string {
-  return seq.seqId > 0 ? `seq-${seq.seqId}` : `seq-new-${seq.routeLevel}-${seq.routeSeq}`
+  return `seq-${seq.uid}`
 }
 
-function rmNodeId(seq: CostRouteSeq, rm: CostRouteRm, rmIdx: number): string {
-  return rm.rmId > 0 ? `rm-${rm.rmId}` : `rm-new-${stageNodeId(seq)}-${rmIdx}`
+function rmNodeId(rm: CostRouteRm): string {
+  return `rm-${rm.uid}`
 }
 
-// Edge data carries the rmId so onEdgeClick can dispatch back.
-type EdgeData = { rmId: number; rmType: "PRODUCT" | "ITEM" | "GROUP" }
+// Edge data carries the rm uid so onEdgeClick can dispatch back.
+type EdgeData = { rmUid: string; rmType: "PRODUCT" | "ITEM" | "GROUP" }
 
 function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
@@ -197,6 +207,7 @@ function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
         type: "stage",
         position: { x, y },
         data: {
+          uid: s.uid,
           level: s.routeLevel,
           seq: s.routeSeq,
           productCode: s.productCode,
@@ -209,57 +220,48 @@ function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
       // stacked vertically. PRODUCT rms become edges (handled below).
       const localRms = (s.rms ?? []).filter((r) => r.rmType !== "PRODUCT")
       localRms.forEach((rm, rmIdx) => {
-        const rmId = rmNodeId(s, rm, rmIdx)
+        const rmId = rmNodeId(rm)
+        // Use the RM's persisted free position when set (>0), else auto-layout
+        // beside the stage as the default starting point.
+        const hasRmPos = (rm.positionX ?? 0) !== 0 || (rm.positionY ?? 0) !== 0
         nodes.push({
           id: rmId,
           type: "rm",
-          position: {
-            x: x - (RM_W + RM_GAP_X),
-            y: y + rmIdx * RM_GAP_Y,
-          },
+          position: hasRmPos
+            ? { x: rm.positionX ?? 0, y: rm.positionY ?? 0 }
+            : { x: x - (RM_W + RM_GAP_X), y: y + rmIdx * RM_GAP_Y },
           data: {
+            uid: rm.uid,
             label: rmLabel(rm),
             kind: rm.rmType === "GROUP" ? "GROUP" : "ITEM",
           } satisfies RmNodeData,
         })
-        // Edge id must be unique even when multiple new (rmId === 0) RMs of the
-        // same type exist on the same stage — fall back to rmIdx + ref code.
-        const edgeId =
-          rm.rmId > 0
-            ? `e-${rm.rmType.toLowerCase()}-rm-${rm.rmId}`
-            : `e-${rm.rmType.toLowerCase()}-rm-new-${id}-${rm.rmItemCode || rm.rmGroupCode || "x"}-${rmIdx}`
         edges.push({
-          id: edgeId,
+          id: `e-${rm.rmType.toLowerCase()}-${rm.uid}`,
           source: rmId,
           target: id,
           label: `×${rm.routeRmRatio}`,
           labelStyle: { fontSize: 10 },
           animated: false,
-          data: { rmId: rm.rmId, rmType: rm.rmType } satisfies EdgeData,
+          data: { rmUid: rm.uid, rmType: rm.rmType } satisfies EdgeData,
         })
       })
 
       // PRODUCT rms become edges from the upstream stage that produces them
       // down to this stage.
       const productRms = (s.rms ?? []).filter((r) => r.rmType === "PRODUCT")
-      productRms.forEach((rm, rmIdx) => {
+      productRms.forEach((rm) => {
         const upstreamId = rm.rmProductSysId ? stageIdByProduct.get(rm.rmProductSysId) : undefined
         if (!upstreamId) return // dangling — validator should have caught
-        // Edge id must be unique even when multiple new (rmId === 0) PRODUCT-RMs
-        // exist on the same stage — fall back to upstreamProductSysId + rmIdx.
-        const edgeId =
-          rm.rmId > 0
-            ? `e-product-rm-${rm.rmId}`
-            : `e-product-rm-new-${id}-${rm.rmProductSysId}-${rmIdx}`
         edges.push({
-          id: edgeId,
+          id: `e-product-${rm.uid}`,
           source: upstreamId,
           target: id,
           label: `×${rm.routeRmRatio}`,
           labelStyle: { fontSize: 10, fontWeight: 600 },
           animated: true,
           style: { stroke: "#10b981", strokeWidth: 1.5 },
-          data: { rmId: rm.rmId, rmType: "PRODUCT" } satisfies EdgeData,
+          data: { rmUid: rm.uid, rmType: "PRODUCT" } satisfies EdgeData,
         })
       })
     })
@@ -269,18 +271,26 @@ function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
 }
 
 function rmLabel(rm: CostRouteRm): string {
-  if (rm.rmType === "GROUP") return rm.rmGroupCode || rm.routeRmName || "(group)"
+  if (rm.rmType === "GROUP") {
+    // Prefer the human-readable group name; render "name (code)" when both
+    // exist so users see the group name, not just the numeric group code.
+    const name = rm.rmGroupName || rm.routeRmName
+    const code = rm.rmGroupCode
+    if (name && code && name !== code) return `${name} (${code})`
+    return name || code || "(group)"
+  }
   if (rm.rmType === "ITEM") return rm.rmItemCode || rm.routeRmName || "(item)"
   return rm.routeRmName || ""
 }
 
-// Pluck the seqId back out of a stage node id. Returns 0 for new/unsaved
-// stages — caller must handle the "not yet persisted, ignore" case.
-function parseSeqIdFromNodeId(nodeId: string): number {
-  // Persisted form: "seq-<id>". New form: "seq-new-<level>-<seq>".
-  if (nodeId.startsWith("seq-new-")) return 0
-  if (nodeId.startsWith("seq-")) return Number(nodeId.slice(4)) || 0
-  return 0
+// Pluck the seq uid back out of a stage node id. Returns "" for non-stage ids.
+function parseSeqUidFromNodeId(nodeId: string): string {
+  return nodeId.startsWith("seq-") ? nodeId.slice(4) : ""
+}
+
+// Pluck the rm uid back out of an rm node id. Returns "" for non-rm ids.
+function parseRmUidFromNodeId(nodeId: string): string {
+  return nodeId.startsWith("rm-") ? nodeId.slice(3) : ""
 }
 
 // ============================================================================
@@ -291,34 +301,41 @@ export function RouteGraphFlow({
   graph,
   locked = false,
   onAddStage,
-  onNodePositionChange,
+  onStagePositionChange,
+  onRmPositionChange,
   onConnectStages,
   onStageClick,
   onEdgeClick,
   onDropOnPane,
 }: Props) {
   const { nodes, edges } = useMemo(() => buildFlow(graph), [graph])
+  const { resolvedTheme } = useTheme()
+  const colorMode = resolvedTheme === "dark" ? "dark" : "light"
 
   // Pending connect state — captured on onConnectStart, consumed on
   // onConnectEnd if the drop landed on the empty pane (not on another node).
   const pendingConnectRef = useRef<
-    null | { sourceSeqId: number; handleType: "source" | "target" }
+    null | { sourceSeqUid: string; handleType: "source" | "target" }
   >(null)
 
   const handleNodeDragStop = useCallback<NodeMouseHandler>(
     (_event, node) => {
-      if (locked || !onNodePositionChange) return
-      if (node.type !== "stage") return
-      const seqId = parseSeqIdFromNodeId(node.id)
-      if (seqId === 0) {
-        // New unsaved stage — find by synthetic id and look up actual seq.
-        // We can't safely persist position without seqId; let parent decide
-        // via the synthetic key (level/seq embedded in id).
+      if (locked) return
+      if (node.type === "stage") {
+        if (!onStagePositionChange) return
+        const seqUid = parseSeqUidFromNodeId(node.id)
+        if (!seqUid) return
+        onStagePositionChange(seqUid, node.position.x, node.position.y)
         return
       }
-      onNodePositionChange(seqId, node.position.x, node.position.y)
+      if (node.type === "rm") {
+        if (!onRmPositionChange) return
+        const rmUid = parseRmUidFromNodeId(node.id)
+        if (!rmUid) return
+        onRmPositionChange(rmUid, node.position.x, node.position.y)
+      }
     },
-    [locked, onNodePositionChange],
+    [locked, onStagePositionChange, onRmPositionChange],
   )
 
   const handleConnect = useCallback(
@@ -327,10 +344,10 @@ export function RouteGraphFlow({
       if (!conn.source || !conn.target) return
       // Only stage↔stage links are meaningful. Reject if either end is an rm-* node.
       if (!conn.source.startsWith("seq-") || !conn.target.startsWith("seq-")) return
-      const srcSeqId = parseSeqIdFromNodeId(conn.source)
-      const tgtSeqId = parseSeqIdFromNodeId(conn.target)
-      if (srcSeqId === 0 || tgtSeqId === 0) return // need persisted stages
-      onConnectStages(srcSeqId, tgtSeqId)
+      const srcSeqUid = parseSeqUidFromNodeId(conn.source)
+      const tgtSeqUid = parseSeqUidFromNodeId(conn.target)
+      if (!srcSeqUid || !tgtSeqUid) return
+      onConnectStages(srcSeqUid, tgtSeqUid)
     },
     [locked, onConnectStages],
   )
@@ -339,9 +356,9 @@ export function RouteGraphFlow({
     (_event, node) => {
       if (!onStageClick) return
       if (node.type !== "stage") return
-      const seqId = parseSeqIdFromNodeId(node.id)
-      if (seqId === 0) return
-      onStageClick(seqId)
+      const seqUid = parseSeqUidFromNodeId(node.id)
+      if (!seqUid) return
+      onStageClick(seqUid)
     },
     [onStageClick],
   )
@@ -350,10 +367,10 @@ export function RouteGraphFlow({
     (_event, params) => {
       if (locked || !onDropOnPane) return
       if (!params.nodeId || !params.nodeId.startsWith("seq-")) return
-      const seqId = parseSeqIdFromNodeId(params.nodeId)
-      if (seqId === 0) return
+      const seqUid = parseSeqUidFromNodeId(params.nodeId)
+      if (!seqUid) return
       pendingConnectRef.current = {
-        sourceSeqId: seqId,
+        sourceSeqUid: seqUid,
         handleType: params.handleType ?? "source",
       }
     },
@@ -369,7 +386,7 @@ export function RouteGraphFlow({
       // React Flow tags the empty canvas element with .react-flow__pane.
       const droppedOnPane = !!target?.classList?.contains("react-flow__pane")
       if (!droppedOnPane) return
-      onDropOnPane(pending.sourceSeqId, pending.handleType)
+      onDropOnPane(pending.sourceSeqUid, pending.handleType)
     },
     [locked, onDropOnPane, pendingConnectRef],
   )
@@ -378,8 +395,8 @@ export function RouteGraphFlow({
     (_event, edge) => {
       if (!onEdgeClick) return
       const data = edge.data as EdgeData | undefined
-      if (!data || !data.rmId) return
-      onEdgeClick(data.rmId)
+      if (!data || !data.rmUid) return
+      onEdgeClick(data.rmUid)
     },
     [onEdgeClick],
   )
@@ -390,6 +407,7 @@ export function RouteGraphFlow({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        colorMode={colorMode}
         fitView
         proOptions={{ hideAttribution: true }}
         nodesDraggable={!locked}

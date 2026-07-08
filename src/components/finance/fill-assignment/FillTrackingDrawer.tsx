@@ -1,12 +1,11 @@
 "use client"
 
-import { ListChecks, X } from "lucide-react"
+import { ArrowLeft, ListChecks } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -14,6 +13,9 @@ import {
 import { DeptName } from "@/components/common/dept-name"
 import { UserName } from "@/components/common/user-name"
 import { useFillTasks } from "@/hooks/finance/use-fill-assignment"
+import { useRouteGraph } from "@/hooks/finance/use-cost-route"
+import { getProductsAtLevel } from "@/types/finance/cost-route"
+import { type FillTask } from "@/types/finance/fill-assignment"
 
 import { FillTaskProgressBar } from "./FillTaskProgressBar"
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge"
@@ -23,6 +25,59 @@ interface Props {
   onOpenChange: (open: boolean) => void
   requestId: number
   requestNo: string
+}
+
+function FillTrackingDrawerRow({ task }: { task: FillTask }) {
+  const { data: graph } = useRouteGraph(task.routeHeadId || undefined)
+  const productsAtLevel = getProductsAtLevel(graph, task.routeLevel)
+
+  return (
+    <li className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-2">
+      {/* Level + status */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold">Level {task.routeLevel}</span>
+        <FillTaskStatusBadge status={task.status} />
+      </div>
+
+      {/* Product codes at this level */}
+      {productsAtLevel.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {productsAtLevel.map((s) => (
+            <Badge
+              key={s.productSysId}
+              variant="outline"
+              className="font-mono text-[10px] font-normal"
+            >
+              {s.productCode || `#${s.productSysId}`}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Filler + SLA */}
+      <div className="text-xs text-muted-foreground">
+        {task.fillerType === "FILL_ACTOR_TYPE_USER" ? (
+          <UserName userId={task.fillerValue} />
+        ) : task.fillerType === "FILL_ACTOR_TYPE_DEPT" ? (
+          <DeptName deptCode={task.fillerValue} />
+        ) : (
+          task.fillerValue || "—"
+        )}
+        <span className="ml-2 opacity-60">{task.slaFillHours}h SLA</span>
+      </div>
+
+      {/* Progress bar */}
+      <FillTaskProgressBar task={task} />
+
+      {/* Claimed by */}
+      {task.claimedBy && (
+        <div className="text-xs text-muted-foreground">
+          <span className="opacity-60">Claimed by </span>
+          <UserName userId={task.claimedBy} />
+        </div>
+      )}
+    </li>
+  )
 }
 
 function DrawerContent({
@@ -63,12 +118,10 @@ function DrawerContent({
                 : `${tasks.length} fill task${tasks.length !== 1 ? "s" : ""}`}
           </SheetDescription>
         </div>
-        <SheetClose asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
-        </SheetClose>
+        <Button variant="ghost" size="sm" className="gap-1.5 text-xs shrink-0" onClick={onClose}>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </Button>
       </div>
 
       {/* Scrollable content */}
@@ -91,39 +144,7 @@ function DrawerContent({
         {!isLoading && tasks.length > 0 && (
           <ol className="space-y-3">
             {tasks.map((task) => (
-              <li
-                key={task.taskId}
-                className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-2"
-              >
-                {/* Level + status */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold">Level {task.routeLevel}</span>
-                  <FillTaskStatusBadge status={task.status} />
-                </div>
-
-                {/* Filler + SLA */}
-                <div className="text-xs text-muted-foreground">
-                  {task.fillerType === "FILL_ACTOR_TYPE_USER" ? (
-                    <UserName userId={task.fillerValue} />
-                  ) : task.fillerType === "FILL_ACTOR_TYPE_DEPT" ? (
-                    <DeptName deptCode={task.fillerValue} />
-                  ) : (
-                    task.fillerValue || "—"
-                  )}
-                  <span className="ml-2 opacity-60">{task.slaFillHours}h SLA</span>
-                </div>
-
-                {/* Progress bar */}
-                <FillTaskProgressBar task={task} />
-
-                {/* Claimed by */}
-                {task.claimedBy && (
-                  <div className="text-xs text-muted-foreground">
-                    <span className="opacity-60">Claimed by </span>
-                    <UserName userId={task.claimedBy} />
-                  </div>
-                )}
-              </li>
+              <FillTrackingDrawerRow key={task.taskId} task={task} />
             ))}
           </ol>
         )}

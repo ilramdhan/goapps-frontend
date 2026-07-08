@@ -27,6 +27,10 @@ export interface CostRouteHead {
   promotedFromDraftId: number;
   cylTypeId: number;
   notes: string;
+  /** Number of distinct route levels in this routing (read-time aggregate). */
+  levelCount: number;
+  /** Number of RM inputs across all stages (read-time aggregate). */
+  rmCount: number;
   /** Lock tracking -- populated when routing_status = "LOCKED". */
   lockedBy: string;
   lockedAt: string;
@@ -80,6 +84,12 @@ export interface CostRouteRm {
   uomId: number;
   subType: string;
   notes: string;
+  /** Persisted node X position on the routing graph. */
+  positionX: number;
+  /** Persisted node Y position on the routing graph. */
+  positionY: number;
+  /** RM group display name (read-time join on rm_group_code). */
+  rmGroupName: string;
 }
 
 /** RouteGraph bundles the head + all seqs (with rms inline). */
@@ -225,6 +235,8 @@ function createBaseCostRouteHead(): CostRouteHead {
     promotedFromDraftId: 0,
     cylTypeId: 0,
     notes: "",
+    levelCount: 0,
+    rmCount: 0,
     lockedBy: "",
     lockedAt: "",
     unlockedBy: "",
@@ -261,6 +273,12 @@ export const CostRouteHead: MessageFns<CostRouteHead> = {
     }
     if (message.notes !== "") {
       writer.uint32(74).string(message.notes);
+    }
+    if (message.levelCount !== 0) {
+      writer.uint32(80).int32(message.levelCount);
+    }
+    if (message.rmCount !== 0) {
+      writer.uint32(88).int32(message.rmCount);
     }
     if (message.lockedBy !== "") {
       writer.uint32(138).string(message.lockedBy);
@@ -359,6 +377,22 @@ export const CostRouteHead: MessageFns<CostRouteHead> = {
           message.notes = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.levelCount = reader.int32();
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.rmCount = reader.int32();
+          continue;
+        }
         case 17: {
           if (tag !== 138) {
             break;
@@ -447,6 +481,16 @@ export const CostRouteHead: MessageFns<CostRouteHead> = {
         ? globalThis.Number(object.cyl_type_id)
         : 0,
       notes: isSet(object.notes) ? globalThis.String(object.notes) : "",
+      levelCount: isSet(object.levelCount)
+        ? globalThis.Number(object.levelCount)
+        : isSet(object.level_count)
+        ? globalThis.Number(object.level_count)
+        : 0,
+      rmCount: isSet(object.rmCount)
+        ? globalThis.Number(object.rmCount)
+        : isSet(object.rm_count)
+        ? globalThis.Number(object.rm_count)
+        : 0,
       lockedBy: isSet(object.lockedBy)
         ? globalThis.String(object.lockedBy)
         : isSet(object.locked_by)
@@ -500,6 +544,12 @@ export const CostRouteHead: MessageFns<CostRouteHead> = {
     if (message.notes !== "") {
       obj.notes = message.notes;
     }
+    if (message.levelCount !== 0) {
+      obj.levelCount = Math.round(message.levelCount);
+    }
+    if (message.rmCount !== 0) {
+      obj.rmCount = Math.round(message.rmCount);
+    }
     if (message.lockedBy !== "") {
       obj.lockedBy = message.lockedBy;
     }
@@ -532,6 +582,8 @@ export const CostRouteHead: MessageFns<CostRouteHead> = {
     message.promotedFromDraftId = object.promotedFromDraftId ?? 0;
     message.cylTypeId = object.cylTypeId ?? 0;
     message.notes = object.notes ?? "";
+    message.levelCount = object.levelCount ?? 0;
+    message.rmCount = object.rmCount ?? 0;
     message.lockedBy = object.lockedBy ?? "";
     message.lockedAt = object.lockedAt ?? "";
     message.unlockedBy = object.unlockedBy ?? "";
@@ -897,6 +949,9 @@ function createBaseCostRouteRm(): CostRouteRm {
     uomId: 0,
     subType: "",
     notes: "",
+    positionX: 0,
+    positionY: 0,
+    rmGroupName: "",
   };
 }
 
@@ -946,6 +1001,15 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     }
     if (message.notes !== "") {
       writer.uint32(122).string(message.notes);
+    }
+    if (message.positionX !== 0) {
+      writer.uint32(129).double(message.positionX);
+    }
+    if (message.positionY !== 0) {
+      writer.uint32(137).double(message.positionY);
+    }
+    if (message.rmGroupName !== "") {
+      writer.uint32(146).string(message.rmGroupName);
     }
     return writer;
   },
@@ -1077,6 +1141,30 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
           message.notes = reader.string();
           continue;
         }
+        case 16: {
+          if (tag !== 129) {
+            break;
+          }
+
+          message.positionX = reader.double();
+          continue;
+        }
+        case 17: {
+          if (tag !== 137) {
+            break;
+          }
+
+          message.positionY = reader.double();
+          continue;
+        }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.rmGroupName = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1159,6 +1247,21 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
         ? globalThis.String(object.sub_type)
         : "",
       notes: isSet(object.notes) ? globalThis.String(object.notes) : "",
+      positionX: isSet(object.positionX)
+        ? globalThis.Number(object.positionX)
+        : isSet(object.position_x)
+        ? globalThis.Number(object.position_x)
+        : 0,
+      positionY: isSet(object.positionY)
+        ? globalThis.Number(object.positionY)
+        : isSet(object.position_y)
+        ? globalThis.Number(object.position_y)
+        : 0,
+      rmGroupName: isSet(object.rmGroupName)
+        ? globalThis.String(object.rmGroupName)
+        : isSet(object.rm_group_name)
+        ? globalThis.String(object.rm_group_name)
+        : "",
     };
   },
 
@@ -1209,6 +1312,15 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     if (message.notes !== "") {
       obj.notes = message.notes;
     }
+    if (message.positionX !== 0) {
+      obj.positionX = message.positionX;
+    }
+    if (message.positionY !== 0) {
+      obj.positionY = message.positionY;
+    }
+    if (message.rmGroupName !== "") {
+      obj.rmGroupName = message.rmGroupName;
+    }
     return obj;
   },
 
@@ -1232,6 +1344,9 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     message.uomId = object.uomId ?? 0;
     message.subType = object.subType ?? "";
     message.notes = object.notes ?? "";
+    message.positionX = object.positionX ?? 0;
+    message.positionY = object.positionY ?? 0;
+    message.rmGroupName = object.rmGroupName ?? "";
     return message;
   },
 };

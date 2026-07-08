@@ -1,6 +1,6 @@
 "use client"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/common/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { ShieldCheck, ShieldOff, Building2, Briefcase } from "lucide-react"
@@ -24,24 +24,17 @@ export function ProfileHeader({
     roles = [],
     twoFactorEnabled = false,
 }: ProfileHeaderProps) {
-    const initials = name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-
     return (
         <Card>
             <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                     {/* Avatar */}
-                    <Avatar className="h-24 w-24">
-                        <AvatarImage src={avatarUrl} alt={name} />
-                        <AvatarFallback className="text-2xl font-semibold bg-primary text-primary-foreground">
-                            {initials}
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                        fullName={name}
+                        avatarUrl={avatarUrl}
+                        className="h-24 w-24"
+                        fallbackClassName="text-2xl font-semibold bg-primary text-primary-foreground"
+                    />
 
                     {/* User Info */}
                     <div className="flex-1 text-center sm:text-left space-y-3">

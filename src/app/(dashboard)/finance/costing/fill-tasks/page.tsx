@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   useFillTasks,
   useClaimFillTask,
-  useApproveFillTask,
   useRejectFillTask,
 } from "@/hooks/finance/use-fill-assignment";
 import { useCostProductRequests } from "@/hooks/finance/use-cost-product-request";
@@ -128,7 +127,6 @@ function FillTasksContent({ requestId, onRequestSelect }: FillTasksContentProps)
 
   const { data: tasks = [], isLoading } = useFillTasks(requestId);
   const claim = useClaimFillTask(requestId);
-  const approve = useApproveFillTask(requestId);
   const reject = useRejectFillTask(requestId);
 
   const myBlockerTask = tasks.find(
@@ -185,7 +183,6 @@ function FillTasksContent({ requestId, onRequestSelect }: FillTasksContentProps)
                 },
               });
             }}
-            onApprove={(taskId) => approve.mutate({ taskId })}
             onReject={(taskId) =>
               reject.mutate({ taskId, reason: "Rejected" })
             }

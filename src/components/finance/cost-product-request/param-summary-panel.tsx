@@ -97,8 +97,9 @@ export function ParamSummaryPanel({ requestId, routeLocked = false }: Props) {
                 >
                   <span className="flex-1 min-w-0">
                     <span className="font-mono font-medium truncate block">{product.productCode}</span>
+                    {product.productName && <span className="text-xs text-muted-foreground truncate block">{product.productName}</span>}
                     <span className="text-muted-foreground">
-                      {product.levels.length} level{product.levels.length !== 1 ? "s" : ""} · {productFilled}/{productTotal} params
+                      Level {product.levels.map(l => l.routeLevel).sort((a,b)=>a-b).join(", ")} · {productFilled}/{productTotal} params
                     </span>
                   </span>
                   {fillStatusBadge(productFilled, productTotal, hasRejected)}

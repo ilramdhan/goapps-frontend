@@ -32,18 +32,14 @@ import { RoutingPanel } from "./routing-panel"
 import { StatusBadge } from "./status-badge"
 import { ParamSummaryPanel } from "./param-summary-panel"
 import {
+  ClassificationAndFeasibilityDialog,
   CloseDialog,
   ConfirmActionDialog,
-  FeasibilityDialog,
   ReasonDialog,
-  UseExistingCostingDialog,
-  VerifyClassificationDialog,
 } from "./transition-dialogs"
 import {
   useApproveRequest,
-  useCancelRequest,
   useConfirmRequest,
-  useDecideFeasibility,
   useMarkParameterComplete,
   useMarkParameterPending,
   useReleaseRequest,
@@ -51,9 +47,6 @@ import {
   useReopenRequest,
   useRejectRequest,
   useStartReview,
-  useSubmitRequest,
-  useUseExistingCosting,
-  useVerifyClassification,
   useCloseRequest,
 } from "@/hooks/finance/use-cost-product-request"
 import type { CostProductRequest } from "@/types/finance/cost-product-request"
@@ -72,7 +65,11 @@ interface Props {
   hasFillTracking?: boolean
 }
 
-type DialogKind = "reject" | "cancel" | "verify" | "feasibility" | "close" | "useExisting" | "confirmAction" | null
+// "submitDecide" — B3 merge (design.md §3 B3): the DRAFT "Submit" button now opens
+// ClassificationAndFeasibilityDialog in mode="submit" instead of firing a bare
+// useSubmitRequest() mutation. "reviewDecide" (mode="review", the UNDER_REVIEW flow)
+// is unchanged and stays a separate dialog kind since its retry semantics differ.
+type DialogKind = "reject" | "reviewDecide" | "submitDecide" | "close" | "confirmAction" | null
 
 export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, hasFillTracking = false }: Props) {
   useCPRRealtimeSync(request.requestId)
@@ -80,15 +77,10 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [confirmActionType, setConfirmActionType] = useState<"confirm" | "approve" | "release">("confirm")
 
-  const submitM = useSubmitRequest()
   const startM = useStartReview()
   const reviseM = useReviseRequest()
   const reopenM = useReopenRequest()
-  const useExistingM = useUseExistingCosting()
-  const verifyM = useVerifyClassification()
-  const feasibilityM = useDecideFeasibility()
   const rejectM = useRejectRequest()
-  const cancelM = useCancelRequest()
   const closeM = useCloseRequest()
   const markPendingM = useMarkParameterPending()
   const markCompleteM = useMarkParameterComplete()
@@ -176,7 +168,7 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
           </Button>
         )}
         {isDraft && canSubmit && (
-          <Button onClick={() => submitM.mutate({ requestId })} disabled={submitM.isPending}>
+          <Button onClick={() => setDialog("submitDecide")}>
             <Play className="mr-2 h-4 w-4" /> Submit
           </Button>
         )}
@@ -193,25 +185,9 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
             <Play className="mr-2 h-4 w-4" /> Promote route
           </Button>
         )}
-        {isUnderReview && canResolve && !request.verifiedClassification && (
-          <Button variant="secondary" onClick={() => setDialog("verify")}>
-            <FileCheck className="mr-2 h-4 w-4" /> Verify classification
-          </Button>
-        )}
         {isUnderReview && canResolve && (
-          <Button onClick={() => setDialog("feasibility")} disabled={feasibilityM.isPending}>
-            <CheckCircle2 className="mr-2 h-4 w-4" /> Decide feasibility
-          </Button>
-        )}
-        {isUnderReview && canResolve &&
-          (request.verifiedClassification === "existing" ||
-            (!request.verifiedClassification && request.productClassification === "existing")) && (
-          <Button
-            variant="secondary"
-            onClick={() => setDialog("useExisting")}
-            disabled={useExistingM.isPending}
-          >
-            <FileCheck className="mr-2 h-4 w-4" /> Use existing costing
+          <Button onClick={() => setDialog("reviewDecide")}>
+            <FileCheck className="mr-2 h-4 w-4" /> Review &amp; decide
           </Button>
         )}
         {(isSubmitted || isUnderReview) && canReject && (
@@ -273,9 +249,6 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
             <Button variant="outline" onClick={() => setDialog("close")}>
               Close
             </Button>
-            <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDialog("cancel")}>
-              <Ban className="mr-2 h-4 w-4" /> Cancel
-            </Button>
           </>
         )}
       </div>
@@ -317,38 +290,30 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
                 <Field label="Target price">{request.targetPriceRange || "—"}</Field>
                 <Field label="Requester"><UserName userId={request.requesterUserId} /></Field>
               </div>
-              {request.description && (
-                <div className="border-t pt-4">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Description</div>
-                  <p className="text-sm whitespace-pre-wrap">{request.description}</p>
-                </div>
-              )}
-              <div className="border-t pt-4 space-y-2">
-                <AttachmentsPanel requestId={request.requestId} readOnly={readOnly} inline />
-              </div>
             </CardContent>
           </Card>
 
-          {request.spec && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Product specification</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <Field label="Raw material">{request.spec.rawMaterialType}</Field>
-                <Field label="Paper tube"><PaperTubeName id={request.spec.paperTubeTypeId} /></Field>
-                <Field label="Weight / bobbin">{request.spec.weightPerBobbinKg} kg</Field>
-                <Field label="Box type">{request.spec.boxType}</Field>
-                <Field label="Shade">{request.spec.shadeCustomText || `master #${request.spec.shadeId ?? "—"}`}</Field>
-                <div className="col-span-2 md:col-span-4">
-                  <Separator className="my-2" />
-                  <Field label="Product description">
-                    <p className="whitespace-pre-wrap">{request.spec.productDescription}</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Product specification</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {request.spec && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Field label="Tube">
+                    <PaperTubeName id={request.spec.paperTubeTypeId} tubeType={request.spec.tubeType} />
                   </Field>
+                  <Field label="Shade code">{request.spec.shadeCode || `master #${request.spec.shadeId ?? "—"}`}</Field>
+                  <Field label="Shade name">{request.spec.shadeName || "—"}</Field>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+              <Field label="Product description">
+                <p className="whitespace-pre-wrap">{request.spec?.productDescription || request.description || "—"}</p>
+              </Field>
+              <Separator className="my-2" />
+              <AttachmentsPanel requestId={request.requestId} readOnly={readOnly} inline />
+            </CardContent>
+          </Card>
 
           {(request.classificationOverrideReason || request.feasibilityDecision) && (
             <Card>
@@ -497,47 +462,22 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
           rejectM.mutate({ requestId, body: { reason } }, { onSuccess: () => setDialog(null) })
         }}
       />
-      <ReasonDialog
-        open={dialog === "cancel"}
-        onOpenChange={(o) => setDialog(o ? "cancel" : null)}
-        title="Cancel request"
-        description="Cancelling closes the request with sub-status = cancelled. Provide a reason."
-        confirmLabel="Cancel request"
-        pending={cancelM.isPending}
-        onConfirm={(reason) => {
-          cancelM.mutate({ requestId, body: { reason } }, { onSuccess: () => setDialog(null) })
-        }}
-      />
-      <VerifyClassificationDialog
-        open={dialog === "verify"}
-        onOpenChange={(o) => setDialog(o ? "verify" : null)}
+      <ClassificationAndFeasibilityDialog
+        open={dialog === "reviewDecide"}
+        onOpenChange={(o) => setDialog(o ? "reviewDecide" : null)}
+        requestId={requestId}
         currentClassification={request.productClassification}
-        pending={verifyM.isPending}
-        onConfirm={(verified, overrideReason) => {
-          verifyM.mutate(
-            { requestId, verifiedClassification: verified, overrideReason },
-            { onSuccess: () => setDialog(null) },
-          )
-        }}
+        initialVerifiedClassification={request.verifiedClassification}
+        referenceProductSysId={request.referenceProductSysId}
       />
-      <FeasibilityDialog
-        open={dialog === "feasibility"}
-        onOpenChange={(o) => setDialog(o ? "feasibility" : null)}
-        pending={feasibilityM.isPending}
-        onConfirm={(decision, note) => {
-          feasibilityM.mutate({ requestId, decision, note }, { onSuccess: () => setDialog(null) })
-        }}
-      />
-      <UseExistingCostingDialog
-        open={dialog === "useExisting"}
-        onOpenChange={(o) => setDialog(o ? "useExisting" : null)}
-        pending={useExistingM.isPending}
-        onConfirm={(existingProductSysId) => {
-          useExistingM.mutate(
-            { requestId, body: { existingProductSysId } },
-            { onSuccess: () => setDialog(null) },
-          )
-        }}
+      <ClassificationAndFeasibilityDialog
+        open={dialog === "submitDecide"}
+        onOpenChange={(o) => setDialog(o ? "submitDecide" : null)}
+        requestId={requestId}
+        currentClassification={request.productClassification}
+        initialVerifiedClassification={request.verifiedClassification}
+        referenceProductSysId={request.referenceProductSysId}
+        mode="submit"
       />
       <CloseDialog
         open={dialog === "close"}

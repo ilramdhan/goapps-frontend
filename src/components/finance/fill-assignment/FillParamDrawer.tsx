@@ -1,13 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ArrowLeft, CheckCircle, Loader2, X } from "lucide-react"
+import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -15,6 +14,7 @@ import {
 import { EmptyState } from "@/components/common/empty-state"
 import { useFillTasks, useSubmitFillTask } from "@/hooks/finance/use-fill-assignment"
 import { useRouteGraph } from "@/hooks/finance/use-cost-route"
+import { getProductsAtLevel } from "@/types/finance/cost-route"
 
 import { FillParamProductSection } from "./FillParamProductSection"
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge"
@@ -31,10 +31,10 @@ function DrawerContent({ requestId, taskId, onClose }: { requestId: number; task
   const task = useMemo(() => tasks.find((t) => t.taskId === taskId), [tasks, taskId])
   const { data: graph, isLoading: graphLoading } = useRouteGraph(task?.routeHeadId)
 
-  const productsAtLevel = useMemo(() => {
-    if (!graph || !task) return []
-    return graph.seqs.filter((s) => s.routeLevel === task.routeLevel)
-  }, [graph, task])
+  const productsAtLevel = useMemo(
+    () => getProductsAtLevel(graph, task?.routeLevel),
+    [graph, task],
+  )
 
   const submitM = useSubmitFillTask(requestId)
   const [savedProducts, setSavedProducts] = useState<Set<number>>(new Set())
@@ -81,12 +81,6 @@ function DrawerContent({ requestId, taskId, onClose }: { requestId: number; task
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to request
           </Button>
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </SheetClose>
         </div>
       </div>
 

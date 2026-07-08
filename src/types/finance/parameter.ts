@@ -184,6 +184,9 @@ export interface ParameterFormData {
   displayOrder: number
   displayGroup: string
   notes: string
+  // Approval review drawer visibility (edit-only; UpdateParameterRequest field)
+  isApprovalVisible: boolean
+  approvalDisplayOrder: number
 }
 
 /**
@@ -207,6 +210,8 @@ export const DEFAULT_PARAMETER_FORM_VALUES: ParameterFormData = {
   displayOrder: 0,
   displayGroup: "",
   notes: "",
+  isApprovalVisible: false,
+  approvalDisplayOrder: 0,
 }
 
 /**

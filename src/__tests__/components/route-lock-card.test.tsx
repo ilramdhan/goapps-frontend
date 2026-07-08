@@ -43,6 +43,8 @@ function baseHead(overrides: Partial<CostRouteHead> = {}): CostRouteHead {
     lockedAt: "",
     unlockedBy: "",
     unlockedAt: "",
+    levelCount: 0,
+    rmCount: 0,
     ...overrides,
   }
 }

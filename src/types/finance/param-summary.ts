@@ -6,6 +6,8 @@ export interface ParamValueEntry {
   paramCode: string
   paramName: string
   dataType: string // "NUMBER" | "TEXT" | "BOOLEAN"
+  displayGroup: string
+  displayOrder: number
   hasValue: boolean
   valueNumeric: string
   valueText: string
@@ -47,6 +49,8 @@ function normalizeParamValue(raw: Record<string, unknown>): ParamValueEntry {
     paramCode: String(raw.paramCode ?? raw.param_code ?? ""),
     paramName: String(raw.paramName ?? raw.param_name ?? ""),
     dataType: String(raw.dataType ?? raw.data_type ?? ""),
+    displayGroup: String(raw.displayGroup ?? raw.display_group ?? ""),
+    displayOrder: Number(raw.displayOrder ?? raw.display_order ?? 0),
     hasValue: Boolean(raw.hasValue ?? raw.has_value ?? false),
     valueNumeric: String(raw.valueNumeric ?? raw.value_numeric ?? ""),
     valueText: String(raw.valueText ?? raw.value_text ?? ""),

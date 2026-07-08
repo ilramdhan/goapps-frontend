@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Edit, Eye, Package, Power } from "lucide-react"
 
 import { ProductTypeName } from "@/components/common/product-type-name"
@@ -62,7 +62,6 @@ export function ProductMasterTable({
   onSort,
   visibility,
 }: Props) {
-  const router = useRouter()
   const show = (id: string) => visibility[id] !== false
   const visibleCount = PRODUCT_MASTER_COLUMNS.filter((c) => show(c.id)).length + 1 // +1 actions
 
@@ -133,13 +132,14 @@ export function ProductMasterTable({
               </TableRow>
             )}
             {items.map((p) => (
-              <TableRow
-                key={p.productSysId}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => router.push(`/finance/product-master/${p.productSysId}`)}
-              >
+              <TableRow key={p.productSysId} className="relative cursor-pointer hover:bg-muted/50">
                 {show("product_code") && (
-                  <TableCell className="pl-4 font-mono text-xs">{p.productCode}</TableCell>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    <Link href={`/finance/product-master/${p.productSysId}`} className="absolute inset-0">
+                      <span className="sr-only">View {p.productCode}</span>
+                    </Link>
+                    {p.productCode}
+                  </TableCell>
                 )}
                 {show("product_name") && <TableCell>{p.productName}</TableCell>}
                 {show("product_type_code") && (
@@ -166,7 +166,7 @@ export function ProductMasterTable({
                   </TableCell>
                 )}
                 <TableCell
-                  className="pr-4 text-right space-x-1"
+                  className="relative z-10 pr-4 text-right space-x-1"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Button size="icon" variant="ghost" onClick={() => onView(p)} title="View">
