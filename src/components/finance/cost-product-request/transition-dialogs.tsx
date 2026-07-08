@@ -15,8 +15,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
+import { RoutingResolver } from "@/components/finance/cost-product-request/routing-resolver"
 import { useCostProductMaster, useCostProductMasters } from "@/hooks/finance/use-cost-product-master"
-import { useDecideFeasibility, useVerifyClassification } from "@/hooks/finance/use-cost-product-request"
+import { useDecideFeasibility, useSubmitAndDecide, useVerifyClassification } from "@/hooks/finance/use-cost-product-request"
+import { useLinkExistingRoute } from "@/hooks/finance/use-link-route"
 import { cn } from "@/lib/utils"
 import type { ClosedSubstatus, ProductClassification } from "@/types/finance/cost-product-request"
 
@@ -66,16 +68,30 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
 
 // ----- ClassificationAndFeasibilityDialog -------------------------------------------------
 // Merges the former VerifyClassificationDialog + FeasibilityDialog into a single screen
-// (item #2, 2026-07-03 CPR UX batch). Submits sequentially — classification first, then
-// feasibility — reusing the two existing mutations/RPCs unchanged. See design.md §2.
+// (item #2, 2026-07-03 CPR UX batch). Extended per design.md §3 Area B (B1) to also resolve
+// + link the request's routing inline, when the decision is FEASIBLE, instead of deferring
+// routing to a separate later step via the Routing card.
 //
-// Local state machine: "idle" (both sections editable) -> "classifying" (step 1 in flight)
-// -> "classified" (step 1 saved; either about to auto-run step 2, or step 2 failed and the
-// user is retrying just feasibility, with classification now read-only) -> "deciding" (step 2
-// in flight) -> "done" (both succeeded, dialog closes). `error` carries the latest inline
-// message; it is distinct from the toasts the underlying hooks already fire on their own
-// success/failure.
-type ReviewPhase = "idle" | "classifying" | "classified" | "deciding" | "done"
+// Routing resolution itself (picking a product / brand-new-product form, then clicking
+// RoutingResolver's own "Resolve routing" button) is a separate, frontend-only interaction
+// that happens BEFORE the dialog's main Submit button is even enabled (mirrors
+// `classificationLocked`'s existing gating pattern) — see `resolvedHeadId` below.
+//
+// Once resolvedHeadId is set and Submit is clicked, the RPC chain is:
+//   VerifyClassification -> LinkRoute(requestId, resolvedHeadId) -> DecideFeasibility -> done
+// (design.md §3 B1's recommended ordering: routing resolves right after classification, before
+// feasibility, since a routing failure should block the whole dialog — consistent with the
+// existing "classification saved but feasibility failed -> retry feasibility" pattern extending
+// naturally to "classification+routing saved but feasibility failed -> retry feasibility only").
+//
+// Local state machine: "idle" (all sections editable) -> "classifying" (step 1, VerifyClassification,
+// in flight) -> "classified" (step 1 saved; either about to auto-run the routing link, or a later
+// step failed and the user is retrying just that step, with classification now read-only) ->
+// "routing" (step 2, LinkRoute, in flight; on failure this phase doubles as the "only the route
+// link needs a retry" state) -> "deciding" (step 3, DecideFeasibility, in flight) -> "done" (all
+// steps succeeded, dialog closes). `error` carries the latest inline message; it is distinct from
+// the toasts the underlying hooks already fire on their own success/failure.
+type ReviewPhase = "idle" | "classifying" | "classified" | "routing" | "deciding" | "done"
 
 interface ClassificationAndFeasibilityProps {
   open: boolean
@@ -85,6 +101,17 @@ interface ClassificationAndFeasibilityProps {
   currentClassification: ProductClassification
   /** request.verifiedClassification, if already set — used to pre-fill instead of the prediction. */
   initialVerifiedClassification?: ProductClassification
+  /** request.referenceProductSysId (D4) — prefills RoutingResolver's product picker when set. */
+  referenceProductSysId?: number
+  /**
+   * "review" (default) — UNDER_REVIEW flow: classification/routing/feasibility are saved via
+   * 3 separate calls (VerifyClassification -> LinkRoute -> DecideFeasibility), each individually
+   * retryable on failure — used by the "Review & decide" button.
+   * "submit" — DRAFT flow (B3 merge): the whole sequence (Submit + StartReview + VerifyClassification
+   * + DecideFeasibility + LinkRoute) is composed server-side in a single SubmitAndDecide call, so
+   * only one consolidated notification pair fires — used by the DRAFT "Submit" button.
+   */
+  mode?: "review" | "submit"
 }
 
 export function ClassificationAndFeasibilityDialog({
@@ -93,34 +120,47 @@ export function ClassificationAndFeasibilityDialog({
   requestId,
   currentClassification,
   initialVerifiedClassification,
+  referenceProductSysId,
+  mode = "review",
 }: ClassificationAndFeasibilityProps) {
   const verifyM = useVerifyClassification()
   const feasibilityM = useDecideFeasibility()
+  const linkRouteM = useLinkExistingRoute()
+  const submitAndDecideM = useSubmitAndDecide()
 
   const [phase, setPhase] = useState<ReviewPhase>("idle")
   const [error, setError] = useState<string | null>(null)
 
   const [verified, setVerified] = useState<ProductClassification>(
-    initialVerifiedClassification ?? currentClassification,
+    initialVerifiedClassification ?? (currentClassification === "pending" ? "existing" : currentClassification),
   )
   const [overrideReason, setOverrideReason] = useState("")
   const [decision, setDecision] = useState<"FEASIBLE" | "NOT_FEASIBLE">("FEASIBLE")
   const [note, setNote] = useState("")
+  // Populated by RoutingResolver's onResolved callback once the user has picked/created a
+  // product and clicked its own "Resolve routing" button — a precondition step that happens
+  // before the dialog's main Submit button is even enabled (mirrors classificationLocked's gate).
+  const [resolvedHeadId, setResolvedHeadId] = useState<number | null>(null)
+  // Tracks whether LinkRoute already succeeded, so a feasibility-only retry (after routing
+  // succeeded but feasibility failed) never re-submits the already-linked route.
+  const [routeLinked, setRouteLinked] = useState(false)
 
-  const isOverride = verified !== currentClassification
+  const isOverride = verified !== currentClassification && currentClassification !== "pending"
   const isInfeasible = decision === "NOT_FEASIBLE"
-  // Once classification has been saved (either mid-flow or after a step-2 failure we're
+  // Once classification has been saved (either mid-flow or after a later-step failure we're
   // retrying), lock the classification section so a retry never re-submits it.
-  const classificationLocked = phase === "classified" || phase === "deciding"
-  const pending = verifyM.isPending || feasibilityM.isPending
+  const classificationLocked = phase === "classified" || phase === "routing" || phase === "deciding"
+  const pending = verifyM.isPending || linkRouteM.isPending || feasibilityM.isPending || submitAndDecideM.isPending
 
   function resetAll() {
     setPhase("idle")
     setError(null)
-    setVerified(initialVerifiedClassification ?? currentClassification)
+    setVerified(initialVerifiedClassification ?? (currentClassification === "pending" ? "existing" : currentClassification))
     setOverrideReason("")
     setDecision("FEASIBLE")
     setNote("")
+    setResolvedHeadId(null)
+    setRouteLinked(false)
   }
 
   async function submitFeasibility() {
@@ -136,16 +176,71 @@ export function ClassificationAndFeasibilityDialog({
       toast.success("Classification & feasibility recorded")
       onOpenChange(false)
     } catch {
-      // Classification already saved — only feasibility needs a retry.
+      // Classification (and routing, if FEASIBLE) already saved — only feasibility needs a retry.
       setPhase("classified")
       setError("Classification saved. Feasibility decision failed — please retry.")
     }
   }
 
+  async function linkResolvedRouteThenDecide() {
+    if (!routeLinked) {
+      setPhase("routing")
+      if (!resolvedHeadId) {
+        // Guarded by canSubmit below — should not be reachable, but keep an explicit message.
+        setError("Resolve routing before continuing.")
+        return
+      }
+      try {
+        await linkRouteM.mutateAsync({ requestId, routeHeadId: resolvedHeadId })
+        setRouteLinked(true)
+      } catch {
+        // Classification already saved — only the routing link needs a retry.
+        setPhase("classified")
+        setError("Classification saved. Linking the route failed — please retry.")
+        return
+      }
+    }
+    await submitFeasibility()
+  }
+
+  // "submit" mode (B3 merge): the entire sequence is one server-side call
+  // (SubmitAndDecide) instead of the "review" mode's 3 separately-retryable
+  // mutations — so on failure the whole action is simply retried as a whole,
+  // there is no partial "classification saved, routing failed" state to track.
+  async function submitAndDecide() {
+    setPhase("deciding")
+    setError(null)
+    try {
+      await submitAndDecideM.mutateAsync({
+        requestId,
+        verifiedClassification: verified,
+        overrideReason: isOverride ? overrideReason.trim() : "",
+        decision,
+        note: isInfeasible ? note.trim() : "",
+        referenceProductHeadId: !isInfeasible && resolvedHeadId != null ? resolvedHeadId : undefined,
+      })
+      setPhase("done")
+      toast.success("Submitted for review")
+      onOpenChange(false)
+    } catch {
+      setPhase("idle")
+      setError("Submit failed — please check the details and try again.")
+    }
+  }
+
   async function handleSubmit() {
+    if (mode === "submit") {
+      await submitAndDecide()
+      return
+    }
     if (classificationLocked) {
-      // Retry path after a step-2 failure: classification is already saved.
-      await submitFeasibility()
+      // Retry path after a later-step failure: classification is already saved. Re-drive
+      // whichever step is next — routing (if FEASIBLE and not yet linked) or feasibility.
+      if (!isInfeasible && !routeLinked) {
+        await linkResolvedRouteThenDecide()
+      } else {
+        await submitFeasibility()
+      }
       return
     }
     if (isInfeasible) {
@@ -166,12 +261,23 @@ export function ClassificationAndFeasibilityDialog({
       return
     }
     setPhase("classified")
-    await submitFeasibility()
+    await linkResolvedRouteThenDecide()
   }
 
   const canSubmitClassification = classificationLocked || !isOverride || !!overrideReason.trim()
   const canSubmitFeasibility = !isInfeasible || !!note.trim()
-  const canSubmit = (isInfeasible || canSubmitClassification) && canSubmitFeasibility
+  const canSubmitRouting = isInfeasible || resolvedHeadId != null
+  const canSubmit = (isInfeasible || canSubmitClassification) && canSubmitFeasibility && canSubmitRouting
+
+  const submitLabel = classificationLocked
+    ? !isInfeasible && !routeLinked
+      ? "Retry routing link"
+      : "Retry feasibility"
+    : isInfeasible
+      ? "Reject as infeasible"
+      : mode === "submit"
+        ? "Submit for review"
+        : "Save & continue"
 
   return (
     <Dialog
@@ -183,9 +289,11 @@ export function ClassificationAndFeasibilityDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Review &amp; decide</DialogTitle>
+          <DialogTitle>{mode === "submit" ? "Submit for review" : "Review & decide"}</DialogTitle>
           <DialogDescription>
-            Confirm the product classification and decide feasibility for this request.
+            {mode === "submit"
+              ? "Confirm the product classification, resolve routing, and decide feasibility — submitted directly to review."
+              : "Confirm the product classification and decide feasibility for this request."}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,8 +331,14 @@ export function ClassificationAndFeasibilityDialog({
               <div className="space-y-3">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">Classification</div>
                 <p className="text-sm text-muted-foreground">
-                  Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an override
-                  requires a reason.
+                  {currentClassification === "pending" ? (
+                    "This request has not yet been classified. Choose existing or new."
+                  ) : (
+                    <>
+                      Marketing marked this as <strong>{currentClassification}</strong>. Confirm or override; an
+                      override requires a reason.
+                    </>
+                  )}
                 </p>
                 <RadioGroup
                   value={verified}
@@ -258,6 +372,36 @@ export function ClassificationAndFeasibilityDialog({
             </>
           )}
 
+          {/* Routing section (B1) — only when FEASIBLE; resolves + links the request's route
+              inline instead of deferring to the separate Routing card. "existing" verified
+              classification shows the full picker (existing product / brand-new toggle);
+              "new" skips straight to the new-product-master form (design.md §3 B1). */}
+          {!isInfeasible && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Routing</div>
+                {routeLinked ? (
+                  <p className="text-sm text-muted-foreground">
+                    Route #{resolvedHeadId} resolved and ready to link.
+                  </p>
+                ) : (
+                  <RoutingResolver
+                    requestId={requestId}
+                    productSysId={referenceProductSysId}
+                    forceNewProduct={verified === "new"}
+                    onResolved={setResolvedHeadId}
+                  />
+                )}
+                {resolvedHeadId != null && !routeLinked && (
+                  <p className="text-sm text-muted-foreground">
+                    Routing resolved — head #{resolvedHeadId} will be linked on submit.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
@@ -277,7 +421,7 @@ export function ClassificationAndFeasibilityDialog({
             }}
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {classificationLocked ? "Retry feasibility" : isInfeasible ? "Reject as infeasible" : "Save & continue"}
+            {submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

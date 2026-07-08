@@ -1,12 +1,15 @@
 "use client"
 
 import { useMemo } from "react"
-import { ArrowRight, FileText, ListChecks } from "lucide-react"
+import Link from "next/link"
+import { FileText, ListChecks } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/common/empty-state"
+import { SortableHeader } from "@/components/shared/data-table/sortable-header"
 import { useColumnVisibility } from "@/components/shared/data-table/use-column-visibility"
 import { cn } from "@/lib/utils"
 import { typography } from "@/lib/ui/typography"
@@ -17,9 +20,11 @@ import type { ColumnDef } from "@/components/shared/data-table/types"
 interface Props {
   items: CostProductRequest[]
   isLoading?: boolean
-  onOpen: (r: CostProductRequest) => void
   onTrack?: (r: CostProductRequest) => void
   visibility: Record<string, boolean>
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
+  onSort: (sortKey: string) => void
 }
 
 function humanize(value: string): string {
@@ -49,11 +54,12 @@ export function useRequestTableColumns(hasTrack: boolean) {
 
 const th = cn(typography.tableHeader)
 
-export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: Props) {
+export function RequestTable({ items, isLoading, onTrack, visibility, sortBy, sortOrder, onSort }: Props) {
   const hasTrack = !!onTrack
   const columns = useMemo(() => buildColumns(hasTrack), [hasTrack])
   const show = (id: string) => visibility[id] !== false
-  const visibleCount = columns.filter((c) => show(c.id)).length + 1 // +1 for action col
+  const visibleCount = columns.filter((c) => show(c.id)).length
+  const sortProps = { currentSortBy: sortBy, currentSortOrder: sortOrder, onSort }
 
   return (
     /*
@@ -69,15 +75,28 @@ export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: 
         <table className="w-full caption-bottom text-sm">
           <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
-              {show("request_no") && <TableHead className={cn(th, "w-40 pl-4")}>Request #</TableHead>}
-              {show("type")       && <TableHead className={cn(th, "w-28")}>Type</TableHead>}
-              {show("title")      && <TableHead className={th}>Title</TableHead>}
-              {show("customer")   && <TableHead className={cn(th, "w-44")}>Customer</TableHead>}
-              {show("class")      && <TableHead className={cn(th, "w-28")}>Class</TableHead>}
-              {show("urgency")    && <TableHead className={cn(th, "w-24")}>Urgency</TableHead>}
-              {show("status")     && <TableHead className={cn(th, "w-44")}>Status</TableHead>}
+              {show("request_no") && (
+                <SortableHeader label="Request #" sortKey="request_no" className={cn(th, "w-40 pl-4")} {...sortProps} />
+              )}
+              {show("type") && (
+                <SortableHeader label="Type" sortKey="type" className={cn(th, "w-28")} {...sortProps} />
+              )}
+              {show("title") && (
+                <SortableHeader label="Title" sortKey="title" className={th} {...sortProps} />
+              )}
+              {show("customer") && (
+                <SortableHeader label="Customer" sortKey="customer" className={cn(th, "w-44")} {...sortProps} />
+              )}
+              {show("class") && (
+                <SortableHeader label="Class" sortKey="class" className={cn(th, "w-28")} {...sortProps} />
+              )}
+              {show("urgency") && (
+                <SortableHeader label="Urgency" sortKey="urgency" className={cn(th, "w-24")} {...sortProps} />
+              )}
+              {show("status") && (
+                <SortableHeader label="Status" sortKey="status" className={cn(th, "w-44")} {...sortProps} />
+              )}
               {show("fills") && onTrack && <TableHead className={cn(th, "w-16 text-center")}>Fills</TableHead>}
-              <TableHead className={cn(th, "w-14 pr-4")} />
             </TableRow>
           </TableHeader>
 
@@ -92,7 +111,6 @@ export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: 
                 {show("urgency")    && <TableCell><Skeleton className="h-4 w-14" /></TableCell>}
                 {show("status")     && <TableCell><Skeleton className="h-5 w-28 rounded-full" /></TableCell>}
                 {show("fills") && onTrack && <TableCell />}
-                <TableCell className="pr-4" />
               </TableRow>
             ))}
 
@@ -110,13 +128,14 @@ export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: 
             )}
 
             {items.map((r) => (
-              <TableRow
-                key={r.requestId}
-                className="hover:bg-muted/50 cursor-pointer"
-                onClick={() => onOpen(r)}
-              >
+              <TableRow key={r.requestId} className="relative hover:bg-muted/50 cursor-pointer">
                 {show("request_no") && (
-                  <TableCell className="pl-4 font-mono text-xs">{r.requestNo}</TableCell>
+                  <TableCell className="pl-4 font-mono text-xs">
+                    <Link href={`/finance/product-requests/${r.requestId}`} className="absolute inset-0">
+                      <span className="sr-only">Open {r.requestNo}</span>
+                    </Link>
+                    {r.requestNo}
+                  </TableCell>
                 )}
                 {show("type") && (
                   <TableCell className="font-mono text-xs text-muted-foreground">
@@ -138,7 +157,11 @@ export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: 
                 )}
                 {show("class") && (
                   <TableCell className="text-sm">
-                    <span>{humanize(r.productClassification)}</span>
+                    {r.productClassification === "pending" ? (
+                      <Badge variant="outline">Pending</Badge>
+                    ) : (
+                      <span>{humanize(r.productClassification)}</span>
+                    )}
                     {r.verifiedClassification && r.verifiedClassification !== r.productClassification && (
                       <span className="ml-1 text-xs text-orange-600">→ {humanize(r.verifiedClassification)}</span>
                     )}
@@ -153,17 +176,12 @@ export function RequestTable({ items, isLoading, onOpen, onTrack, visibility }: 
                   </TableCell>
                 )}
                 {show("fills") && onTrack && (
-                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="relative z-10 text-center" onClick={(e) => e.stopPropagation()}>
                     <Button size="icon" variant="ghost" aria-label="Track fill tasks" onClick={() => onTrack(r)}>
                       <ListChecks className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 )}
-                <TableCell className="pr-4 text-right">
-                  <Button size="icon" variant="ghost" aria-label="Open request">
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>

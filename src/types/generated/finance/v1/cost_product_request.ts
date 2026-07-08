@@ -7,26 +7,85 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AuditInfo, BaseResponse, PaginationRequest, PaginationResponse } from "../../common/v1/common";
+import { ImportError } from "./uom";
 
 export const protobufPackage = "finance.v1";
+
+/**
+ * TubeType represents the fixed Paper/Plastic tube classification for a
+ * product spec, replacing the old master-data-backed paper_tube_type_id lookup.
+ */
+export enum TubeType {
+  /** TUBE_TYPE_UNSPECIFIED - Default unspecified value - used when no tube type has been selected. */
+  TUBE_TYPE_UNSPECIFIED = 0,
+  /** TUBE_TYPE_PAPER - Paper tube. */
+  TUBE_TYPE_PAPER = 1,
+  /** TUBE_TYPE_PLASTIC - Plastic tube. */
+  TUBE_TYPE_PLASTIC = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function tubeTypeFromJSON(object: any): TubeType {
+  switch (object) {
+    case 0:
+    case "TUBE_TYPE_UNSPECIFIED":
+      return TubeType.TUBE_TYPE_UNSPECIFIED;
+    case 1:
+    case "TUBE_TYPE_PAPER":
+      return TubeType.TUBE_TYPE_PAPER;
+    case 2:
+    case "TUBE_TYPE_PLASTIC":
+      return TubeType.TUBE_TYPE_PLASTIC;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TubeType.UNRECOGNIZED;
+  }
+}
+
+export function tubeTypeToJSON(object: TubeType): string {
+  switch (object) {
+    case TubeType.TUBE_TYPE_UNSPECIFIED:
+      return "TUBE_TYPE_UNSPECIFIED";
+    case TubeType.TUBE_TYPE_PAPER:
+      return "TUBE_TYPE_PAPER";
+    case TubeType.TUBE_TYPE_PLASTIC:
+      return "TUBE_TYPE_PLASTIC";
+    case TubeType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 export interface CostProductSpec {
   specId: number;
   requestId: number;
-  /** POY_BOUGHTOUT | CHIPS_SD | CHIPS_BRT | CHIPS_RECYCLE. */
+  /**
+   * POY_BOUGHTOUT | CHIPS_SD | CHIPS_BRT | CHIPS_RECYCLE.
+   * Deprecated for new writes: retained for historical rows, no longer populated by new writes.
+   */
   rawMaterialType: string;
   productDescription: string;
   shadeId: number;
-  shadeCustomText: string;
+  /** Free-text or master shade code (e.g. NL, Z114S). Renamed from shade_custom_text — field number unchanged for wire compatibility. */
+  shadeCode: string;
+  /** Deprecated: retained for historical rows, no longer populated by new writes. Use tube_type instead. */
   paperTubeTypeId: number;
   /** denormalized */
   paperTubeLabel: string;
-  /** decimal stringified to preserve precision */
+  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
   weightPerBobbinKg: string;
-  /** JUMBO | NORMAL | PALLET. */
+  /**
+   * JUMBO | NORMAL | PALLET.
+   * Deprecated for new writes: retained for historical rows, no longer populated by new writes.
+   */
   boxType: string;
   createdAt: string;
   createdBy: string;
+  /** Human-readable shade name (e.g. Natural, Jet Black), mirrors cost_product_master's shade_name. */
+  shadeName: string;
+  /** Fixed Paper/Plastic tube classification. Replaces paper_tube_type_id for new writes. */
+  tubeType: TubeType;
 }
 
 export interface CostProductRequest {
@@ -72,16 +131,30 @@ export interface CostProductRequest {
   linkedRouteHeadId: number;
   /** IAM workflow instance ID linked to this request (empty if no workflow attached). */
   wflInstanceId: string;
+  /**
+   * Optional reviewer-facing hint pointing at a similar existing product master,
+   * used to pre-fill routing resolution during review. 0 = unset.
+   */
+  referenceProductSysId: number;
 }
 
 export interface SpecInput {
+  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
   rawMaterialType: string;
   productDescription: string;
   shadeId: number;
-  shadeCustomText: string;
+  /** Free-text or master shade code (e.g. NL, Z114S). Renamed from shade_custom_text — field number unchanged for wire compatibility. */
+  shadeCode: string;
+  /** Deprecated: retained for historical rows, no longer populated by new writes. Use tube_type instead. */
   paperTubeTypeId: number;
+  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
   weightPerBobbinKg: string;
+  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
   boxType: string;
+  /** Human-readable shade name (e.g. Natural, Jet Black), mirrors cost_product_master's shade_name. */
+  shadeName: string;
+  /** Fixed Paper/Plastic tube classification. Replaces paper_tube_type_id for new writes. */
+  tubeType: TubeType;
 }
 
 export interface CreateCostProductRequestRequest {
@@ -95,7 +168,14 @@ export interface CreateCostProductRequestRequest {
   targetPriceRange: string;
   urgencyLevel: string;
   neededByDate: string;
-  spec: SpecInput | undefined;
+  spec:
+    | SpecInput
+    | undefined;
+  /**
+   * Optional reviewer-facing hint pointing at a similar existing product master.
+   * 0 = unset.
+   */
+  referenceProductSysId: number;
 }
 
 export interface CreateCostProductRequestResponse {
@@ -132,7 +212,14 @@ export interface UpdateCostProductRequestRequest {
   targetPriceRange: string;
   urgencyLevel: string;
   neededByDate: string;
-  spec: SpecInput | undefined;
+  spec:
+    | SpecInput
+    | undefined;
+  /**
+   * Optional reviewer-facing hint pointing at a similar existing product master.
+   * 0 = unset.
+   */
+  referenceProductSysId: number;
 }
 
 export interface UpdateCostProductRequestResponse {
@@ -155,6 +242,92 @@ export interface ListCostProductRequestsResponse {
   base: BaseResponse | undefined;
   data: CostProductRequest[];
   pagination: PaginationResponse | undefined;
+}
+
+/**
+ * ExportCostProductRequestsRequest is the request for exporting cost product
+ * requests to Excel. Filters mirror ListCostProductRequestsRequest's subset
+ * relevant to export (no pagination/sort — export returns all matches).
+ */
+export interface ExportCostProductRequestsRequest {
+  search: string;
+  status: string;
+  requestTypeId: number;
+}
+
+/** ExportCostProductRequestsResponse is the response containing the Excel file. */
+export interface ExportCostProductRequestsResponse {
+  base:
+    | BaseResponse
+    | undefined;
+  /** Excel file content as bytes (.xlsx format). */
+  fileContent: Uint8Array;
+  /** Suggested filename. */
+  fileName: string;
+}
+
+/**
+ * ImportCostProductRequestsRequest is the request for importing cost product
+ * requests from Excel. Create-only: every row creates a new DRAFT request
+ * regardless of duplicate_action — the field is accepted for shape parity
+ * with other import RPCs but has no skip/update effect in v1.
+ */
+export interface ImportCostProductRequestsRequest {
+  /** Excel file content as bytes (.xlsx or .xls format). */
+  fileContent: Uint8Array;
+  /**
+   * Original filename (for format detection).
+   * Must be a simple filename without path separators.
+   */
+  fileName: string;
+  /**
+   * Accepted for shape parity with other import RPCs. Create-only: only
+   * "error" semantics apply (unresolvable rows fail with a row-level
+   * ImportError); there is no update/skip behavior in v1.
+   */
+  duplicateAction: string;
+}
+
+/**
+ * ImportCostProductRequestsResponse is the response for importing cost
+ * product requests. updated_count/skipped_count are always 0 in v1 since
+ * the import is create-only (kept for shape consistency with other imports).
+ */
+export interface ImportCostProductRequestsResponse {
+  base:
+    | BaseResponse
+    | undefined;
+  /** Number of successfully created DRAFT requests. */
+  successCount: number;
+  /** Always 0 in v1 (create-only import has no skip semantics). */
+  skippedCount: number;
+  /** Always 0 in v1 (create-only import has no update semantics). */
+  updatedCount: number;
+  /** Number of failed rows. */
+  failedCount: number;
+  /** Details of failed rows. */
+  errors: ImportError[];
+}
+
+/**
+ * GetCostProductRequestImportTemplateRequest is the request for downloading
+ * the Excel import template.
+ */
+export interface GetCostProductRequestImportTemplateRequest {
+}
+
+/**
+ * GetCostProductRequestImportTemplateResponse is the response containing the
+ * template file.
+ */
+export interface GetCostProductRequestImportTemplateResponse {
+  base:
+    | BaseResponse
+    | undefined;
+  /** Excel template file content as bytes (.xlsx format). */
+  fileContent: Uint8Array;
+  /** Suggested filename. */
+  fileName: string;
 }
 
 export interface SubmitCostProductRequestRequest {
@@ -193,6 +366,32 @@ export interface DecideCostProductRequestFeasibilityRequest {
 }
 
 export interface DecideCostProductRequestFeasibilityResponse {
+  base: BaseResponse | undefined;
+  data: CostProductRequest | undefined;
+}
+
+/**
+ * SubmitAndDecideCostProductRequest merges Submit + Start-review + Verify
+ * classification + Decide feasibility + (when feasible) Link route into a
+ * single action (design.md §3 B3). SUBMITTED and UNDER_REVIEW remain real
+ * internal states recorded in the audit trail; only one consolidated
+ * notification pair is emitted regardless of the feasibility outcome.
+ */
+export interface SubmitAndDecideCostProductRequestRequest {
+  requestId: number;
+  verifiedClassification: string;
+  overrideReason: string;
+  decision: string;
+  note: string;
+  /**
+   * reference_product_head_id is the route head resolved by RoutingResolver
+   * on the client before submitting; only applied when decision is FEASIBLE.
+   * 0 means no route was resolved (e.g. decision is NOT_FEASIBLE).
+   */
+  referenceProductHeadId: number;
+}
+
+export interface SubmitAndDecideCostProductRequestResponse {
   base: BaseResponse | undefined;
   data: CostProductRequest | undefined;
 }
@@ -454,13 +653,15 @@ function createBaseCostProductSpec(): CostProductSpec {
     rawMaterialType: "",
     productDescription: "",
     shadeId: 0,
-    shadeCustomText: "",
+    shadeCode: "",
     paperTubeTypeId: 0,
     paperTubeLabel: "",
     weightPerBobbinKg: "",
     boxType: "",
     createdAt: "",
     createdBy: "",
+    shadeName: "",
+    tubeType: 0,
   };
 }
 
@@ -481,8 +682,8 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
     if (message.shadeId !== 0) {
       writer.uint32(40).int32(message.shadeId);
     }
-    if (message.shadeCustomText !== "") {
-      writer.uint32(50).string(message.shadeCustomText);
+    if (message.shadeCode !== "") {
+      writer.uint32(50).string(message.shadeCode);
     }
     if (message.paperTubeTypeId !== 0) {
       writer.uint32(56).int32(message.paperTubeTypeId);
@@ -501,6 +702,12 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
     }
     if (message.createdBy !== "") {
       writer.uint32(98).string(message.createdBy);
+    }
+    if (message.shadeName !== "") {
+      writer.uint32(106).string(message.shadeName);
+    }
+    if (message.tubeType !== 0) {
+      writer.uint32(112).int32(message.tubeType);
     }
     return writer;
   },
@@ -557,7 +764,7 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
             break;
           }
 
-          message.shadeCustomText = reader.string();
+          message.shadeCode = reader.string();
           continue;
         }
         case 7: {
@@ -608,6 +815,22 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
           message.createdBy = reader.string();
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.shadeName = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 112) {
+            break;
+          }
+
+          message.tubeType = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -644,10 +867,10 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
         : isSet(object.shade_id)
         ? globalThis.Number(object.shade_id)
         : 0,
-      shadeCustomText: isSet(object.shadeCustomText)
-        ? globalThis.String(object.shadeCustomText)
-        : isSet(object.shade_custom_text)
-        ? globalThis.String(object.shade_custom_text)
+      shadeCode: isSet(object.shadeCode)
+        ? globalThis.String(object.shadeCode)
+        : isSet(object.shade_code)
+        ? globalThis.String(object.shade_code)
         : "",
       paperTubeTypeId: isSet(object.paperTubeTypeId)
         ? globalThis.Number(object.paperTubeTypeId)
@@ -679,6 +902,16 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
         : isSet(object.created_by)
         ? globalThis.String(object.created_by)
         : "",
+      shadeName: isSet(object.shadeName)
+        ? globalThis.String(object.shadeName)
+        : isSet(object.shade_name)
+        ? globalThis.String(object.shade_name)
+        : "",
+      tubeType: isSet(object.tubeType)
+        ? tubeTypeFromJSON(object.tubeType)
+        : isSet(object.tube_type)
+        ? tubeTypeFromJSON(object.tube_type)
+        : 0,
     };
   },
 
@@ -699,8 +932,8 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
     if (message.shadeId !== 0) {
       obj.shadeId = Math.round(message.shadeId);
     }
-    if (message.shadeCustomText !== "") {
-      obj.shadeCustomText = message.shadeCustomText;
+    if (message.shadeCode !== "") {
+      obj.shadeCode = message.shadeCode;
     }
     if (message.paperTubeTypeId !== 0) {
       obj.paperTubeTypeId = Math.round(message.paperTubeTypeId);
@@ -720,6 +953,12 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
     if (message.createdBy !== "") {
       obj.createdBy = message.createdBy;
     }
+    if (message.shadeName !== "") {
+      obj.shadeName = message.shadeName;
+    }
+    if (message.tubeType !== 0) {
+      obj.tubeType = tubeTypeToJSON(message.tubeType);
+    }
     return obj;
   },
 
@@ -733,13 +972,15 @@ export const CostProductSpec: MessageFns<CostProductSpec> = {
     message.rawMaterialType = object.rawMaterialType ?? "";
     message.productDescription = object.productDescription ?? "";
     message.shadeId = object.shadeId ?? 0;
-    message.shadeCustomText = object.shadeCustomText ?? "";
+    message.shadeCode = object.shadeCode ?? "";
     message.paperTubeTypeId = object.paperTubeTypeId ?? 0;
     message.paperTubeLabel = object.paperTubeLabel ?? "";
     message.weightPerBobbinKg = object.weightPerBobbinKg ?? "";
     message.boxType = object.boxType ?? "";
     message.createdAt = object.createdAt ?? "";
     message.createdBy = object.createdBy ?? "";
+    message.shadeName = object.shadeName ?? "";
+    message.tubeType = object.tubeType ?? 0;
     return message;
   },
 };
@@ -776,6 +1017,7 @@ function createBaseCostProductRequest(): CostProductRequest {
     existingProductSysId: 0,
     linkedRouteHeadId: 0,
     wflInstanceId: "",
+    referenceProductSysId: 0,
   };
 }
 
@@ -870,6 +1112,9 @@ export const CostProductRequest: MessageFns<CostProductRequest> = {
     }
     if (message.wflInstanceId !== "") {
       writer.uint32(242).string(message.wflInstanceId);
+    }
+    if (message.referenceProductSysId !== 0) {
+      writer.uint32(248).int64(message.referenceProductSysId);
     }
     return writer;
   },
@@ -1121,6 +1366,14 @@ export const CostProductRequest: MessageFns<CostProductRequest> = {
           message.wflInstanceId = reader.string();
           continue;
         }
+        case 31: {
+          if (tag !== 248) {
+            break;
+          }
+
+          message.referenceProductSysId = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1262,6 +1515,11 @@ export const CostProductRequest: MessageFns<CostProductRequest> = {
         : isSet(object.wfl_instance_id)
         ? globalThis.String(object.wfl_instance_id)
         : "",
+      referenceProductSysId: isSet(object.referenceProductSysId)
+        ? globalThis.Number(object.referenceProductSysId)
+        : isSet(object.reference_product_sys_id)
+        ? globalThis.Number(object.reference_product_sys_id)
+        : 0,
     };
   },
 
@@ -1357,6 +1615,9 @@ export const CostProductRequest: MessageFns<CostProductRequest> = {
     if (message.wflInstanceId !== "") {
       obj.wflInstanceId = message.wflInstanceId;
     }
+    if (message.referenceProductSysId !== 0) {
+      obj.referenceProductSysId = Math.round(message.referenceProductSysId);
+    }
     return obj;
   },
 
@@ -1399,6 +1660,7 @@ export const CostProductRequest: MessageFns<CostProductRequest> = {
     message.existingProductSysId = object.existingProductSysId ?? 0;
     message.linkedRouteHeadId = object.linkedRouteHeadId ?? 0;
     message.wflInstanceId = object.wflInstanceId ?? "";
+    message.referenceProductSysId = object.referenceProductSysId ?? 0;
     return message;
   },
 };
@@ -1408,10 +1670,12 @@ function createBaseSpecInput(): SpecInput {
     rawMaterialType: "",
     productDescription: "",
     shadeId: 0,
-    shadeCustomText: "",
+    shadeCode: "",
     paperTubeTypeId: 0,
     weightPerBobbinKg: "",
     boxType: "",
+    shadeName: "",
+    tubeType: 0,
   };
 }
 
@@ -1426,8 +1690,8 @@ export const SpecInput: MessageFns<SpecInput> = {
     if (message.shadeId !== 0) {
       writer.uint32(24).int32(message.shadeId);
     }
-    if (message.shadeCustomText !== "") {
-      writer.uint32(34).string(message.shadeCustomText);
+    if (message.shadeCode !== "") {
+      writer.uint32(34).string(message.shadeCode);
     }
     if (message.paperTubeTypeId !== 0) {
       writer.uint32(40).int32(message.paperTubeTypeId);
@@ -1437,6 +1701,12 @@ export const SpecInput: MessageFns<SpecInput> = {
     }
     if (message.boxType !== "") {
       writer.uint32(58).string(message.boxType);
+    }
+    if (message.shadeName !== "") {
+      writer.uint32(66).string(message.shadeName);
+    }
+    if (message.tubeType !== 0) {
+      writer.uint32(72).int32(message.tubeType);
     }
     return writer;
   },
@@ -1477,7 +1747,7 @@ export const SpecInput: MessageFns<SpecInput> = {
             break;
           }
 
-          message.shadeCustomText = reader.string();
+          message.shadeCode = reader.string();
           continue;
         }
         case 5: {
@@ -1502,6 +1772,22 @@ export const SpecInput: MessageFns<SpecInput> = {
           }
 
           message.boxType = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.shadeName = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.tubeType = reader.int32() as any;
           continue;
         }
       }
@@ -1530,10 +1816,10 @@ export const SpecInput: MessageFns<SpecInput> = {
         : isSet(object.shade_id)
         ? globalThis.Number(object.shade_id)
         : 0,
-      shadeCustomText: isSet(object.shadeCustomText)
-        ? globalThis.String(object.shadeCustomText)
-        : isSet(object.shade_custom_text)
-        ? globalThis.String(object.shade_custom_text)
+      shadeCode: isSet(object.shadeCode)
+        ? globalThis.String(object.shadeCode)
+        : isSet(object.shade_code)
+        ? globalThis.String(object.shade_code)
         : "",
       paperTubeTypeId: isSet(object.paperTubeTypeId)
         ? globalThis.Number(object.paperTubeTypeId)
@@ -1550,6 +1836,16 @@ export const SpecInput: MessageFns<SpecInput> = {
         : isSet(object.box_type)
         ? globalThis.String(object.box_type)
         : "",
+      shadeName: isSet(object.shadeName)
+        ? globalThis.String(object.shadeName)
+        : isSet(object.shade_name)
+        ? globalThis.String(object.shade_name)
+        : "",
+      tubeType: isSet(object.tubeType)
+        ? tubeTypeFromJSON(object.tubeType)
+        : isSet(object.tube_type)
+        ? tubeTypeFromJSON(object.tube_type)
+        : 0,
     };
   },
 
@@ -1564,8 +1860,8 @@ export const SpecInput: MessageFns<SpecInput> = {
     if (message.shadeId !== 0) {
       obj.shadeId = Math.round(message.shadeId);
     }
-    if (message.shadeCustomText !== "") {
-      obj.shadeCustomText = message.shadeCustomText;
+    if (message.shadeCode !== "") {
+      obj.shadeCode = message.shadeCode;
     }
     if (message.paperTubeTypeId !== 0) {
       obj.paperTubeTypeId = Math.round(message.paperTubeTypeId);
@@ -1575,6 +1871,12 @@ export const SpecInput: MessageFns<SpecInput> = {
     }
     if (message.boxType !== "") {
       obj.boxType = message.boxType;
+    }
+    if (message.shadeName !== "") {
+      obj.shadeName = message.shadeName;
+    }
+    if (message.tubeType !== 0) {
+      obj.tubeType = tubeTypeToJSON(message.tubeType);
     }
     return obj;
   },
@@ -1587,10 +1889,12 @@ export const SpecInput: MessageFns<SpecInput> = {
     message.rawMaterialType = object.rawMaterialType ?? "";
     message.productDescription = object.productDescription ?? "";
     message.shadeId = object.shadeId ?? 0;
-    message.shadeCustomText = object.shadeCustomText ?? "";
+    message.shadeCode = object.shadeCode ?? "";
     message.paperTubeTypeId = object.paperTubeTypeId ?? 0;
     message.weightPerBobbinKg = object.weightPerBobbinKg ?? "";
     message.boxType = object.boxType ?? "";
+    message.shadeName = object.shadeName ?? "";
+    message.tubeType = object.tubeType ?? 0;
     return message;
   },
 };
@@ -1608,6 +1912,7 @@ function createBaseCreateCostProductRequestRequest(): CreateCostProductRequestRe
     urgencyLevel: "",
     neededByDate: "",
     spec: undefined,
+    referenceProductSysId: 0,
   };
 }
 
@@ -1645,6 +1950,9 @@ export const CreateCostProductRequestRequest: MessageFns<CreateCostProductReques
     }
     if (message.spec !== undefined) {
       SpecInput.encode(message.spec, writer.uint32(90).fork()).join();
+    }
+    if (message.referenceProductSysId !== 0) {
+      writer.uint32(96).int64(message.referenceProductSysId);
     }
     return writer;
   },
@@ -1744,6 +2052,14 @@ export const CreateCostProductRequestRequest: MessageFns<CreateCostProductReques
           message.spec = SpecInput.decode(reader, reader.uint32());
           continue;
         }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.referenceProductSysId = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1798,6 +2114,11 @@ export const CreateCostProductRequestRequest: MessageFns<CreateCostProductReques
         ? globalThis.String(object.needed_by_date)
         : "",
       spec: isSet(object.spec) ? SpecInput.fromJSON(object.spec) : undefined,
+      referenceProductSysId: isSet(object.referenceProductSysId)
+        ? globalThis.Number(object.referenceProductSysId)
+        : isSet(object.reference_product_sys_id)
+        ? globalThis.Number(object.reference_product_sys_id)
+        : 0,
     };
   },
 
@@ -1836,6 +2157,9 @@ export const CreateCostProductRequestRequest: MessageFns<CreateCostProductReques
     if (message.spec !== undefined) {
       obj.spec = SpecInput.toJSON(message.spec);
     }
+    if (message.referenceProductSysId !== 0) {
+      obj.referenceProductSysId = Math.round(message.referenceProductSysId);
+    }
     return obj;
   },
 
@@ -1855,6 +2179,7 @@ export const CreateCostProductRequestRequest: MessageFns<CreateCostProductReques
     message.urgencyLevel = object.urgencyLevel ?? "";
     message.neededByDate = object.neededByDate ?? "";
     message.spec = (object.spec !== undefined && object.spec !== null) ? SpecInput.fromPartial(object.spec) : undefined;
+    message.referenceProductSysId = object.referenceProductSysId ?? 0;
     return message;
   },
 };
@@ -2240,6 +2565,7 @@ function createBaseUpdateCostProductRequestRequest(): UpdateCostProductRequestRe
     urgencyLevel: "",
     neededByDate: "",
     spec: undefined,
+    referenceProductSysId: 0,
   };
 }
 
@@ -2277,6 +2603,9 @@ export const UpdateCostProductRequestRequest: MessageFns<UpdateCostProductReques
     }
     if (message.spec !== undefined) {
       SpecInput.encode(message.spec, writer.uint32(90).fork()).join();
+    }
+    if (message.referenceProductSysId !== 0) {
+      writer.uint32(96).int64(message.referenceProductSysId);
     }
     return writer;
   },
@@ -2376,6 +2705,14 @@ export const UpdateCostProductRequestRequest: MessageFns<UpdateCostProductReques
           message.spec = SpecInput.decode(reader, reader.uint32());
           continue;
         }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.referenceProductSysId = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2430,6 +2767,11 @@ export const UpdateCostProductRequestRequest: MessageFns<UpdateCostProductReques
         ? globalThis.String(object.needed_by_date)
         : "",
       spec: isSet(object.spec) ? SpecInput.fromJSON(object.spec) : undefined,
+      referenceProductSysId: isSet(object.referenceProductSysId)
+        ? globalThis.Number(object.referenceProductSysId)
+        : isSet(object.reference_product_sys_id)
+        ? globalThis.Number(object.reference_product_sys_id)
+        : 0,
     };
   },
 
@@ -2468,6 +2810,9 @@ export const UpdateCostProductRequestRequest: MessageFns<UpdateCostProductReques
     if (message.spec !== undefined) {
       obj.spec = SpecInput.toJSON(message.spec);
     }
+    if (message.referenceProductSysId !== 0) {
+      obj.referenceProductSysId = Math.round(message.referenceProductSysId);
+    }
     return obj;
   },
 
@@ -2487,6 +2832,7 @@ export const UpdateCostProductRequestRequest: MessageFns<UpdateCostProductReques
     message.urgencyLevel = object.urgencyLevel ?? "";
     message.neededByDate = object.neededByDate ?? "";
     message.spec = (object.spec !== undefined && object.spec !== null) ? SpecInput.fromPartial(object.spec) : undefined;
+    message.referenceProductSysId = object.referenceProductSysId ?? 0;
     return message;
   },
 };
@@ -2866,6 +3212,618 @@ export const ListCostProductRequestsResponse: MessageFns<ListCostProductRequests
     message.pagination = (object.pagination !== undefined && object.pagination !== null)
       ? PaginationResponse.fromPartial(object.pagination)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseExportCostProductRequestsRequest(): ExportCostProductRequestsRequest {
+  return { search: "", status: "", requestTypeId: 0 };
+}
+
+export const ExportCostProductRequestsRequest: MessageFns<ExportCostProductRequestsRequest> = {
+  encode(message: ExportCostProductRequestsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.search !== "") {
+      writer.uint32(10).string(message.search);
+    }
+    if (message.status !== "") {
+      writer.uint32(18).string(message.status);
+    }
+    if (message.requestTypeId !== 0) {
+      writer.uint32(24).int32(message.requestTypeId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportCostProductRequestsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportCostProductRequestsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.requestTypeId = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportCostProductRequestsRequest {
+    return {
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      requestTypeId: isSet(object.requestTypeId)
+        ? globalThis.Number(object.requestTypeId)
+        : isSet(object.request_type_id)
+        ? globalThis.Number(object.request_type_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: ExportCostProductRequestsRequest): unknown {
+    const obj: any = {};
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.requestTypeId !== 0) {
+      obj.requestTypeId = Math.round(message.requestTypeId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportCostProductRequestsRequest>): ExportCostProductRequestsRequest {
+    return ExportCostProductRequestsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportCostProductRequestsRequest>): ExportCostProductRequestsRequest {
+    const message = createBaseExportCostProductRequestsRequest();
+    message.search = object.search ?? "";
+    message.status = object.status ?? "";
+    message.requestTypeId = object.requestTypeId ?? 0;
+    return message;
+  },
+};
+
+function createBaseExportCostProductRequestsResponse(): ExportCostProductRequestsResponse {
+  return { base: undefined, fileContent: new Uint8Array(0), fileName: "" };
+}
+
+export const ExportCostProductRequestsResponse: MessageFns<ExportCostProductRequestsResponse> = {
+  encode(message: ExportCostProductRequestsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.fileContent.length !== 0) {
+      writer.uint32(18).bytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(26).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportCostProductRequestsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportCostProductRequestsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileContent = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportCostProductRequestsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      fileContent: isSet(object.fileContent)
+        ? bytesFromBase64(object.fileContent)
+        : isSet(object.file_content)
+        ? bytesFromBase64(object.file_content)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: ExportCostProductRequestsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.fileContent.length !== 0) {
+      obj.fileContent = base64FromBytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportCostProductRequestsResponse>): ExportCostProductRequestsResponse {
+    return ExportCostProductRequestsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportCostProductRequestsResponse>): ExportCostProductRequestsResponse {
+    const message = createBaseExportCostProductRequestsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.fileContent = object.fileContent ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseImportCostProductRequestsRequest(): ImportCostProductRequestsRequest {
+  return { fileContent: new Uint8Array(0), fileName: "", duplicateAction: "" };
+}
+
+export const ImportCostProductRequestsRequest: MessageFns<ImportCostProductRequestsRequest> = {
+  encode(message: ImportCostProductRequestsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.fileContent.length !== 0) {
+      writer.uint32(10).bytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(18).string(message.fileName);
+    }
+    if (message.duplicateAction !== "") {
+      writer.uint32(26).string(message.duplicateAction);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ImportCostProductRequestsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseImportCostProductRequestsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.fileContent = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.duplicateAction = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ImportCostProductRequestsRequest {
+    return {
+      fileContent: isSet(object.fileContent)
+        ? bytesFromBase64(object.fileContent)
+        : isSet(object.file_content)
+        ? bytesFromBase64(object.file_content)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+      duplicateAction: isSet(object.duplicateAction)
+        ? globalThis.String(object.duplicateAction)
+        : isSet(object.duplicate_action)
+        ? globalThis.String(object.duplicate_action)
+        : "",
+    };
+  },
+
+  toJSON(message: ImportCostProductRequestsRequest): unknown {
+    const obj: any = {};
+    if (message.fileContent.length !== 0) {
+      obj.fileContent = base64FromBytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    if (message.duplicateAction !== "") {
+      obj.duplicateAction = message.duplicateAction;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ImportCostProductRequestsRequest>): ImportCostProductRequestsRequest {
+    return ImportCostProductRequestsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ImportCostProductRequestsRequest>): ImportCostProductRequestsRequest {
+    const message = createBaseImportCostProductRequestsRequest();
+    message.fileContent = object.fileContent ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
+    message.duplicateAction = object.duplicateAction ?? "";
+    return message;
+  },
+};
+
+function createBaseImportCostProductRequestsResponse(): ImportCostProductRequestsResponse {
+  return { base: undefined, successCount: 0, skippedCount: 0, updatedCount: 0, failedCount: 0, errors: [] };
+}
+
+export const ImportCostProductRequestsResponse: MessageFns<ImportCostProductRequestsResponse> = {
+  encode(message: ImportCostProductRequestsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.successCount !== 0) {
+      writer.uint32(16).int32(message.successCount);
+    }
+    if (message.skippedCount !== 0) {
+      writer.uint32(24).int32(message.skippedCount);
+    }
+    if (message.updatedCount !== 0) {
+      writer.uint32(32).int32(message.updatedCount);
+    }
+    if (message.failedCount !== 0) {
+      writer.uint32(40).int32(message.failedCount);
+    }
+    for (const v of message.errors) {
+      ImportError.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ImportCostProductRequestsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseImportCostProductRequestsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.successCount = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.skippedCount = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.updatedCount = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.failedCount = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errors.push(ImportError.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ImportCostProductRequestsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      successCount: isSet(object.successCount)
+        ? globalThis.Number(object.successCount)
+        : isSet(object.success_count)
+        ? globalThis.Number(object.success_count)
+        : 0,
+      skippedCount: isSet(object.skippedCount)
+        ? globalThis.Number(object.skippedCount)
+        : isSet(object.skipped_count)
+        ? globalThis.Number(object.skipped_count)
+        : 0,
+      updatedCount: isSet(object.updatedCount)
+        ? globalThis.Number(object.updatedCount)
+        : isSet(object.updated_count)
+        ? globalThis.Number(object.updated_count)
+        : 0,
+      failedCount: isSet(object.failedCount)
+        ? globalThis.Number(object.failedCount)
+        : isSet(object.failed_count)
+        ? globalThis.Number(object.failed_count)
+        : 0,
+      errors: globalThis.Array.isArray(object?.errors)
+        ? object.errors.map((e: any) => ImportError.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ImportCostProductRequestsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.successCount !== 0) {
+      obj.successCount = Math.round(message.successCount);
+    }
+    if (message.skippedCount !== 0) {
+      obj.skippedCount = Math.round(message.skippedCount);
+    }
+    if (message.updatedCount !== 0) {
+      obj.updatedCount = Math.round(message.updatedCount);
+    }
+    if (message.failedCount !== 0) {
+      obj.failedCount = Math.round(message.failedCount);
+    }
+    if (message.errors?.length) {
+      obj.errors = message.errors.map((e) => ImportError.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ImportCostProductRequestsResponse>): ImportCostProductRequestsResponse {
+    return ImportCostProductRequestsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ImportCostProductRequestsResponse>): ImportCostProductRequestsResponse {
+    const message = createBaseImportCostProductRequestsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.successCount = object.successCount ?? 0;
+    message.skippedCount = object.skippedCount ?? 0;
+    message.updatedCount = object.updatedCount ?? 0;
+    message.failedCount = object.failedCount ?? 0;
+    message.errors = object.errors?.map((e) => ImportError.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseGetCostProductRequestImportTemplateRequest(): GetCostProductRequestImportTemplateRequest {
+  return {};
+}
+
+export const GetCostProductRequestImportTemplateRequest: MessageFns<GetCostProductRequestImportTemplateRequest> = {
+  encode(_: GetCostProductRequestImportTemplateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCostProductRequestImportTemplateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCostProductRequestImportTemplateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): GetCostProductRequestImportTemplateRequest {
+    return {};
+  },
+
+  toJSON(_: GetCostProductRequestImportTemplateRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetCostProductRequestImportTemplateRequest>): GetCostProductRequestImportTemplateRequest {
+    return GetCostProductRequestImportTemplateRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<GetCostProductRequestImportTemplateRequest>): GetCostProductRequestImportTemplateRequest {
+    const message = createBaseGetCostProductRequestImportTemplateRequest();
+    return message;
+  },
+};
+
+function createBaseGetCostProductRequestImportTemplateResponse(): GetCostProductRequestImportTemplateResponse {
+  return { base: undefined, fileContent: new Uint8Array(0), fileName: "" };
+}
+
+export const GetCostProductRequestImportTemplateResponse: MessageFns<GetCostProductRequestImportTemplateResponse> = {
+  encode(
+    message: GetCostProductRequestImportTemplateResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.fileContent.length !== 0) {
+      writer.uint32(18).bytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(26).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCostProductRequestImportTemplateResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCostProductRequestImportTemplateResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileContent = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetCostProductRequestImportTemplateResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      fileContent: isSet(object.fileContent)
+        ? bytesFromBase64(object.fileContent)
+        : isSet(object.file_content)
+        ? bytesFromBase64(object.file_content)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: GetCostProductRequestImportTemplateResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.fileContent.length !== 0) {
+      obj.fileContent = base64FromBytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetCostProductRequestImportTemplateResponse>): GetCostProductRequestImportTemplateResponse {
+    return GetCostProductRequestImportTemplateResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<GetCostProductRequestImportTemplateResponse>,
+  ): GetCostProductRequestImportTemplateResponse {
+    const message = createBaseGetCostProductRequestImportTemplateResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.fileContent = object.fileContent ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
     return message;
   },
 };
@@ -3532,6 +4490,251 @@ export const DecideCostProductRequestFeasibilityResponse: MessageFns<DecideCostP
     object: DeepPartial<DecideCostProductRequestFeasibilityResponse>,
   ): DecideCostProductRequestFeasibilityResponse {
     const message = createBaseDecideCostProductRequestFeasibilityResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? CostProductRequest.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSubmitAndDecideCostProductRequestRequest(): SubmitAndDecideCostProductRequestRequest {
+  return {
+    requestId: 0,
+    verifiedClassification: "",
+    overrideReason: "",
+    decision: "",
+    note: "",
+    referenceProductHeadId: 0,
+  };
+}
+
+export const SubmitAndDecideCostProductRequestRequest: MessageFns<SubmitAndDecideCostProductRequestRequest> = {
+  encode(message: SubmitAndDecideCostProductRequestRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== 0) {
+      writer.uint32(8).int64(message.requestId);
+    }
+    if (message.verifiedClassification !== "") {
+      writer.uint32(18).string(message.verifiedClassification);
+    }
+    if (message.overrideReason !== "") {
+      writer.uint32(26).string(message.overrideReason);
+    }
+    if (message.decision !== "") {
+      writer.uint32(34).string(message.decision);
+    }
+    if (message.note !== "") {
+      writer.uint32(42).string(message.note);
+    }
+    if (message.referenceProductHeadId !== 0) {
+      writer.uint32(48).int64(message.referenceProductHeadId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubmitAndDecideCostProductRequestRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubmitAndDecideCostProductRequestRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.requestId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.verifiedClassification = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.overrideReason = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.decision = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.note = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.referenceProductHeadId = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubmitAndDecideCostProductRequestRequest {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.Number(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.Number(object.request_id)
+        : 0,
+      verifiedClassification: isSet(object.verifiedClassification)
+        ? globalThis.String(object.verifiedClassification)
+        : isSet(object.verified_classification)
+        ? globalThis.String(object.verified_classification)
+        : "",
+      overrideReason: isSet(object.overrideReason)
+        ? globalThis.String(object.overrideReason)
+        : isSet(object.override_reason)
+        ? globalThis.String(object.override_reason)
+        : "",
+      decision: isSet(object.decision) ? globalThis.String(object.decision) : "",
+      note: isSet(object.note) ? globalThis.String(object.note) : "",
+      referenceProductHeadId: isSet(object.referenceProductHeadId)
+        ? globalThis.Number(object.referenceProductHeadId)
+        : isSet(object.reference_product_head_id)
+        ? globalThis.Number(object.reference_product_head_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: SubmitAndDecideCostProductRequestRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== 0) {
+      obj.requestId = Math.round(message.requestId);
+    }
+    if (message.verifiedClassification !== "") {
+      obj.verifiedClassification = message.verifiedClassification;
+    }
+    if (message.overrideReason !== "") {
+      obj.overrideReason = message.overrideReason;
+    }
+    if (message.decision !== "") {
+      obj.decision = message.decision;
+    }
+    if (message.note !== "") {
+      obj.note = message.note;
+    }
+    if (message.referenceProductHeadId !== 0) {
+      obj.referenceProductHeadId = Math.round(message.referenceProductHeadId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubmitAndDecideCostProductRequestRequest>): SubmitAndDecideCostProductRequestRequest {
+    return SubmitAndDecideCostProductRequestRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SubmitAndDecideCostProductRequestRequest>): SubmitAndDecideCostProductRequestRequest {
+    const message = createBaseSubmitAndDecideCostProductRequestRequest();
+    message.requestId = object.requestId ?? 0;
+    message.verifiedClassification = object.verifiedClassification ?? "";
+    message.overrideReason = object.overrideReason ?? "";
+    message.decision = object.decision ?? "";
+    message.note = object.note ?? "";
+    message.referenceProductHeadId = object.referenceProductHeadId ?? 0;
+    return message;
+  },
+};
+
+function createBaseSubmitAndDecideCostProductRequestResponse(): SubmitAndDecideCostProductRequestResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const SubmitAndDecideCostProductRequestResponse: MessageFns<SubmitAndDecideCostProductRequestResponse> = {
+  encode(message: SubmitAndDecideCostProductRequestResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      CostProductRequest.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubmitAndDecideCostProductRequestResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubmitAndDecideCostProductRequestResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = CostProductRequest.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubmitAndDecideCostProductRequestResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? CostProductRequest.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: SubmitAndDecideCostProductRequestResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = CostProductRequest.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubmitAndDecideCostProductRequestResponse>): SubmitAndDecideCostProductRequestResponse {
+    return SubmitAndDecideCostProductRequestResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<SubmitAndDecideCostProductRequestResponse>,
+  ): SubmitAndDecideCostProductRequestResponse {
+    const message = createBaseSubmitAndDecideCostProductRequestResponse();
     message.base = (object.base !== undefined && object.base !== null)
       ? BaseResponse.fromPartial(object.base)
       : undefined;
@@ -7100,6 +8303,19 @@ export const CostProductRequestServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * SubmitAndDecideCostProductRequest merges Submit + Start-review + Verify
+     * classification + Decide feasibility + (when feasible) Link route into a
+     * single action (design.md §3 B3).
+     */
+    submitAndDecideCostProductRequest: {
+      name: "SubmitAndDecideCostProductRequest",
+      requestType: SubmitAndDecideCostProductRequestRequest,
+      requestStream: false,
+      responseType: SubmitAndDecideCostProductRequestResponse,
+      responseStream: false,
+      options: {},
+    },
     useExistingCostingForCostProductRequest: {
       name: "UseExistingCostingForCostProductRequest",
       requestType: UseExistingCostingForCostProductRequestRequest,
@@ -7250,8 +8466,63 @@ export const CostProductRequestServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** ExportCostProductRequests exports cost product requests to Excel file. */
+    exportCostProductRequests: {
+      name: "ExportCostProductRequests",
+      requestType: ExportCostProductRequestsRequest,
+      requestStream: false,
+      responseType: ExportCostProductRequestsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ImportCostProductRequests imports cost product requests from Excel file.
+     * Create-only: every row creates a new DRAFT request, no dedup/merge.
+     */
+    importCostProductRequests: {
+      name: "ImportCostProductRequests",
+      requestType: ImportCostProductRequestsRequest,
+      requestStream: false,
+      responseType: ImportCostProductRequestsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetCostProductRequestImportTemplate downloads the Excel import template. */
+    getCostProductRequestImportTemplate: {
+      name: "GetCostProductRequestImportTemplate",
+      requestType: GetCostProductRequestImportTemplateRequest,
+      requestStream: false,
+      responseType: GetCostProductRequestImportTemplateResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
+
+function bytesFromBase64(b64: string): Uint8Array {
+  if ((globalThis as any).Buffer) {
+    return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+  } else {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+      arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+  }
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  if ((globalThis as any).Buffer) {
+    return globalThis.Buffer.from(arr).toString("base64");
+  } else {
+    const bin: string[] = [];
+    arr.forEach((byte) => {
+      bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+  }
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

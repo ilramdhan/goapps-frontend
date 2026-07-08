@@ -47,7 +47,6 @@ import {
   useReopenRequest,
   useRejectRequest,
   useStartReview,
-  useSubmitRequest,
   useCloseRequest,
 } from "@/hooks/finance/use-cost-product-request"
 import type { CostProductRequest } from "@/types/finance/cost-product-request"
@@ -66,7 +65,11 @@ interface Props {
   hasFillTracking?: boolean
 }
 
-type DialogKind = "reject" | "reviewDecide" | "close" | "confirmAction" | null
+// "submitDecide" — B3 merge (design.md §3 B3): the DRAFT "Submit" button now opens
+// ClassificationAndFeasibilityDialog in mode="submit" instead of firing a bare
+// useSubmitRequest() mutation. "reviewDecide" (mode="review", the UNDER_REVIEW flow)
+// is unchanged and stays a separate dialog kind since its retry semantics differ.
+type DialogKind = "reject" | "reviewDecide" | "submitDecide" | "close" | "confirmAction" | null
 
 export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, hasFillTracking = false }: Props) {
   useCPRRealtimeSync(request.requestId)
@@ -74,7 +77,6 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [confirmActionType, setConfirmActionType] = useState<"confirm" | "approve" | "release">("confirm")
 
-  const submitM = useSubmitRequest()
   const startM = useStartReview()
   const reviseM = useReviseRequest()
   const reopenM = useReopenRequest()
@@ -166,7 +168,7 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
           </Button>
         )}
         {isDraft && canSubmit && (
-          <Button onClick={() => submitM.mutate({ requestId })} disabled={submitM.isPending}>
+          <Button onClick={() => setDialog("submitDecide")}>
             <Play className="mr-2 h-4 w-4" /> Submit
           </Button>
         )}
@@ -307,10 +309,13 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
               </CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <Field label="Raw material">{request.spec.rawMaterialType}</Field>
-                <Field label="Paper tube"><PaperTubeName id={request.spec.paperTubeTypeId} /></Field>
+                <Field label="Tube">
+                  <PaperTubeName id={request.spec.paperTubeTypeId} tubeType={request.spec.tubeType} />
+                </Field>
                 <Field label="Weight / bobbin">{request.spec.weightPerBobbinKg} kg</Field>
                 <Field label="Box type">{request.spec.boxType}</Field>
-                <Field label="Shade">{request.spec.shadeCustomText || `master #${request.spec.shadeId ?? "—"}`}</Field>
+                <Field label="Shade code">{request.spec.shadeCode || `master #${request.spec.shadeId ?? "—"}`}</Field>
+                <Field label="Shade name">{request.spec.shadeName || "—"}</Field>
                 <div className="col-span-2 md:col-span-4">
                   <Separator className="my-2" />
                   <Field label="Product description">
@@ -474,6 +479,16 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
         requestId={requestId}
         currentClassification={request.productClassification}
         initialVerifiedClassification={request.verifiedClassification}
+        referenceProductSysId={request.referenceProductSysId}
+      />
+      <ClassificationAndFeasibilityDialog
+        open={dialog === "submitDecide"}
+        onOpenChange={(o) => setDialog(o ? "submitDecide" : null)}
+        requestId={requestId}
+        currentClassification={request.productClassification}
+        initialVerifiedClassification={request.verifiedClassification}
+        referenceProductSysId={request.referenceProductSysId}
+        mode="submit"
       />
       <CloseDialog
         open={dialog === "close"}
