@@ -74,6 +74,43 @@ npx tsc --noEmit         # Type-check only — run after every significant chang
 npx shadcn@latest add [name]  # Add shadcn/ui component
 ```
 
+### Key Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| next | 16.x | Framework (App Router) |
+| react | 19.x | UI library |
+| @tanstack/react-query | 5.x | Server state |
+| zustand | 5.x | Client state |
+| react-hook-form | 7.x | Forms |
+| zod | 3.x | Validation |
+| @grpc/grpc-js | 1.x | gRPC client (BFF) |
+| tailwindcss | 4.x | Styling |
+| sonner | — | Toast notifications |
+| lucide-react | — | Icons |
+| recharts | — | Charts |
+
+### Testing Stack
+
+- Vitest + Testing Library + MSW (Mock Service Worker)
+- Setup file: `src/__tests__/setup.ts` — auto-cleanup, MSW server, `matchMedia`/`ResizeObserver` mocks
+- Test files: `src/__tests__/**/*.test.{ts,tsx}`
+- Current coverage: query-key unit tests + component filter tests (see §Improvement Notes for gaps)
+
+### Environment Variables (`.env.local`)
+
+```bash
+# gRPC endpoints (server-side only, NOT exposed to the browser)
+IAM_GRPC_HOST=localhost
+IAM_GRPC_PORT=50052
+FINANCE_GRPC_HOST=localhost
+FINANCE_GRPC_PORT=50051
+
+# Public variables (exposed to the browser)
+NEXT_PUBLIC_API_URL=           # Leave empty for relative paths (recommended)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
 ---
 
 ## 2. Architecture Overview
@@ -96,9 +133,30 @@ The frontend **never** calls the Go backend directly. All requests go through `/
 QueryProvider → ThemeProvider → AuthProvider → PermissionProvider → {children}
 ```
 
-- `AuthProvider` — user state, login/logout, auto token refresh every 10 min
+- `AuthProvider` — user state, login/logout, auto token refresh every 10 min, **plus a silent refresh on mount** (attempts a token refresh once when the app loads, ahead of the 10-min interval)
 - `PermissionProvider` — `hasPermission(code)`, `hasAnyRole(...roles)`
 - `QueryProvider` — TanStack Query client (staleTime 60s, refetchOnWindowFocus false)
+
+### Route Protection (`src/proxy.ts`)
+
+Next.js 16 route protection (replaces the old `middleware.ts`):
+
+- **Public routes**: `/login`, `/forgot-password`, `/reset-password`, `/verify-otp`
+- **Protected routes**: everything else — redirect to `/login?callbackUrl=...` when unauthenticated
+- **API routes**: pass through untouched — each BFF route handles its own auth
+- Auth check is based on the presence of `access_token` + `refresh_token` cookies
+
+### Dynamic Sidebar System
+
+The sidebar is **fully dynamic** — driven by database menu data, not a hardcoded nav config:
+
+1. Backend `GetMenuTree` RPC returns hierarchical menu data already filtered by the current user's permissions
+2. BFF route `/api/v1/iam/menus/tree` proxies the RPC
+3. `useMenuTree()` hook (`src/hooks/iam/use-menu.ts`) fetches the tree → `menuTreeToNavGroups()` converts it to sidebar nav-group shape
+4. Icons lazy-load via `preloadMenuIcons()` + `resolveIcon()` in `src/types/iam/menu.ts` (dynamic imports from `lucide-react`)
+5. `AppSidebar` renders the resulting nav groups
+
+**Menu permission visibility rule**: a menu with **no** rows in `menu_permissions` is visible to **all** authenticated users; a menu **with** rows requires the user to hold at least one matching permission. Parent menus filtered out by permission drop their children too — `buildMenuTree()` only keeps children under a parent that itself survived the filter.
 
 ---
 
@@ -947,6 +1005,20 @@ export const ACTIVE_FILTER_OPTIONS = [
 
 **Never** edit files in `src/types/generated/` — they are auto-generated from proto.
 
+### Response normalization (camelCase + snake_case)
+
+Backend responses aren't guaranteed to arrive in one casing consistently, so normalizer functions read both:
+
+```ts
+function normalizeUOM(raw: RawUOM): NormalizedUOM {
+  return {
+    uomId: raw.uomId || raw.uom_id || "",
+    uomCode: raw.uomCode || raw.uom_code || "",
+    // ...
+  }
+}
+```
+
 ---
 
 ## 12. BFF API Route Pattern
@@ -1042,6 +1114,23 @@ getCompanyClient()         // IAM Organization
 ```
 
 All clients are singletons via `globalThis` (survive HMR in dev).
+
+### gRPC → HTTP error mapping
+
+**File**: `src/lib/grpc/errors.ts`
+
+```ts
+const GRPC_TO_HTTP = {
+  [grpc.status.NOT_FOUND]: 404,
+  [grpc.status.ALREADY_EXISTS]: 409,
+  [grpc.status.INVALID_ARGUMENT]: 400,
+  [grpc.status.PERMISSION_DENIED]: 403,
+  [grpc.status.UNAUTHENTICATED]: 401,
+  // ...
+}
+```
+
+`isGrpcError()` + `handleGrpcError()` use this table to translate a caught gRPC error into the right `NextResponse` status before returning the standard `{ base, data }` envelope.
 
 ---
 
@@ -1218,3 +1307,17 @@ When building a new CRUD feature from scratch, complete in this order:
 9. `src/app/(dashboard)/{module}/{resource}/page.tsx` — server component
 10. `src/app/(dashboard)/{module}/{resource}/loading.tsx` — skeleton
 11. `src/app/(dashboard)/{module}/{resource}/{resource}-page-client.tsx` — client component wiring everything together
+
+---
+
+## 18. Improvement Notes
+
+Known gaps identified during a 2026-07 documentation audit — not blockers, but worth knowing before assuming full coverage:
+
+| Area | Severity | Note |
+|------|----------|------|
+| Limited test coverage | Medium | Only 2 test files exist (query keys + component filter) |
+| No E2E tests | Medium | No Playwright/Cypress — only unit/component tests |
+| Generated proto types in git | Low | Could be generated in CI instead of committed |
+| No error boundary components | Low | Missing React error boundaries |
+| No i18n/internationalization | Low | All strings hardcoded |
