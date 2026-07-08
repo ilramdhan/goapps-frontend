@@ -290,41 +290,30 @@ export function RequestDetailPanel({ request, onEdit, allFillsApproved = false, 
                 <Field label="Target price">{request.targetPriceRange || "—"}</Field>
                 <Field label="Requester"><UserName userId={request.requesterUserId} /></Field>
               </div>
-              {request.description && (
-                <div className="border-t pt-4">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Description</div>
-                  <p className="text-sm whitespace-pre-wrap">{request.description}</p>
-                </div>
-              )}
-              <div className="border-t pt-4 space-y-2">
-                <AttachmentsPanel requestId={request.requestId} readOnly={readOnly} inline />
-              </div>
             </CardContent>
           </Card>
 
-          {request.spec && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Product specification</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <Field label="Raw material">{request.spec.rawMaterialType}</Field>
-                <Field label="Tube">
-                  <PaperTubeName id={request.spec.paperTubeTypeId} tubeType={request.spec.tubeType} />
-                </Field>
-                <Field label="Weight / bobbin">{request.spec.weightPerBobbinKg} kg</Field>
-                <Field label="Box type">{request.spec.boxType}</Field>
-                <Field label="Shade code">{request.spec.shadeCode || `master #${request.spec.shadeId ?? "—"}`}</Field>
-                <Field label="Shade name">{request.spec.shadeName || "—"}</Field>
-                <div className="col-span-2 md:col-span-4">
-                  <Separator className="my-2" />
-                  <Field label="Product description">
-                    <p className="whitespace-pre-wrap">{request.spec.productDescription}</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Product specification</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {request.spec && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Field label="Tube">
+                    <PaperTubeName id={request.spec.paperTubeTypeId} tubeType={request.spec.tubeType} />
                   </Field>
+                  <Field label="Shade code">{request.spec.shadeCode || `master #${request.spec.shadeId ?? "—"}`}</Field>
+                  <Field label="Shade name">{request.spec.shadeName || "—"}</Field>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+              <Field label="Product description">
+                <p className="whitespace-pre-wrap">{request.spec?.productDescription || request.description || "—"}</p>
+              </Field>
+              <Separator className="my-2" />
+              <AttachmentsPanel requestId={request.requestId} readOnly={readOnly} inline />
+            </CardContent>
+          </Card>
 
           {(request.classificationOverrideReason || request.feasibilityDecision) && (
             <Card>

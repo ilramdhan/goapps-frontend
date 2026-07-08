@@ -32,7 +32,6 @@ import type { CostProductRequest, SpecInput, UrgencyLevel } from "@/types/financ
 const schema = z.object({
   requestTypeId: z.number().int().positive("Pick a request type"),
   title: z.string().min(1, "Required").max(255, "Max 255 chars"),
-  description: z.string().max(10000, "Max 10000 chars"),
   customerName: z.string().min(1, "Required").max(255, "Max 255 chars"),
   customerCode: z.string().max(50, "Max 50 chars"),
   urgencyLevel: z.enum(["low", "medium", "high"]),
@@ -63,7 +62,6 @@ interface Props {
 const DEFAULTS: FormValues = {
   requestTypeId: 0,
   title: "",
-  description: "",
   customerName: "",
   customerCode: "",
   urgencyLevel: "medium",
@@ -93,7 +91,6 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
       form.reset({
         requestTypeId: request.requestTypeId,
         title: request.title,
-        description: request.description || "",
         customerName: request.customerName,
         customerCode: request.customerCode || "",
         urgencyLevel: request.urgencyLevel,
@@ -135,7 +132,7 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
     const payload = {
       requestTypeId: values.requestTypeId,
       title: values.title,
-      description: values.description,
+      description: values.specProductDescription || "",
       customerName: values.customerName,
       customerCode: values.customerCode,
       productClassification: isEditing && request ? request.productClassification : "pending",
@@ -289,24 +286,11 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                 />
                 <div />
               </div>
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} rows={3} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </section>
 
             {/* SECTION 2 — Product Specification & Pricing (always visible; description+tube
                 all-or-nothing, everything else independently optional) */}
-            <section className="space-y-4 rounded-md border bg-muted/30 p-4">
+            <section className="space-y-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Section 2 — Product specification & pricing
               </h3>
@@ -334,9 +318,6 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                       <FormControl>
                         <Input {...field} placeholder="e.g. NL, Z114S" />
                       </FormControl>
-                      <FormDescription>
-                        Optional — independent of shade name. Use {`"natural"`} for unpigmented.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -350,12 +331,14 @@ export function RequestFormDialog({ open, onOpenChange, request }: Props) {
                       <FormControl>
                         <Input {...field} placeholder="e.g. Natural, Jet Black" />
                       </FormControl>
-                      <FormDescription>Optional — independent of shade code.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              <FormDescription>
+                Shade code/name are optional and independent of each other. Use {`"natural"`} for unpigmented.
+              </FormDescription>
               <FormField
                 control={form.control}
                 name="specTubeType"
