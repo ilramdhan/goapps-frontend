@@ -152,22 +152,101 @@ export async function createDraftRequest(
 
 // ─── Status Transitions ───────────────────────────────────────────────────────
 
-export async function submitRequest(page: Page) {
+// B3 merge: the DRAFT "Submit" button now opens ClassificationAndFeasibilityDialog in
+// mode="submit" (single SubmitAndDecide RPC — Submit + StartReview + VerifyClassification
+// + DecideFeasibility + (conditional) LinkRoute, see handlers.go's SubmitAndDecide) instead
+// of firing a bare submit mutation. This drives the full dialog flow: classification ->
+// routing (RoutingResolver, inline, FEASIBLE only) -> feasibility -> "Submit for review".
+// Final status is ROUTING_DEFINED (FEASIBLE) or REJECTED (NOT_FEASIBLE) — SubmitAndDecide's
+// chain ends at DecideFeasibility, it does not stop at UNDER_REVIEW.
+export interface SubmitAndDecideOptions {
+  classification?: "existing" | "new"
+  overrideReason?: string
+  decision?: "FEASIBLE" | "NOT_FEASIBLE"
+  productCode?: string
+  newProductName?: string
+  note?: string
+}
+
+export async function submitAndDecide(page: Page, opts: SubmitAndDecideOptions = {}) {
+  const decision = opts.decision ?? "FEASIBLE"
   const btn = page.getByRole("button", { name: /^submit$/i })
   await expect(btn).toBeVisible()
-  // Wait for the BFF mutation response before asserting UI update
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().includes("/submit") && r.request().method() === "POST",
-      { timeout: 15000 },
-    ).catch(() => null),
-    btn.click(),
-  ])
-  if (response && !response.ok()) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(`Submit failed: ${response.status()} — ${JSON.stringify(body)}`)
+  await btn.click()
+  await page.waitForSelector('[role="dialog"]', { state: "visible" })
+
+  if (decision === "NOT_FEASIBLE") {
+    await page.locator('[role="radio"][value="NOT_FEASIBLE"]').click()
   }
-  await expectStatus(page, "SUBMITTED")
+  if (opts.note || decision === "NOT_FEASIBLE") {
+    await page.getByLabel(/^note/i).fill(opts.note ?? "Test note")
+  }
+  if (opts.classification) {
+    await page.locator(`[role="radio"][value="${opts.classification}"]`).click()
+  }
+  if (opts.overrideReason) {
+    const overrideField = page.getByLabel(/override reason/i)
+    if (await overrideField.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await overrideField.fill(opts.overrideReason)
+    }
+  }
+
+  if (decision === "FEASIBLE") {
+    await resolveRoutingInline(page, { productCode: opts.productCode, newProductName: opts.newProductName })
+  }
+
+  const submitBtn = decision === "FEASIBLE"
+    ? page.getByRole("button", { name: /submit for review/i })
+    : page.getByRole("button", { name: /reject as infeasible/i })
+  await expect(submitBtn).toBeEnabled({ timeout: 10000 })
+  await submitBtn.click()
+  await page.waitForSelector('[role="dialog"]', { state: "hidden", timeout: 15000 })
+  await page.waitForLoadState("load")
+  await expectStatus(page, decision === "FEASIBLE" ? "ROUTING_DEFINED" : "REJECTED")
+}
+
+// Direct API-bypass helpers — skip the UI for test setup steps that aren't the
+// thing under test. All hit the same BFF routes the UI mutations call.
+export async function submitViaApi(page: Page, requestId: string | number) {
+  const baseUrl = process.env.E2E_BASE_URL ?? "http://localhost:3000"
+  const resp = await page.request.post(`${baseUrl}/api/v1/finance/cost-product-requests/${requestId}/submit`, {
+    data: {},
+  })
+  if (!resp.ok()) throw new Error(`submitViaApi failed: ${resp.status()} — ${await resp.text()}`)
+}
+
+export async function startReviewViaApi(page: Page, requestId: string | number) {
+  const baseUrl = process.env.E2E_BASE_URL ?? "http://localhost:3000"
+  const resp = await page.request.post(
+    `${baseUrl}/api/v1/finance/cost-product-requests/${requestId}/start-review`,
+    { data: {} },
+  )
+  if (!resp.ok()) throw new Error(`startReviewViaApi failed: ${resp.status()} — ${await resp.text()}`)
+}
+
+export async function useExistingCostingViaApi(
+  page: Page,
+  requestId: string | number,
+  existingProductSysId: number,
+) {
+  const baseUrl = process.env.E2E_BASE_URL ?? "http://localhost:3000"
+  const resp = await page.request.post(
+    `${baseUrl}/api/v1/finance/cost-product-requests/${requestId}/use-existing-costing`,
+    { data: { existingProductSysId } },
+  )
+  if (!resp.ok()) throw new Error(`useExistingCostingViaApi failed: ${resp.status()} — ${await resp.text()}`)
+}
+
+// Looks up any active product master row's sysId — avoids hardcoding a seed-data ID that
+// may not exist in every environment.
+export async function findAnyProductSysId(page: Page): Promise<number> {
+  const baseUrl = process.env.E2E_BASE_URL ?? "http://localhost:3000"
+  const resp = await page.request.get(`${baseUrl}/api/v1/finance/cost-product-masters?pageSize=1&activeFilter=active`)
+  if (!resp.ok()) throw new Error(`findAnyProductSysId failed: ${resp.status()} — ${await resp.text()}`)
+  const body = await resp.json()
+  const sysId = body?.data?.[0]?.productSysId
+  if (!sysId) throw new Error("findAnyProductSysId: no active product masters found in this environment")
+  return sysId
 }
 
 export async function startReview(page: Page) {
@@ -176,12 +255,66 @@ export async function startReview(page: Page) {
   await expectStatus(page, "UNDER_REVIEW")
 }
 
+// Drives RoutingResolver inline (used by both the "submitDecide" and "reviewDecide"
+// variants of ClassificationAndFeasibilityDialog, and by RoutingPanel's standalone
+// "Attach product routing" dialog). Only runs when the resolver form is actually
+// visible — the FEASIBLE section renders it, NOT_FEASIBLE skips it entirely.
+export interface ResolveRoutingOptions {
+  productCode?: string
+  newProductName?: string
+  newProductTypeIndex?: number
+}
+
+export async function resolveRoutingInline(page: Page, opts: ResolveRoutingOptions = {}) {
+  const resolveBtn = page.getByRole("button", { name: /^resolve routing$/i })
+  if (!(await resolveBtn.isVisible({ timeout: 1000 }).catch(() => false))) {
+    return // NOT_FEASIBLE path, or already resolved (routeLinked) — nothing to do
+  }
+
+  if (opts.newProductName) {
+    const newProductCheckbox = page.locator("#rr-new-product")
+    if (await newProductCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await newProductCheckbox.check()
+    }
+    await page.getByPlaceholder(/PTY 75\/72 SD BRIGHT/i).fill(opts.newProductName)
+    const typeCombobox = page.getByRole("combobox", { name: /select product type/i })
+    await typeCombobox.click()
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 })
+    const options = page.getByRole("option")
+    const idx = opts.newProductTypeIndex ?? 0
+    await options.nth(idx).click()
+  } else {
+    const productCombobox = page.getByRole("combobox", { name: /search product by code or name/i })
+    await productCombobox.click()
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 })
+    if (opts.productCode) {
+      const searchInput = page.getByPlaceholder(/search by code or name/i)
+      await searchInput.fill(opts.productCode)
+      await page.waitForTimeout(400) // debounce
+      await page.getByRole("option", { name: new RegExp(opts.productCode, "i") }).first().click()
+    } else {
+      await page.getByRole("option").first().click()
+    }
+  }
+
+  await resolveBtn.click()
+  // Two different hosts react differently on success: ClassificationAndFeasibilityDialog
+  // keeps RoutingResolver mounted and shows a "Routing resolved — head #N…" message,
+  // while RoutingPanel's standalone dialog just closes (onResolved => setResolverOpen(false)).
+  // Race both signals instead of assuming either one.
+  await Promise.race([
+    page.getByText(/rout(e|ing) #?\d* ?resolved/i).waitFor({ state: "visible", timeout: 15000 }),
+    resolveBtn.waitFor({ state: "hidden", timeout: 15000 }),
+  ])
+}
+
 export async function decideFeasibility(
   page: Page,
   decision: "FEASIBLE" | "NOT_FEASIBLE",
   note = "Test note",
+  routingOpts: ResolveRoutingOptions = {},
 ) {
-  await page.getByRole("button", { name: /decide feasibility/i }).click()
+  await page.getByRole("button", { name: /review.*decide/i }).click()
   await page.waitForSelector('[role="dialog"]', { state: "visible" })
 
   // Select decision — use value attribute to avoid /FEASIBLE/i matching both "Feasible" and "Not feasible"
@@ -189,16 +322,23 @@ export async function decideFeasibility(
   await radio.click()
 
   // Fill note
-  const noteField = page.getByLabel(/note/i)
+  const noteField = page.getByLabel(/^note/i)
   if (await noteField.isVisible({ timeout: 1000 }).catch(() => false)) {
     await noteField.fill(note)
   }
 
-  // Button label is "Approve" for FEASIBLE, "Reject as infeasible" for NOT_FEASIBLE
+  if (decision === "FEASIBLE") {
+    await resolveRoutingInline(page, routingOpts)
+  }
+
+  // Submit label is dynamic: "Save & continue" (first pass), "Reject as infeasible"
+  // (NOT_FEASIBLE), or a retry label after a partial failure.
   const submitBtn = decision === "FEASIBLE"
-    ? page.getByRole("button", { name: /^approve$/i })
+    ? page.getByRole("button", { name: /save.*continue|retry/i })
     : page.getByRole("button", { name: /reject as infeasible/i })
+  await expect(submitBtn).toBeEnabled({ timeout: 10000 })
   await submitBtn.click()
+  await page.waitForSelector('[role="dialog"]', { state: "hidden", timeout: 15000 })
   await page.waitForLoadState("load")
 
   if (decision === "FEASIBLE") {
@@ -206,23 +346,6 @@ export async function decideFeasibility(
   } else {
     await expectStatus(page, "REJECTED")
   }
-}
-
-export async function useExistingCosting(page: Page, productCode: string) {
-  await page.getByRole("button", { name: /use existing costing/i }).click()
-  await page.waitForSelector('[role="dialog"]', { state: "visible" })
-
-  // Search for product
-  const searchInput = page.getByPlaceholder(/search.*product|product.*code/i)
-  await searchInput.fill(productCode)
-  await page.waitForTimeout(500) // debounce
-
-  // Select from dropdown
-  await page.getByRole("option", { name: new RegExp(productCode, "i") }).first().click()
-
-  await page.getByRole("button", { name: /^(confirm|select|use)$/i }).last().click()
-  await page.waitForLoadState("load")
-  await expectStatus(page, "QUOTE_READY")
 }
 
 export async function rejectRequest(page: Page, reason: string) {
@@ -278,35 +401,28 @@ export interface RouteMaterial {
   ratio: number
 }
 
-export async function createProductAndRoute(
+// Drives RoutingPanel's standalone "Attach product routing" button (shown when a
+// request has no linked route yet), which opens a Dialog containing an inline
+// RoutingResolver — the same component used by ClassificationAndFeasibilityDialog's
+// Routing section. Does NOT navigate to a separate route editor URL; it just closes
+// the dialog once RoutingResolver's onResolved fires. Returns nothing resolvable as
+// a route ID from the UI — callers needing the head ID should read it from the panel
+// (e.g. via `page.getByText(/route #(\d+)/i)`) or use the API directly.
+export async function attachProductRouting(
   page: Page,
   fgProductName: string,
-): Promise<string> {
-  // Click Create new routing button in routing panel
-  await page.getByRole("button", { name: /create new routing/i }).click()
+  opts: { productTypeIndex?: number } = {},
+) {
+  await page.getByRole("button", { name: /attach product routing/i }).click()
   await page.waitForSelector('[role="dialog"]', { state: "visible" })
 
-  // Step 1: switch to "Create new product master" mode (default is "existing")
-  await page.locator('[role="radio"][value="new"]').click()
-  // Click Next to go to step 2
-  await page.getByRole("button", { name: /^next$/i }).click()
+  await resolveRoutingInline(page, {
+    newProductName: fgProductName,
+    newProductTypeIndex: opts.productTypeIndex,
+  })
 
-  // Step 2: fill product name via placeholder (Label has no htmlFor)
-  await page.getByPlaceholder(/PTY|product name/i).first().fill(fgProductName)
-
-  // Select product type — only one role="combobox" on step 2
-  await page.getByRole("combobox").click()
-  await page.waitForSelector('[role="option"]', { state: "visible", timeout: 10000 })
-  await page.getByRole("option").first().click()
-
-  // Click "Create product + route"
-  await page.getByRole("button", { name: /create product.*route/i }).click()
-
-  // Wizard navigates to route editor at /finance/routes/[id]
-  await page.waitForURL(/\/finance\/routes\/\d+/, { timeout: 15000 })
-  const url = page.url()
-  const match = url.match(/routes\/(\d+)/)
-  return match?.[1] ?? ""
+  await page.waitForSelector('[role="dialog"]', { state: "hidden", timeout: 15000 })
+  await page.waitForLoadState("load")
 }
 
 export async function promoteRoute(page: Page) {
