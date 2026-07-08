@@ -1,33 +1,30 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   CheckCircle2,
-  ChevronDown,
   FileStack,
   GitFork,
   Lock,
   PencilRuler,
   Plus,
+  X,
 } from "lucide-react"
 
 import { DebouncedSearchInput, EmptyState, KpiCard, KpiGrid, PageHeader } from "@/components/common"
 import { StatusBadge } from "@/components/common/status-badge"
-import { CreateRoutingWizard } from "@/components/finance/cost-product-request/create-routing-wizard"
+import { RoutingResolver } from "@/components/finance/cost-product-request/routing-resolver"
 import { ColumnVisibilityMenu, DataTablePagination, SortableHeader, useColumnVisibility } from "@/components/shared"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouteCounts, useRoutes } from "@/hooks/finance/use-cost-route"
 import { useUrlState } from "@/lib/hooks"
+import { cn } from "@/lib/utils"
 import type { ListRoutesParams, RouteStatus } from "@/types/finance/cost-route"
 
 // Column definitions — id doubles as the sort key where sortable
@@ -36,7 +33,8 @@ const ROUTE_COLUMNS = [
   { id: "product_code",           header: "Product" },
   { id: "status",                 header: "Status" },
   { id: "version",                header: "Version",     defaultHidden: false },
-  { id: "promoted_from_draft_id", header: "From draft",  defaultHidden: true },
+  { id: "level_count",            header: "# levels" },
+  { id: "rm_count",               header: "# RM" },
 ] as const
 
 type ColId = (typeof ROUTE_COLUMNS)[number]["id"]
@@ -55,7 +53,7 @@ const defaultFilters: ListRoutesParams = {
 export default function RoutesPageClient() {
   const router = useRouter()
   const [filters, setFilters] = useUrlState<ListRoutesParams>({ defaultValues: defaultFilters })
-  const [wizardOpen, setWizardOpen] = useState(false)
+  const [resolverOpen, setResolverOpen] = useState(false)
 
   const { data, isLoading } = useRoutes(filters)
   const { data: counts, isLoading: countsLoading } = useRouteCounts()
@@ -63,6 +61,9 @@ export default function RoutesPageClient() {
   const columns = useMemo(() => [...ROUTE_COLUMNS], [])
   const { visibility, toggle, setAll, reset } = useColumnVisibility(TABLE_ID, columns)
   const show = (id: ColId) => visibility[id] !== false
+  // Right edge padding goes on whichever column renders last (routes has no trailing actions column).
+  const lastVisibleId = [...ROUTE_COLUMNS].reverse().find((c) => show(c.id))?.id
+  const edgeRight = (id: ColId) => (id === lastVisibleId ? "pr-4" : "")
 
   function handleSort(sortKey: string) {
     const nextOrder =
@@ -76,6 +77,19 @@ export default function RoutesPageClient() {
     onSort: handleSort,
   }
 
+  const hasActiveFilters = !!filters.search || !!filters.status || !!filters.sortBy
+
+  function clearFilters() {
+    setFilters({
+      ...filters,
+      search: "",
+      status: "",
+      sortBy: "",
+      sortOrder: "asc",
+      page: 1,
+    })
+  }
+
   const items = data?.items ?? []
   const totalItems = data?.total ?? 0
   const totalPages = data?.totalPages ?? 0
@@ -87,28 +101,17 @@ export default function RoutesPageClient() {
         subtitle="Multi-stage routings (DAG): one head per product, each stage produces an intermediate or FG product."
         className="pb-0"
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Plus className="mr-1 h-4 w-4" />
-              <span className="hidden sm:inline">New route</span>
-              <span className="sm:hidden">New</span>
-              <ChevronDown className="ml-1 h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setWizardOpen(true)}>
-              From product (wizard)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button onClick={() => setResolverOpen(true)} aria-label="New route">
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">New route</span>
+        </Button>
       </PageHeader>
 
       <KpiGrid cols={4}>
         <KpiCard title="Total routes" value={counts?.total ?? 0} icon={FileStack} loading={countsLoading} />
-        <KpiCard title="Draft"    value={counts?.draft ?? 0}    icon={PencilRuler} variant="warning"  loading={countsLoading} />
-        <KpiCard title="Complete" value={counts?.complete ?? 0} icon={CheckCircle2} variant="success" loading={countsLoading} />
-        <KpiCard title="Locked"   value={counts?.locked ?? 0}   icon={Lock}        loading={countsLoading} />
+        <KpiCard title="Draft"    value={counts?.draft ?? 0}    icon={PencilRuler}  loading={countsLoading} />
+        <KpiCard title="Complete" value={counts?.complete ?? 0} icon={CheckCircle2} loading={countsLoading} />
+        <KpiCard title="Locked"   value={counts?.locked ?? 0}   icon={Lock}         loading={countsLoading} />
       </KpiGrid>
 
       {/* Filter bar — matches product-master grid pattern */}
@@ -136,7 +139,12 @@ export default function RoutesPageClient() {
             <SelectItem value="LOCKED">Locked</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+              <X className="mr-1.5 h-3.5 w-3.5" /> Clear
+            </Button>
+          )}
           <ColumnVisibilityMenu
             columns={columns}
             visibility={visibility}
@@ -155,19 +163,22 @@ export default function RoutesPageClient() {
             <TableHeader>
               <TableRow>
                 {show("head_id") && (
-                  <SortableHeader label="Head #" sortKey="head_id" className="w-24 pl-4" {...sortProps} />
+                  <SortableHeader label="Head #" sortKey="head_id" className={cn("w-24 pl-4", edgeRight("head_id"))} {...sortProps} />
                 )}
                 {show("product_code") && (
-                  <SortableHeader label="Product" sortKey="product_code" {...sortProps} />
+                  <SortableHeader label="Product" sortKey="product_code" className={edgeRight("product_code")} {...sortProps} />
                 )}
                 {show("status") && (
-                  <SortableHeader label="Status" sortKey="status" className="w-28" {...sortProps} />
+                  <SortableHeader label="Status" sortKey="status" className={cn("w-28", edgeRight("status"))} {...sortProps} />
                 )}
                 {show("version") && (
-                  <SortableHeader label="Version" sortKey="version" className="w-24" {...sortProps} />
+                  <SortableHeader label="Version" sortKey="version" className={cn("w-24", edgeRight("version"))} {...sortProps} />
                 )}
-                {show("promoted_from_draft_id") && (
-                  <TableHead className="w-28">From draft</TableHead>
+                {show("level_count") && (
+                  <SortableHeader label="# levels" sortKey="level_count" className={cn("w-24 text-right", edgeRight("level_count"))} {...sortProps} />
+                )}
+                {show("rm_count") && (
+                  <SortableHeader label="# RM" sortKey="rm_count" className={cn("w-20 text-right", edgeRight("rm_count"))} {...sortProps} />
                 )}
               </TableRow>
             </TableHeader>
@@ -179,7 +190,8 @@ export default function RoutesPageClient() {
                     {show("product_code") && <TableCell><Skeleton className="h-4 w-40" /></TableCell>}
                     {show("status") && <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>}
                     {show("version") && <TableCell><Skeleton className="h-4 w-8" /></TableCell>}
-                    {show("promoted_from_draft_id") && <TableCell><Skeleton className="h-4 w-10" /></TableCell>}
+                    {show("level_count") && <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-8" /></TableCell>}
+                    {show("rm_count") && <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-8" /></TableCell>}
                   </TableRow>
                 ))}
               {!isLoading && items.length === 0 && (
@@ -195,16 +207,17 @@ export default function RoutesPageClient() {
                 </TableRow>
               )}
               {items.map((h) => (
-                <TableRow
-                  key={h.headId}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/finance/routes/${h.headId}`)}
-                >
+                <TableRow key={h.headId} className="relative cursor-pointer hover:bg-muted/50">
                   {show("head_id") && (
-                    <TableCell className="pl-4 font-mono text-xs">#{h.headId}</TableCell>
+                    <TableCell className={cn("pl-4 font-mono text-xs", edgeRight("head_id"))}>
+                      <Link href={`/finance/routes/${h.headId}`} className="absolute inset-0">
+                        <span className="sr-only">Open route #{h.headId}</span>
+                      </Link>
+                      #{h.headId}
+                    </TableCell>
                   )}
                   {show("product_code") && (
-                    <TableCell>
+                    <TableCell className={edgeRight("product_code")}>
                       <div className="font-medium">{h.productCode || "—"}</div>
                       {h.productName && (
                         <div className="text-xs text-muted-foreground">{h.productName}</div>
@@ -212,17 +225,18 @@ export default function RoutesPageClient() {
                     </TableCell>
                   )}
                   {show("status") && (
-                    <TableCell>
+                    <TableCell className={edgeRight("status")}>
                       <StatusBadge status={h.routingStatus} type="route" size="sm" />
                     </TableCell>
                   )}
                   {show("version") && (
-                    <TableCell className="text-sm">v{h.version}</TableCell>
+                    <TableCell className={cn("text-sm", edgeRight("version"))}>v{h.version}</TableCell>
                   )}
-                  {show("promoted_from_draft_id") && (
-                    <TableCell className="text-sm">
-                      {h.promotedFromDraftId ? `#${h.promotedFromDraftId}` : "—"}
-                    </TableCell>
+                  {show("level_count") && (
+                    <TableCell className={cn("text-right text-sm tabular-nums", edgeRight("level_count"))}>{h.levelCount}</TableCell>
+                  )}
+                  {show("rm_count") && (
+                    <TableCell className={cn("text-right text-sm tabular-nums", edgeRight("rm_count"))}>{h.rmCount}</TableCell>
                   )}
                 </TableRow>
               ))}
@@ -242,11 +256,20 @@ export default function RoutesPageClient() {
         />
       )}
 
-      <CreateRoutingWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        requestId={0}
-      />
+      <Dialog open={resolverOpen} onOpenChange={setResolverOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New route</DialogTitle>
+          </DialogHeader>
+          <RoutingResolver
+            requestId={0}
+            onResolved={(headId) => {
+              setResolverOpen(false)
+              router.push(`/finance/routes/${headId}`)
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

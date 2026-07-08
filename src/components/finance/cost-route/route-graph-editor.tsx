@@ -28,7 +28,7 @@ import Link from "next/link"
 import { CalculateButton } from "@/components/finance/calc-jobs/calculate-button"
 import { ProductMasterCombobox } from "@/components/finance/comboboxes/product-master-combobox"
 import { DuplicateRouteDialog } from "@/components/finance/cost-route/duplicate-route-dialog"
-import { LinkedRequestsPopover } from "@/components/finance/cost-route/linked-requests-popover"
+import { LinkedRequestsSheet } from "@/components/finance/cost-route/linked-requests-sheet"
 import { RouteGraphEditPanel } from "@/components/finance/cost-route/route-graph-edit-panel"
 import { RouteGraphFlow } from "@/components/finance/cost-route/route-graph-flow"
 import { StatusBadge } from "@/components/common/status-badge"
@@ -43,7 +43,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/shared"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -63,11 +63,18 @@ import {
   useSaveRouteGraph,
 } from "@/hooks/finance/use-cost-route"
 import { useRMGroups } from "@/hooks/finance/use-rm-group"
-import type {
-  CostRouteRm,
-  CostRouteSeq,
-  RmRefType,
-  RouteGraph,
+import {
+  ScrollableDialogBody,
+  ScrollableDialogContent,
+  ScrollableDialogFooter,
+  ScrollableDialogHeader,
+} from "@/components/common/scrollable-dialog"
+import {
+  newUid,
+  type CostRouteRm,
+  type CostRouteSeq,
+  type RmRefType,
+  type RouteGraph,
 } from "@/types/finance/cost-route"
 import { cn } from "@/lib/utils"
 
@@ -84,15 +91,16 @@ export function RouteGraphEditor({ headId }: Props) {
   const [dirty, setDirty] = useState(false)
   const [stageDialogState, setStageDialogState] = useState<
     | { open: false }
-    | { open: true; defaultLevel?: number; linkToSeqId?: number; linkDirection?: "upstream" | "downstream" }
+    | { open: true; defaultLevel?: number; linkToSeqUid?: string; linkDirection?: "upstream" | "downstream" }
   >({ open: false })
   const [forkOpen, setForkOpen] = useState(false)
   const [rmDialog, setRmDialog] = useState<{ seqIdx: number } | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [view, setView] = useState<"visual" | "cards">("visual")
   // Inline edit-panel selection — only one of these is set at a time.
-  const [selectedSeqId, setSelectedSeqId] = useState<number | null>(null)
-  const [selectedRmId, setSelectedRmId] = useState<number | null>(null)
+  // Keyed on the client uid so new/unsaved elements are selectable pre-save.
+  const [selectedSeqUid, setSelectedSeqUid] = useState<string | null>(null)
+  const [selectedRmUid, setSelectedRmUid] = useState<string | null>(null)
 
   useEffect(() => {
     workingRef.current = working
@@ -141,14 +149,6 @@ export function RouteGraphEditor({ headId }: Props) {
     [seqs],
   )
 
-  const ensureWorking = useCallback((): RouteGraph | null => {
-    if (working) return working
-    if (!persisted) return null
-    const clone = JSON.parse(JSON.stringify(persisted)) as RouteGraph
-    setWorking(clone)
-    return clone
-  }, [working, persisted])
-
   // ---------- stage actions ----------
   // addStage returns the index of the newly-pushed seq in the next graph's
   // seqs array, so callers (e.g. F3 drop-on-pane) can immediately link it.
@@ -162,13 +162,17 @@ export function RouteGraphEditor({ headId }: Props) {
     productCode?: string,
     productName?: string,
     meta?: { routeName?: string; routeItemCode?: string; routeShadeCode?: string; routeShadeName?: string },
-  ): { newSeqIdx: number } => {
-    let newSeqIdx = -1
+  ): { newSeqUid: string } => {
+    const newSeqUid = newUid()
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
       if (!base) return prev
       const existing = base.seqs.filter((s) => s.routeLevel === level).length
-      base.seqs.push({
+      // Pure updater: never mutate `prev`. Under React StrictMode the updater is
+      // double-invoked with the same `prev`, so an in-place push would append the
+      // stage twice with a shared uid. Build a fresh seqs array instead.
+      const newSeq = {
+        uid: newSeqUid,
         seqId: 0,
         headId,
         productSysId,
@@ -183,31 +187,40 @@ export function RouteGraphEditor({ headId }: Props) {
         positionX: 0,
         positionY: 0,
         rms: [],
-      })
-      newSeqIdx = base.seqs.length - 1
-      return { ...base, seqs: [...base.seqs] }
+      }
+      return { ...base, seqs: [...base.seqs, newSeq] }
     })
     setDirty(true)
-    return { newSeqIdx }
+    return { newSeqUid }
   }
 
-  const deleteStage = (seqIdx: number) => {
+  const deleteStageByUid = (seqUid: string) => {
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
       if (!base) return prev
-      return { ...base, seqs: base.seqs.filter((_, i) => i !== seqIdx) }
+      return { ...base, seqs: base.seqs.filter((s) => s.uid !== seqUid) }
     })
     setDirty(true)
   }
 
   // ---------- rm actions ----------
-  const addRm = (seqIdx: number, rm: CostRouteRm) => {
+  // Callers may omit `uid` — a fresh client uid is always stamped here so the
+  // new RM is immediately clickable/editable and delete targets exactly one.
+  const addRm = (seqIdx: number, rm: Omit<CostRouteRm, "uid"> & { uid?: string }) => {
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
       if (!base) return prev
       const seq = base.seqs[seqIdx]
       if (!seq) return base
-      const updatedSeq = { ...seq, rms: [...(seq.rms ?? []), { ...rm, seqId: seq.seqId, parentProductSysId: seq.productSysId }] }
+      const newRm: CostRouteRm = {
+        ...rm,
+        // Always stamp a fresh client uid so the new RM is immediately
+        // clickable/editable and delete targets exactly this one.
+        uid: rm.uid || newUid(),
+        seqId: seq.seqId,
+        parentProductSysId: seq.productSysId,
+      }
+      const updatedSeq = { ...seq, rms: [...(seq.rms ?? []), newRm] }
       const updatedSeqs = [...base.seqs]
       updatedSeqs[seqIdx] = updatedSeq
       return { ...base, seqs: updatedSeqs }
@@ -240,32 +253,60 @@ export function RouteGraphEditor({ headId }: Props) {
 
   // ---------- React Flow native actions ----------
 
-  // Persist a stage's drag position.
+  // Persist a stage's drag position (keyed on the client uid).
   const updateSeqPosition = useCallback(
-    (seqId: number, x: number, y: number) => {
+    (seqUid: string, x: number, y: number) => {
       setWorking((prev) => {
         const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
         if (!base) return prev
-        const seq = base.seqs.find((s) => s.seqId === seqId)
+        const seq = base.seqs.find((s) => s.uid === seqUid)
         if (!seq) return base
         if (seq.positionX === x && seq.positionY === y) return base
-        seq.positionX = x
-        seq.positionY = y
-        return { ...base, seqs: [...base.seqs] }
+        // Pure updater — replace the target seq, never mutate `prev` in place.
+        return {
+          ...base,
+          seqs: base.seqs.map((s) => (s.uid === seqUid ? { ...s, positionX: x, positionY: y } : s)),
+        }
       })
       setDirty(true)
     },
     [persisted],
   )
 
-  // Add a PRODUCT-RM by drawing an edge from upstream → downstream stage.
+  // Persist an ITEM/GROUP RM's drag position (keyed on the client uid).
+  const updateRmPosition = useCallback(
+    (rmUid: string, x: number, y: number) => {
+      setWorking((prev) => {
+        const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
+        if (!base) return prev
+        let changed = false
+        const seqs = base.seqs.map((seq) => {
+          const idx = (seq.rms ?? []).findIndex((r) => r.uid === rmUid)
+          if (idx < 0) return seq
+          const rm = seq.rms[idx]
+          if (rm.positionX === x && rm.positionY === y) return seq
+          changed = true
+          const rms = [...seq.rms]
+          rms[idx] = { ...rm, positionX: x, positionY: y }
+          return { ...seq, rms }
+        })
+        if (!changed) return base
+        return { ...base, seqs }
+      })
+      setDirty(true)
+    },
+    [persisted],
+  )
+
+  // Add a PRODUCT-RM by drawing an edge from upstream → downstream stage
+  // (keyed on client uids so newly-added, unsaved stages can be linked).
   const addProductRmFromEdge = useCallback(
-    (upstreamSeqId: number, downstreamSeqId: number) => {
+    (upstreamSeqUid: string, downstreamSeqUid: string) => {
       if (locked) return
       const current = working ?? persisted
       if (!current) return
-      const upstream = current.seqs.find((s) => s.seqId === upstreamSeqId)
-      const downstream = current.seqs.find((s) => s.seqId === downstreamSeqId)
+      const upstream = current.seqs.find((s) => s.uid === upstreamSeqUid)
+      const downstream = current.seqs.find((s) => s.uid === downstreamSeqUid)
       if (!upstream || !downstream) return
       const verdict = isValidProductRmEdge(current, upstream, downstream)
       if (!verdict.ok) {
@@ -292,24 +333,17 @@ export function RouteGraphEditor({ headId }: Props) {
   // Click stage node → open inline edit panel (stays on React Flow view).
   // We still keep stageCardRefs so the "Open in Cards view" escape hatch can
   // scroll to the right card.
-  const stageCardRefs = useRef<Map<number, HTMLDivElement | null>>(new Map())
-  const handleStageClick = useCallback((seqId: number) => {
-    if (seqId === 0) {
-      toast.info("Save the route first to edit this element.")
-      return
-    }
-    setSelectedRmId(null)
-    setSelectedSeqId(seqId)
+  const stageCardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  const handleStageClick = useCallback((seqUid: string) => {
+    // Keyed on the stable client uid — new/unsaved stages are editable too.
+    setSelectedRmUid(null)
+    setSelectedSeqUid(seqUid)
   }, [])
 
-  // Click edge → open inline edit panel for that RM.
-  const handleEdgeClick = useCallback((rmId: number) => {
-    if (rmId === 0) {
-      toast.info("Save the route first to edit this element.")
-      return
-    }
-    setSelectedSeqId(null)
-    setSelectedRmId(rmId)
+  // Click edge → open inline edit panel for that RM (keyed on client uid).
+  const handleEdgeClick = useCallback((rmUid: string) => {
+    setSelectedSeqUid(null)
+    setSelectedRmUid(rmUid)
   }, [])
 
   // Update a single RM's ratio (used by both seq-panel rows + rm-panel).
@@ -323,8 +357,12 @@ export function RouteGraphEditor({ headId }: Props) {
         if (!seq) return base
         const targetRm = seq.rms[rmIdx]
         if (!targetRm) return base
-        targetRm.routeRmRatio = next
-        return { ...base, seqs: [...base.seqs] }
+        // Pure updater — rebuild the target seq's rms array, never mutate `prev`.
+        const rms = [...seq.rms]
+        rms[rmIdx] = { ...targetRm, routeRmRatio: next }
+        const seqs = [...base.seqs]
+        seqs[seqIdx] = { ...seq, rms }
+        return { ...base, seqs }
       })
       setDirty(true)
     },
@@ -335,11 +373,11 @@ export function RouteGraphEditor({ headId }: Props) {
   // AddStageDialog pre-filled with a level hint and a "link back to source"
   // intent. The dialog's onAdd callback will append the new stage and link.
   const handleDropOnPane = useCallback(
-    (sourceSeqId: number, handleType: "source" | "target") => {
+    (sourceSeqUid: string, handleType: "source" | "target") => {
       if (locked) return
       const current = working ?? persisted
       if (!current) return
-      const sourceSeq = current.seqs.find((s) => s.seqId === sourceSeqId)
+      const sourceSeq = current.seqs.find((s) => s.uid === sourceSeqUid)
       if (!sourceSeq) return
       // handleType === "source" = dragged from the BOTTOM handle = adding a
       // DOWNSTREAM stage (one level shallower than source).
@@ -354,7 +392,7 @@ export function RouteGraphEditor({ headId }: Props) {
       setStageDialogState({
         open: true,
         defaultLevel,
-        linkToSeqId: sourceSeqId,
+        linkToSeqUid: sourceSeqUid,
         linkDirection,
       })
     },
@@ -386,7 +424,6 @@ export function RouteGraphEditor({ headId }: Props) {
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
             <StatusBadge status={head?.routingStatus} type="route" size="sm" />
             <span>version v{head?.version}</span>
-            {head?.promotedFromDraftId ? <span>· promoted from a routing draft</span> : null}
           </div>
           {!locked && (
             <details className="mt-2">
@@ -406,7 +443,7 @@ export function RouteGraphEditor({ headId }: Props) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <LinkedRequestsPopover headId={headId} />
+          <LinkedRequestsSheet headId={headId} />
           <CalculateButton
             routeHeadId={headId}
             size="sm"
@@ -451,7 +488,7 @@ export function RouteGraphEditor({ headId }: Props) {
       )}
 
       {complete && (
-        <Card className="border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <Card className="border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
           Status: COMPLETE. Edits are still allowed — Lock the route to freeze it for calculation.
         </Card>
       )}
@@ -486,7 +523,8 @@ export function RouteGraphEditor({ headId }: Props) {
             graph={graph}
             locked={locked}
             onAddStage={!locked ? () => setStageDialogState({ open: true }) : undefined}
-            onNodePositionChange={updateSeqPosition}
+            onStagePositionChange={updateSeqPosition}
+            onRmPositionChange={updateRmPosition}
             onConnectStages={addProductRmFromEdge}
             onStageClick={handleStageClick}
             onEdgeClick={handleEdgeClick}
@@ -496,34 +534,34 @@ export function RouteGraphEditor({ headId }: Props) {
           <EditPanelHost
             graph={graph}
             locked={locked}
-            selectedSeqId={selectedSeqId}
-            selectedRmId={selectedRmId}
+            selectedSeqUid={selectedSeqUid}
+            selectedRmUid={selectedRmUid}
             onClose={() => {
-              setSelectedSeqId(null)
-              setSelectedRmId(null)
+              setSelectedSeqUid(null)
+              setSelectedRmUid(null)
             }}
             onChangeRmRatio={updateRmRatio}
             onRemoveRm={(seqIdx, rmIdx) => {
               deleteRm(seqIdx, rmIdx)
-              setSelectedRmId(null)
+              setSelectedRmUid(null)
             }}
             onAddRm={(seqIdx) => setRmDialog({ seqIdx })}
-            onRemoveStage={(seqIdx) => {
-              deleteStage(seqIdx)
-              setSelectedSeqId(null)
+            onRemoveStage={(seqUid) => {
+              deleteStageByUid(seqUid)
+              setSelectedSeqUid(null)
             }}
-            onOpenInCards={(seqId) => {
+            onOpenInCards={(seqUid) => {
               setView("cards")
               requestAnimationFrame(() => {
-                const el = stageCardRefs.current.get(seqId)
+                const el = stageCardRefs.current.get(seqUid)
                 if (el) {
                   el.scrollIntoView({ behavior: "smooth", block: "center" })
                   el.classList.add("ring-2", "ring-primary")
                   setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1500)
                 }
               })
-              setSelectedSeqId(null)
-              setSelectedRmId(null)
+              setSelectedSeqUid(null)
+              setSelectedRmUid(null)
             }}
           />
         </div>
@@ -540,13 +578,11 @@ export function RouteGraphEditor({ headId }: Props) {
               const idx = seqs.indexOf(s)
               return (
                 <Card
-                  key={`${s.seqId}-${s.routeLevel}-${s.routeSeq}-${idx}`}
+                  key={s.uid}
                   className="p-3 transition-shadow"
                   ref={(el: HTMLDivElement | null) => {
-                    if (s.seqId > 0) {
-                      if (el) stageCardRefs.current.set(s.seqId, el)
-                      else stageCardRefs.current.delete(s.seqId)
-                    }
+                    if (el) stageCardRefs.current.set(s.uid, el)
+                    else stageCardRefs.current.delete(s.uid)
                   }}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -570,7 +606,7 @@ export function RouteGraphEditor({ headId }: Props) {
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-red-500"
-                        onClick={() => deleteStage(idx)}
+                        onClick={() => deleteStageByUid(s.uid)}
                         title="Remove stage"
                       >
                         <X className="h-4 w-4" />
@@ -583,7 +619,7 @@ export function RouteGraphEditor({ headId }: Props) {
                     ) : (
                       s.rms.map((rm, rmIdx) => (
                         <div
-                          key={`${rm.rmId}-${rmIdx}`}
+                          key={rm.uid}
                           className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1 text-xs"
                         >
                           <div className="flex min-w-0 items-center gap-2 flex-1">
@@ -642,18 +678,18 @@ export function RouteGraphEditor({ headId }: Props) {
         existingLevels={seqsByLevel.map((g) => g.level)}
         defaultLevel={stageDialogState.defaultLevel}
         onAdd={(level, productSysId, productCode, productName, meta) => {
-          const { newSeqIdx } = addStage(level, productSysId, productCode, productName, meta)
+          const { newSeqUid } = addStage(level, productSysId, productCode, productName, meta)
           // F3 link-after-add: if we opened the dialog by dropping on the pane,
           // wire a PRODUCT-RM between the source seq and the newly-created seq.
-          if (stageDialogState.open && stageDialogState.linkToSeqId !== undefined && newSeqIdx >= 0) {
-            const sourceSeqId = stageDialogState.linkToSeqId
+          if (stageDialogState.open && stageDialogState.linkToSeqUid !== undefined) {
+            const sourceSeqUid = stageDialogState.linkToSeqUid
             const direction = stageDialogState.linkDirection ?? "upstream"
             // Defer one frame so the working state setter has flushed.
             requestAnimationFrame(() => {
               const current = (workingRef.current ?? persisted) as RouteGraph | null
               if (!current) return
-              const newSeq = current.seqs[newSeqIdx]
-              const sourceSeq = current.seqs.find((s) => s.seqId === sourceSeqId)
+              const newSeq = current.seqs.find((s) => s.uid === newSeqUid)
+              const sourceSeq = current.seqs.find((s) => s.uid === sourceSeqUid)
               if (!newSeq || !sourceSeq) return
               // Newly-added seq has seqId === 0 (unsaved). PRODUCT-RM expects
               // both ends to exist; we add it by indexing into the seqs array.
@@ -730,14 +766,14 @@ export function RouteGraphEditor({ headId }: Props) {
 
 // ============================================================================
 // Edit-panel render helper — Bug 2 (stage click) + Bug 5 (RM edge click).
-// Picks the right panel mode based on selectedSeqId / selectedRmId.
+// Picks the right panel mode based on selectedSeqUid / selectedRmUid.
 // ============================================================================
 
 function EditPanelHost({
   graph,
   locked,
-  selectedSeqId,
-  selectedRmId,
+  selectedSeqUid,
+  selectedRmUid,
   onClose,
   onChangeRmRatio,
   onRemoveRm,
@@ -747,17 +783,17 @@ function EditPanelHost({
 }: {
   graph: RouteGraph
   locked: boolean
-  selectedSeqId: number | null
-  selectedRmId: number | null
+  selectedSeqUid: string | null
+  selectedRmUid: string | null
   onClose: () => void
   onChangeRmRatio: (seqIdx: number, rmIdx: number, next: number) => void
   onRemoveRm: (seqIdx: number, rmIdx: number) => void
   onAddRm: (seqIdx: number) => void
-  onRemoveStage: (seqIdx: number) => void
-  onOpenInCards: (seqId: number) => void
+  onRemoveStage: (seqUid: string) => void
+  onOpenInCards: (seqUid: string) => void
 }) {
-  if (selectedSeqId !== null) {
-    const seqIdx = graph.seqs.findIndex((s) => s.seqId === selectedSeqId)
+  if (selectedSeqUid !== null) {
+    const seqIdx = graph.seqs.findIndex((s) => s.uid === selectedSeqUid)
     if (seqIdx < 0) return null
     const seq = graph.seqs[seqIdx]
     return (
@@ -769,14 +805,14 @@ function EditPanelHost({
         onChangeRmRatio={(rmIdx, ratio) => onChangeRmRatio(seqIdx, rmIdx, ratio)}
         onRemoveRm={(rmIdx) => onRemoveRm(seqIdx, rmIdx)}
         onAddRm={() => onAddRm(seqIdx)}
-        onRemoveStage={() => onRemoveStage(seqIdx)}
-        onOpenInCards={() => onOpenInCards(selectedSeqId)}
+        onRemoveStage={() => onRemoveStage(selectedSeqUid)}
+        onOpenInCards={() => onOpenInCards(selectedSeqUid)}
       />
     )
   }
-  if (selectedRmId !== null) {
+  if (selectedRmUid !== null) {
     for (let i = 0; i < graph.seqs.length; i += 1) {
-      const j = graph.seqs[i].rms.findIndex((r) => r.rmId === selectedRmId)
+      const j = graph.seqs[i].rms.findIndex((r) => r.uid === selectedRmUid)
       if (j >= 0) {
         return (
           <RouteGraphEditPanel
@@ -824,12 +860,15 @@ function AddStageDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
+      <ScrollableDialogContent className="max-w-lg">
+        <ScrollableDialogHeader>
           <DialogTitle>Add stage</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
+          <DialogDescription>
+            A stage produces one product at a route level. 1 = finished good.
+          </DialogDescription>
+        </ScrollableDialogHeader>
+        <ScrollableDialogBody className="space-y-4">
+          <div className="space-y-1.5">
             <Label htmlFor="stage-level">Route level</Label>
             <Input
               id="stage-level"
@@ -838,45 +877,45 @@ function AddStageDialog({
               value={level}
               onChange={(e) => setLevel(Number(e.target.value) || 1)}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               1 = Finished good. Each higher level is one step upstream.
             </p>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label>Output product *</Label>
             <ProductMasterCombobox
               value={picked?.id}
               onChange={(id, code, name) => setPicked({ id, code, name })}
               placeholder="Search product by code or name…"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               The product this stage produces (intermediate or FG).
             </p>
           </div>
           <details className="text-xs">
             <summary className="cursor-pointer text-muted-foreground select-none">Additional metadata (optional)</summary>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs">Route name</Label>
-                <Input value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder="e.g. Main spin" className="h-8 text-xs" />
+                <Input value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder="e.g. Main spin" className="h-9 text-sm" />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">ERP item code</Label>
-                <Input value={routeItemCode} onChange={(e) => setRouteItemCode(e.target.value)} placeholder="e.g. ACY0000001" className="h-8 text-xs" />
+                <Input value={routeItemCode} onChange={(e) => setRouteItemCode(e.target.value)} placeholder="e.g. ACY0000001" className="h-9 text-sm" />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Shade code</Label>
-                <Input value={routeShadeCode} onChange={(e) => setRouteShadeCode(e.target.value)} placeholder="NL" className="h-8 text-xs" />
+                <Input value={routeShadeCode} onChange={(e) => setRouteShadeCode(e.target.value)} placeholder="NL" className="h-9 text-sm" />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Shade name</Label>
-                <Input value={routeShadeName} onChange={(e) => setRouteShadeName(e.target.value)} placeholder="NATURAL" className="h-8 text-xs" />
+                <Input value={routeShadeName} onChange={(e) => setRouteShadeName(e.target.value)} placeholder="NATURAL" className="h-9 text-sm" />
               </div>
             </div>
           </details>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+        </ScrollableDialogBody>
+        <ScrollableDialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -894,8 +933,8 @@ function AddStageDialog({
           >
             Add stage
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </ScrollableDialogFooter>
+      </ScrollableDialogContent>
     </Dialog>
   )
 }
@@ -922,7 +961,7 @@ function AddRmDialog({
   onClose: () => void
   stageLevel: number
   upstreamProducts: UpstreamProduct[]
-  onAdd: (rm: CostRouteRm) => void
+  onAdd: (rm: Omit<CostRouteRm, "uid">) => void
 }) {
   const [rmType, setRmType] = useState<RmRefType>("PRODUCT")
   const [productPick, setProductPick] = useState<UpstreamProduct | null>(null)
@@ -940,12 +979,16 @@ function AddRmDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add RM input (feeding stage at level {stageLevel})</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
+      <ScrollableDialogContent className="max-w-lg">
+        <ScrollableDialogHeader>
+          <DialogTitle>Add RM input</DialogTitle>
+          <DialogDescription>
+            Feeding the stage at level {stageLevel}. PRODUCT comes from another
+            stage in this routing; GROUP is a raw-material group.
+          </DialogDescription>
+        </ScrollableDialogHeader>
+        <ScrollableDialogBody className="space-y-4">
+          <div className="space-y-1.5">
             <Label htmlFor="rm-type">Source</Label>
             <Select
               value={rmType}
@@ -966,7 +1009,7 @@ function AddRmDialog({
           </div>
 
           {rmType === "PRODUCT" && (
-            <div>
+            <div className="space-y-1.5">
               <Label>Upstream stage (must be at higher level)</Label>
               <UpstreamProductPicker
                 candidates={upstreamProducts}
@@ -982,14 +1025,14 @@ function AddRmDialog({
           )}
 
           {rmType === "GROUP" && (
-            <div>
+            <div className="space-y-1.5">
               <Label>RM group</Label>
               <RmGroupCombobox value={groupPick?.code} onChange={(code, name) => setGroupPick({ code, name })} />
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
               <Label htmlFor="rm-ratio">Ratio per output unit *</Label>
               <Input
                 id="rm-ratio"
@@ -1000,7 +1043,7 @@ function AddRmDialog({
                 onChange={(e) => setRatio(e.target.value)}
               />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="rm-subtype">Sub type (optional)</Label>
               <Input
                 id="rm-subtype"
@@ -1012,24 +1055,24 @@ function AddRmDialog({
           </div>
           <details className="text-xs">
             <summary className="cursor-pointer text-muted-foreground select-none">Additional metadata (optional)</summary>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs">Shade code</Label>
-                <Input value={shadeCode} onChange={(e) => setShadeCode(e.target.value)} placeholder="NL" className="h-8 text-xs" />
+                <Input value={shadeCode} onChange={(e) => setShadeCode(e.target.value)} placeholder="NL" className="h-9 text-sm" />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Shade name</Label>
-                <Input value={shadeName} onChange={(e) => setRmShadeName(e.target.value)} placeholder="NATURAL" className="h-8 text-xs" />
+                <Input value={shadeName} onChange={(e) => setRmShadeName(e.target.value)} placeholder="NATURAL" className="h-9 text-sm" />
               </div>
-              <div className="col-span-2">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs">Notes</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" className="h-8 text-xs" />
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" className="h-9 text-sm" />
               </div>
             </div>
           </details>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+        </ScrollableDialogBody>
+        <ScrollableDialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -1073,8 +1116,8 @@ function AddRmDialog({
           >
             Add input
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </ScrollableDialogFooter>
+      </ScrollableDialogContent>
     </Dialog>
   )
 }

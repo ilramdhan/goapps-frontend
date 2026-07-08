@@ -18,9 +18,16 @@ export interface CostRouteHead {
   lockedAt: string
   unlockedBy: string
   unlockedAt: string
+  // Read-time aggregates from ListRoutes (distinct route levels / total RM entries).
+  levelCount: number
+  rmCount: number
 }
 
 export interface CostRouteRm {
+  // Stable client-side id — assigned on hydration + creation so React keys,
+  // React Flow node/edge ids, and edit-panel lookups never collide when the
+  // DB id is still 0 (unsaved). Never sent to / read from the backend.
+  uid: string
   rmId: number
   seqId: number
   parentProductSysId: number
@@ -28,6 +35,7 @@ export interface CostRouteRm {
   rmProductSysId?: number
   rmItemCode?: string
   rmGroupCode?: string
+  rmGroupName?: string
   routeRmName?: string
   routeRmItemCode?: string
   routeRmShadeCode?: string
@@ -36,9 +44,14 @@ export interface CostRouteRm {
   uomId?: number
   subType?: string
   notes?: string
+  // Persisted free node position for ITEM/GROUP RM nodes (0 = auto-layout).
+  positionX?: number
+  positionY?: number
 }
 
 export interface CostRouteSeq {
+  // Stable client-side id — see CostRouteRm.uid.
+  uid: string
   seqId: number
   headId: number
   productSysId: number
@@ -65,8 +78,23 @@ export interface ListRoutesParams {
   status?: RouteStatus | ""
   page?: number
   pageSize?: number
-  sortBy?: "created_at" | "product_code" | "status" | ""
+  sortBy?: "created_at" | "product_code" | "status" | "head_id" | "version" | "level_count" | "rm_count" | ""
   sortOrder?: "asc" | "desc" | ""
+}
+
+// ---------- client uid ----------
+
+/**
+ * newUid — stable client-side identifier for a seq/rm. Independent of the DB
+ * id (which is 0 until the graph is saved). Used for React keys, React Flow
+ * node/edge ids, and edit-panel lookups so newly-added elements are
+ * clickable/editable before save and deletes target exactly one element.
+ */
+export function newUid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `uid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 // ---------- normalizers (handle both camel + snake_case) ----------
@@ -80,6 +108,7 @@ const numOpt = (v: unknown): number | undefined => {
 
 export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm {
   return {
+    uid: newUid(),
     rmId: num(raw.rmId ?? raw.rm_id),
     seqId: num(raw.seqId ?? raw.seq_id),
     parentProductSysId: num(raw.parentProductSysId ?? raw.parent_product_sys_id),
@@ -87,6 +116,7 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
     rmProductSysId: numOpt(raw.rmProductSysId ?? raw.rm_product_sys_id),
     rmItemCode: str(raw.rmItemCode ?? raw.rm_item_code) || undefined,
     rmGroupCode: str(raw.rmGroupCode ?? raw.rm_group_code) || undefined,
+    rmGroupName: str(raw.rmGroupName ?? raw.rm_group_name) || undefined,
     routeRmName: str(raw.routeRmName ?? raw.route_rm_name) || undefined,
     routeRmItemCode: str(raw.routeRmItemCode ?? raw.route_rm_item_code) || undefined,
     routeRmShadeCode: str(raw.routeRmShadeCode ?? raw.route_rm_shade_code) || undefined,
@@ -95,12 +125,15 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
     uomId: numOpt(raw.uomId ?? raw.uom_id),
     subType: str(raw.subType ?? raw.sub_type) || undefined,
     notes: str(raw.notes) || undefined,
+    positionX: Number(raw.positionX ?? raw.position_x ?? 0),
+    positionY: Number(raw.positionY ?? raw.position_y ?? 0),
   }
 }
 
 export function normalizeCostRouteSeq(raw: Record<string, unknown>): CostRouteSeq {
   const rms = (raw.rms as unknown[]) ?? []
   return {
+    uid: newUid(),
     seqId: num(raw.seqId ?? raw.seq_id),
     headId: num(raw.headId ?? raw.head_id),
     productSysId: num(raw.productSysId ?? raw.product_sys_id),
@@ -133,6 +166,8 @@ export function normalizeCostRouteHead(raw: Record<string, unknown>): CostRouteH
     lockedAt: str(raw.lockedAt ?? raw.locked_at),
     unlockedBy: str(raw.unlockedBy ?? raw.unlocked_by),
     unlockedAt: str(raw.unlockedAt ?? raw.unlocked_at),
+    levelCount: num(raw.levelCount ?? raw.level_count),
+    rmCount: num(raw.rmCount ?? raw.rm_count),
   }
 }
 

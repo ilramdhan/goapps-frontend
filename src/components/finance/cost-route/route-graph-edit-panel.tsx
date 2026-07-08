@@ -116,7 +116,7 @@ function SeqBody({
           <div className="mt-2 space-y-1">
             {rms.map((rm, rmIdx) => (
               <div
-                key={`${rm.rmId}-${rmIdx}`}
+                key={rm.uid}
                 className="flex items-center gap-2 rounded border bg-muted/20 px-2 py-1.5 text-xs"
               >
                 <Badge variant="outline" className="shrink-0 text-[10px]">

@@ -19,7 +19,7 @@ interface Props {
   headId: number
 }
 
-export function LinkedRequestsPopover({ headId }: Props) {
+export function LinkedRequestsSheet({ headId }: Props) {
   const [open, setOpen] = useState(false)
   const { data } = useLinkedRequests(headId)
   const rows = data ?? []
