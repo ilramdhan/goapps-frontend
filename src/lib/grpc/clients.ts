@@ -48,6 +48,13 @@ import { RMCostServiceDefinition } from "@/types/generated/finance/v1/rm_cost"
 import { CostProductTypeServiceDefinition } from "@/types/generated/finance/v1/cost_product_type"
 import { CostRmTypeServiceDefinition } from "@/types/generated/finance/v1/cost_rm_type"
 import { CostProductMasterServiceDefinition } from "@/types/generated/finance/v1/cost_product_master"
+import {
+  MbCompositionServiceDefinition,
+  MbLustureServiceDefinition,
+  MbParamServiceDefinition,
+  MbPushServiceDefinition,
+  MbWorkflowLogServiceDefinition,
+} from "@/types/generated/finance/v1/yarn_master"
 import { CostRouteServiceDefinition } from "@/types/generated/finance/v1/cost_route"
 import { CostRequestTypeServiceDefinition } from "@/types/generated/finance/v1/cost_request_type"
 import { CostPaperTubeTypeServiceDefinition } from "@/types/generated/finance/v1/cost_paper_tube_type"
@@ -469,5 +476,35 @@ export function getYarnLookupFillClient() {
 export function getLookupMasterClient() {
   return getOrCreate("lookupMaster_v2", () =>
     createServiceClient(LookupMasterServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbCompositionClient() {
+  return getOrCreate("mbComposition", () =>
+    createServiceClient(MbCompositionServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbLustureClient() {
+  return getOrCreate("mbLusture", () =>
+    createServiceClient(MbLustureServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbParamClient() {
+  return getOrCreate("mbParam", () =>
+    createServiceClient(MbParamServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbPushClient() {
+  return getOrCreate("mbPush", () =>
+    createServiceClient(MbPushServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbWorkflowLogClient() {
+  return getOrCreate("mbWorkflowLog", () =>
+    createServiceClient(MbWorkflowLogServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }

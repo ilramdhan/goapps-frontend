@@ -2,7 +2,7 @@
 // Keyed by (type, status) so adding a new status is a one-line change and
 // every page renders the same color + label for the same status.
 
-export type StatusType = "request" | "route" | "job" | "chunk" | "cost" | "product" | "generic";
+export type StatusType = "request" | "route" | "job" | "chunk" | "cost" | "product" | "mbhead" | "generic";
 
 // Base shadcn badge variants + two semantic extensions (success, warning) that
 // StatusBadge renders via className overrides (shadcn badge has no such
@@ -89,6 +89,14 @@ export const statusRegistry: Record<StatusType, Record<string, StatusDisplay>> =
   product: {
     ACTIVE: { variant: "success", label: "Active" },
     INACTIVE: { variant: "secondary", label: "Inactive" },
+  },
+  mbhead: {
+    DRAFT: { variant: "secondary", label: "Draft" },
+    SUBMITTED: { variant: "default", label: "Submitted" },
+    APPROVED: { variant: "success", label: "Approved" },
+    VALIDATED: { variant: "success", label: "Validated" },
+    UN_APPROVED: { variant: "warning", label: "Un-Approved" },
+    REVOKED: { variant: "destructive", label: "Revoked" },
   },
   generic: {},
 };

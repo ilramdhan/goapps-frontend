@@ -139,17 +139,29 @@ export interface CostProductRequest {
 }
 
 export interface SpecInput {
-  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
+  /**
+   * Deprecated for new writes: retained for historical rows, no longer populated by new writes.
+   * Validation is skipped when empty so new writes (which always send "") pass.
+   */
   rawMaterialType: string;
   productDescription: string;
   shadeId: number;
   /** Free-text or master shade code (e.g. NL, Z114S). Renamed from shade_custom_text — field number unchanged for wire compatibility. */
   shadeCode: string;
-  /** Deprecated: retained for historical rows, no longer populated by new writes. Use tube_type instead. */
+  /**
+   * Deprecated: retained for historical rows, no longer populated by new writes. Use tube_type instead.
+   * Validation is skipped when zero so new writes (which always send 0) pass.
+   */
   paperTubeTypeId: number;
-  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
+  /**
+   * Deprecated for new writes: retained for historical rows, no longer populated by new writes.
+   * Validation is skipped when empty so new writes (which always send "") pass.
+   */
   weightPerBobbinKg: string;
-  /** Deprecated for new writes: retained for historical rows, no longer populated by new writes. */
+  /**
+   * Deprecated for new writes: retained for historical rows, no longer populated by new writes.
+   * Validation is skipped when empty so new writes (which always send "") pass.
+   */
   boxType: string;
   /** Human-readable shade name (e.g. Natural, Jet Black), mirrors cost_product_master's shade_name. */
   shadeName: string;

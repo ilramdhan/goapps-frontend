@@ -2,22 +2,25 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { ArrowLeft, Download, Loader2, Package } from "lucide-react"
+import { ArrowLeft, Download, Loader2, Lock, Package } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/common/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCostProductMaster } from "@/hooks/finance/use-cost-product-master"
+import { usePermissionContext } from "@/providers/permission-provider"
 import { CalculateButton } from "@/components/finance/calc-jobs/calculate-button"
 import { ProductParametersTab } from "@/components/finance/cost-product-master/parameters-tab"
 import { ProductRoutingTab } from "@/components/finance/cost-product-master/routing-tab"
 import { ProductAuditTab } from "@/components/finance/cost-product-master/audit-tab"
 import { CostHistoryTab } from "@/components/finance/cost-results/cost-history-tab"
 import { ProductTypeName } from "@/components/common/product-type-name"
+import { UnlockProductMasterDialog } from "@/components/finance/cost-product-master/unlock-dialog"
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
 
 interface Props {
@@ -28,6 +31,9 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
   const { data: product, isLoading } = useCostProductMaster(productSysId)
   const router = useRouter()
   const [exporting, setExporting] = useState(false)
+  const [unlockOpen, setUnlockOpen] = useState(false)
+  const { hasPermission } = usePermissionContext()
+  const canUnlock = hasPermission("finance.product.route.update")
 
   async function handleExport() {
     setExporting(true)
@@ -86,6 +92,24 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         </div>
       </div>
 
+      {product && product.isLocked && (
+        <Alert variant="destructive">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Product locked</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              Route and parameters are locked while an MB recipe is linked. Unlock temporarily to make manual
+              edits.
+            </span>
+            {canUnlock && (
+              <Button size="sm" variant="outline" onClick={() => setUnlockOpen(true)}>
+                Unlock (24h)
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {product && (
         <Card>
           <CardHeader className="py-3">
@@ -93,6 +117,11 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
               <Package className="h-4 w-4" />
               Identity
               {!product.isActive && <Badge variant="secondary">Inactive</Badge>}
+              {product.isLocked && (
+                <Badge variant="outline" className="gap-1">
+                  <Lock className="h-3 w-3" /> Locked
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -130,7 +159,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
         <TabsContent value="parameters" className="mt-4">
-          <ProductParametersTab productSysId={productSysId} />
+          <ProductParametersTab productSysId={productSysId} isLocked={!!product?.isLocked} />
         </TabsContent>
         <TabsContent value="routing" className="mt-4">
           <ProductRoutingTab productSysId={productSysId} />
@@ -142,6 +171,8 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
           <ProductAuditTab productSysId={productSysId} />
         </TabsContent>
       </Tabs>
+
+      <UnlockProductMasterDialog open={unlockOpen} onOpenChange={setUnlockOpen} product={product ?? null} />
     </div>
   )
 }

@@ -30,6 +30,13 @@ import {
   ImportMBHeadsResponseParser,
   DownloadMBHeadTemplateResponseParser,
 } from "@/types/finance/mb-head"
+import {
+  submitMBHead,
+  approveMBHead,
+  validateMBHead,
+  unApproveMBHead,
+  revokeMBHead,
+} from "@/services/finance/mb-head-api"
 
 // ============================================================================
 // Create CRUD hooks using factory
@@ -143,6 +150,69 @@ export function useImportMBHeads() {
       toast.error(error.message || "Failed to import MB Heads")
     },
   })
+}
+
+// ============================================================================
+// Workflow Transition Hooks
+// ============================================================================
+
+function useMbHeadTransition(
+  transitionFn: (mbhId: string) => Promise<MBHead>,
+  successMessage: string,
+  errorMessage: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (mbhId: string) => transitionFn(mbhId),
+    onSuccess: (_, mbhId) => {
+      queryClient.invalidateQueries({ queryKey: mbHeadKeys.detail(mbhId) })
+      queryClient.invalidateQueries({ queryKey: mbHeadKeys.lists() })
+      toast.success(successMessage)
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || errorMessage)
+    },
+  })
+}
+
+function useMbHeadReasonTransition(
+  transitionFn: (mbhId: string, reason: string) => Promise<MBHead>,
+  successMessage: string,
+  errorMessage: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ mbhId, reason }: { mbhId: string; reason: string }) =>
+      transitionFn(mbhId, reason),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: mbHeadKeys.detail(variables.mbhId) })
+      queryClient.invalidateQueries({ queryKey: mbHeadKeys.lists() })
+      toast.success(successMessage)
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || errorMessage)
+    },
+  })
+}
+
+export function useSubmitMBHead() {
+  return useMbHeadTransition(submitMBHead, "MB Head submitted for approval", "Failed to submit MB Head")
+}
+
+export function useApproveMBHead() {
+  return useMbHeadTransition(approveMBHead, "MB Head approved", "Failed to approve MB Head")
+}
+
+export function useValidateMBHead() {
+  return useMbHeadTransition(validateMBHead, "MB Head validated", "Failed to validate MB Head")
+}
+
+export function useUnApproveMBHead() {
+  return useMbHeadReasonTransition(unApproveMBHead, "MB Head un-approved", "Failed to un-approve MB Head")
+}
+
+export function useRevokeMBHead() {
+  return useMbHeadReasonTransition(revokeMBHead, "MB Head revoked", "Failed to revoke MB Head")
 }
 
 // ============================================================================

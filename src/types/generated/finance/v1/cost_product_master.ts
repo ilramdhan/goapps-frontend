@@ -34,6 +34,10 @@ export interface CostProductMaster {
   flex01: string;
   flex02: string;
   flex03: string;
+  /** origin marker, e.g. "MB_RECIPE" when auto-generated; empty if manually created */
+  source: string;
+  /** true blocks manual edits to route/params; escape hatch via UnlockCostProductMaster */
+  isLocked: boolean;
 }
 
 export interface CreateCostProductMasterRequest {
@@ -112,6 +116,16 @@ export interface DeactivateCostProductMasterResponse {
   base: BaseResponse | undefined;
 }
 
+export interface UnlockCostProductMasterRequest {
+  productSysId: number;
+  reason: string;
+}
+
+export interface UnlockCostProductMasterResponse {
+  base: BaseResponse | undefined;
+  data: CostProductMaster | undefined;
+}
+
 export interface ListCostProductMastersRequest {
   /** matches product_code OR product_name OR erp_item_code OR oracle sys id (flex_02) */
   search: string;
@@ -185,6 +199,8 @@ function createBaseCostProductMaster(): CostProductMaster {
     flex01: "",
     flex02: "",
     flex03: "",
+    source: "",
+    isLocked: false,
   };
 }
 
@@ -249,6 +265,12 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     }
     if (message.flex03 !== "") {
       writer.uint32(162).string(message.flex03);
+    }
+    if (message.source !== "") {
+      writer.uint32(170).string(message.source);
+    }
+    if (message.isLocked !== false) {
+      writer.uint32(176).bool(message.isLocked);
     }
     return writer;
   },
@@ -420,6 +442,22 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
           message.flex03 = reader.string();
           continue;
         }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.source = reader.string();
+          continue;
+        }
+        case 22: {
+          if (tag !== 176) {
+            break;
+          }
+
+          message.isLocked = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -523,6 +561,12 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
         : isSet(object.flex_03)
         ? globalThis.String(object.flex_03)
         : "",
+      source: isSet(object.source) ? globalThis.String(object.source) : "",
+      isLocked: isSet(object.isLocked)
+        ? globalThis.Boolean(object.isLocked)
+        : isSet(object.is_locked)
+        ? globalThis.Boolean(object.is_locked)
+        : false,
     };
   },
 
@@ -588,6 +632,12 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     if (message.flex03 !== "") {
       obj.flex03 = message.flex03;
     }
+    if (message.source !== "") {
+      obj.source = message.source;
+    }
+    if (message.isLocked !== false) {
+      obj.isLocked = message.isLocked;
+    }
     return obj;
   },
 
@@ -618,6 +668,8 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     message.flex01 = object.flex01 ?? "";
     message.flex02 = object.flex02 ?? "";
     message.flex03 = object.flex03 ?? "";
+    message.source = object.source ?? "";
+    message.isLocked = object.isLocked ?? false;
     return message;
   },
 };
@@ -1818,6 +1870,166 @@ export const DeactivateCostProductMasterResponse: MessageFns<DeactivateCostProdu
   },
 };
 
+function createBaseUnlockCostProductMasterRequest(): UnlockCostProductMasterRequest {
+  return { productSysId: 0, reason: "" };
+}
+
+export const UnlockCostProductMasterRequest: MessageFns<UnlockCostProductMasterRequest> = {
+  encode(message: UnlockCostProductMasterRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnlockCostProductMasterRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUnlockCostProductMasterRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UnlockCostProductMasterRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: UnlockCostProductMasterRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UnlockCostProductMasterRequest>): UnlockCostProductMasterRequest {
+    return UnlockCostProductMasterRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UnlockCostProductMasterRequest>): UnlockCostProductMasterRequest {
+    const message = createBaseUnlockCostProductMasterRequest();
+    message.productSysId = object.productSysId ?? 0;
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseUnlockCostProductMasterResponse(): UnlockCostProductMasterResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UnlockCostProductMasterResponse: MessageFns<UnlockCostProductMasterResponse> = {
+  encode(message: UnlockCostProductMasterResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      CostProductMaster.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnlockCostProductMasterResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUnlockCostProductMasterResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = CostProductMaster.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UnlockCostProductMasterResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? CostProductMaster.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UnlockCostProductMasterResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = CostProductMaster.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UnlockCostProductMasterResponse>): UnlockCostProductMasterResponse {
+    return UnlockCostProductMasterResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UnlockCostProductMasterResponse>): UnlockCostProductMasterResponse {
+    const message = createBaseUnlockCostProductMasterResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? CostProductMaster.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseListCostProductMastersRequest(): ListCostProductMastersRequest {
   return {
     search: "",
@@ -2718,6 +2930,14 @@ export const CostProductMasterServiceDefinition = {
       requestType: DeactivateCostProductMasterRequest,
       requestStream: false,
       responseType: DeactivateCostProductMasterResponse,
+      responseStream: false,
+      options: {},
+    },
+    unlockCostProductMaster: {
+      name: "UnlockCostProductMaster",
+      requestType: UnlockCostProductMasterRequest,
+      requestStream: false,
+      responseType: UnlockCostProductMasterResponse,
       responseStream: false,
       options: {},
     },

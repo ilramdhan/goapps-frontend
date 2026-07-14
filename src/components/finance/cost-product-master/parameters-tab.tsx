@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import {
   useProductRequiredParams,
@@ -21,6 +22,7 @@ import {
   useMissingRequiredParams,
   useRemoveApplicableParam,
 } from "@/hooks/finance/use-cost-product-parameter"
+import { useMbParams } from "@/hooks/finance/use-mb-param"
 import type { RequiredParamEntry, UpsertParamValuePayload } from "@/types/finance/cost-product-parameter"
 import type { LookupFillValuesResponse } from "@/types/finance/yarn-master"
 import type { RemoveApplicablePreview } from "@/types/finance/lookup-master"
@@ -32,6 +34,7 @@ import { toast } from "sonner"
 
 interface ParametersTabProps {
   productSysId: number
+  isLocked?: boolean
 }
 
 export interface DraftValue {
@@ -52,7 +55,7 @@ function emptyDraft(entry: RequiredParamEntry): DraftValue {
   }
 }
 
-export function ProductParametersTab({ productSysId }: ParametersTabProps) {
+export function ProductParametersTab({ productSysId, isLocked = false }: ParametersTabProps) {
   const { data, isLoading } = useProductRequiredParams(productSysId)
   const { data: missing } = useMissingRequiredParams(productSysId)
   const upsertM = useUpsertProductParamValuesBatch()
@@ -218,7 +221,7 @@ export function ProductParametersTab({ productSysId }: ParametersTabProps) {
           <p className="text-sm text-muted-foreground">
             No parameters are applicable to this product yet.
           </p>
-          <Button onClick={() => setAddOpen(true)} size="sm">
+          <Button onClick={() => setAddOpen(true)} size="sm" disabled={isLocked}>
             <Plus className="h-4 w-4 mr-1" /> Add parameter
           </Button>
         </div>
@@ -249,10 +252,10 @@ export function ProductParametersTab({ productSysId }: ParametersTabProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} disabled={isLocked}>
             <Plus className="h-4 w-4 mr-1" /> Add parameter
           </Button>
-          <Button onClick={handleSave} disabled={dirtyCount === 0 || upsertM.isPending}>
+          <Button onClick={handleSave} disabled={dirtyCount === 0 || upsertM.isPending || isLocked}>
             {upsertM.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
@@ -282,6 +285,7 @@ export function ProductParametersTab({ productSysId }: ParametersTabProps) {
                   removing={removeM.isPending || previewLoading}
                   allEntries={data}
                   onLookupChange={handleLookupChange}
+                  disabled={isLocked}
                 />
               )
             })}
@@ -326,9 +330,10 @@ interface ParamRowProps {
   onChange: (paramId: string, p: Partial<DraftValue>) => void
   allEntries?: RequiredParamEntry[]
   onLookupChange?: (triggerParamId: string, selectedKey: string, fills: LookupFillValuesResponse | null) => void
+  disabled?: boolean
 }
 
-function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLookupChange }: ParamRowProps) {
+function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLookupChange, disabled }: ParamRowProps) {
   return (
     <div className="grid grid-cols-12 gap-3 items-start">
       <div className="col-span-5">
@@ -354,7 +359,7 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
           )}
         </div>
       </div>
-      <div className="col-span-6">{renderValueInput(entry, draft, onChange, allEntries, onLookupChange)}</div>
+      <div className="col-span-6">{renderValueInput(entry, draft, onChange, allEntries, onLookupChange, disabled)}</div>
       <div className="col-span-1 text-right">
         {entry.lookupFillGroupCode ? (
           /* Child params are managed via their parent — no individual delete */
@@ -372,7 +377,7 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
             size="icon"
             variant="ghost"
             title="Remove parameter from this product"
-            disabled={removing}
+            disabled={removing || disabled}
             onClick={onRemove}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
@@ -383,12 +388,74 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
   )
 }
 
+// MB_THROUGHPUT/MB_NO_PROCESS store a resolved NUMERIC magnitude (frozen from an
+// mst_mb_param picklist option during MB Recipe auto-gen) but have no metadata marking
+// them as picklist-backed. This map lets the UI render a dropdown for just these two,
+// while still reading/writing the plain numeric value — same wire format as any other
+// NUMBER param, no calc-engine or schema changes involved.
+const MB_PICKLIST_PARAM_CODES: Record<string, string> = {
+  MB_THROUGHPUT: "THROUGHPUT_PER_HOUR",
+  MB_NO_PROCESS: "NO_OF_PROCESS",
+}
+
+function MbPicklistNumberField({
+  entry,
+  draft,
+  mbpCode,
+  onChange,
+  disabled,
+}: {
+  entry: RequiredParamEntry
+  draft: DraftValue
+  mbpCode: string
+  onChange: (paramId: string, p: Partial<DraftValue>) => void
+  disabled?: boolean
+}) {
+  const { data, isLoading } = useMbParams({ pageSize: 100 })
+  const mbParam = data?.items.find((p) => p.code === mbpCode)
+  const options = mbParam?.options ?? []
+  const selected = options.find((o) => o.numericValue === draft.valueNumeric)
+
+  if (isLoading) {
+    return (
+      <div className="flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-sm text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading options…
+      </div>
+    )
+  }
+
+  return (
+    <Select
+      value={selected?.code ?? ""}
+      onValueChange={(code) => {
+        const opt = options.find((o) => o.code === code)
+        if (opt) onChange(entry.paramId, { valueNumeric: opt.numericValue })
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={`Select ${entry.paramName}…`} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.mbpoId} value={o.code}>
+            {o.code} — {o.numericValue}
+            {mbParam?.unit ? ` ${mbParam.unit}` : ""}
+            {o.description ? ` (${o.description})` : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 function renderValueInput(
   entry: RequiredParamEntry,
   draft: DraftValue,
   onChange: (paramId: string, p: Partial<DraftValue>) => void,
   allEntries?: RequiredParamEntry[],
   onLookupChange?: (triggerParamId: string, selectedKey: string, fills: LookupFillValuesResponse | null) => void,
+  disabled?: boolean,
 ) {
   if (entry.paramCategory === "CALCULATED") {
     return (
@@ -420,6 +487,19 @@ function renderValueInput(
     )
   }
 
+  const mbpCode = MB_PICKLIST_PARAM_CODES[entry.paramCode]
+  if (mbpCode) {
+    return (
+      <MbPicklistNumberField
+        entry={entry}
+        draft={draft}
+        mbpCode={mbpCode}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    )
+  }
+
   if (entry.lookupMasterCode) {
     if (onLookupChange && allEntries) {
       return (
@@ -428,6 +508,7 @@ function renderValueInput(
           draft={draft}
           allEntries={allEntries}
           onChangeLookup={onLookupChange}
+          disabled={disabled}
         />
       )
     }
@@ -437,6 +518,7 @@ function renderValueInput(
         value={draft.valueText}
         placeholder={`Select ${entry.lookupMasterCode}…`}
         onChange={(e) => onChange(entry.paramId, { valueText: e.target.value })}
+        disabled={disabled}
       />
     )
   }
@@ -449,6 +531,7 @@ function renderValueInput(
           step="any"
           value={draft.valueNumeric}
           onChange={(e) => onChange(entry.paramId, { valueNumeric: e.target.value })}
+          disabled={disabled}
         />
       )
     case "TEXT":
@@ -456,6 +539,7 @@ function renderValueInput(
         <Input
           value={draft.valueText}
           onChange={(e) => onChange(entry.paramId, { valueText: e.target.value })}
+          disabled={disabled}
         />
       )
     case "BOOLEAN":
@@ -466,6 +550,7 @@ function renderValueInput(
             onCheckedChange={(v) =>
               onChange(entry.paramId, { valueFlag: v, hasValueFlag: true })
             }
+            disabled={disabled}
           />
           <span className="text-xs text-muted-foreground">
             {draft.valueFlag ? "TRUE" : "FALSE"}

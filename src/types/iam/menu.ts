@@ -176,6 +176,11 @@ const ICON_MAP: Record<string, () => Promise<LucideIcon>> = {
     FileText:         () => import("lucide-react").then((m) => m.FileText),
     BarChart3:        () => import("lucide-react").then((m) => m.BarChart3),
     Globe:            () => import("lucide-react").then((m) => m.Globe),
+    FlaskConical:     () => import("lucide-react").then((m) => m.FlaskConical),
+    TestTube:         () => import("lucide-react").then((m) => m.TestTube),
+    Send:             () => import("lucide-react").then((m) => m.Send),
+    Sparkles:         () => import("lucide-react").then((m) => m.Sparkles),
+    SlidersHorizontal: () => import("lucide-react").then((m) => m.SlidersHorizontal),
 }
 
 // Synchronous icon cache populated after first async resolution
