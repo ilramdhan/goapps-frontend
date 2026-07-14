@@ -7,14 +7,13 @@ import { z } from "zod"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  ScrollableDialogContent,
+  ScrollableDialogHeader,
+  ScrollableDialogBody,
+  ScrollableDialogFooter,
+} from "@/components/common/scrollable-dialog"
 import {
   Form,
   FormControl,
@@ -42,6 +41,12 @@ const formSchema = z.object({
   mbhLdrPrsn: z.coerce.number().min(0).optional().nullable(),
   mbhFinalProduct: z.string().max(200).optional(),
   mbhCode: z.string().max(100).optional(),
+  mbhIsBoughtout: z.boolean(),
+  mbhDevCode: z.string().max(50).optional(),
+  mbhShadeCode: z.string().max(20).optional(),
+  mbhShadeName: z.string().max(100).optional(),
+  mbhCrossSection: z.string().max(20).optional(),
+  mbhLustureCode: z.string().max(10).optional(),
   mbhIsActive: z.boolean(),
 })
 
@@ -65,6 +70,8 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
       mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "",
       mbhDenier: "", mbhFilament: "", mbhDozing: "",
       mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
+      mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
+      mbhCrossSection: "", mbhLustureCode: "",
       mbhIsActive: true,
     },
   })
@@ -85,9 +92,21 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               mbhLdrPrsn: mbHead.mbhLdrPrsn ?? null,
               mbhFinalProduct: mbHead.mbhFinalProduct || "",
               mbhCode: mbHead.mbhCode || "",
+              mbhIsBoughtout: mbHead.isBoughtout ?? false,
+              mbhDevCode: mbHead.devCode || "",
+              mbhShadeCode: mbHead.shadeCode || "",
+              mbhShadeName: mbHead.shadeName || "",
+              mbhCrossSection: mbHead.crossSection || "",
+              mbhLustureCode: mbHead.lustureCode || "",
               mbhIsActive: mbHead.mbhIsActive ?? true,
             }
-          : { mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "", mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "", mbhIsActive: true }
+          : {
+              mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
+              mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
+              mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
+              mbhCrossSection: "", mbhLustureCode: "",
+              mbhIsActive: true,
+            }
       )
     }
   }, [open, mbHead, form])
@@ -110,6 +129,11 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
             mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
             mbhFinalProduct: values.mbhFinalProduct || undefined,
             mbhCode: values.mbhCode || undefined,
+            mbhDevCode: values.mbhDevCode || undefined,
+            mbhShadeCode: values.mbhShadeCode || undefined,
+            mbhShadeName: values.mbhShadeName || undefined,
+            mbhCrossSection: values.mbhCrossSection || undefined,
+            mbhLustureCode: values.mbhLustureCode || undefined,
             mbhIsActive: values.mbhIsActive,
           },
         })
@@ -126,6 +150,12 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
           mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
           mbhFinalProduct: values.mbhFinalProduct || undefined,
           mbhCode: values.mbhCode || undefined,
+          mbhIsBoughtout: values.mbhIsBoughtout,
+          mbhDevCode: values.mbhDevCode || undefined,
+          mbhShadeCode: values.mbhShadeCode || undefined,
+          mbhShadeName: values.mbhShadeName || undefined,
+          mbhCrossSection: values.mbhCrossSection || undefined,
+          mbhLustureCode: values.mbhLustureCode || undefined,
         })
       }
       onOpenChange(false)
@@ -139,16 +169,17 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
+      <ScrollableDialogContent className="sm:max-w-[640px]">
+        <ScrollableDialogHeader>
           <DialogTitle>{isEditing ? "Edit MB Head" : "Add MB Head"}</DialogTitle>
           <DialogDescription>
             {isEditing ? "Update MB Head details." : "Create a new MB Head record."}
           </DialogDescription>
-        </DialogHeader>
+        </ScrollableDialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col min-h-0">
+          <ScrollableDialogBody className="space-y-4">
             <FormField
               control={form.control}
               name="mbhMbCosting"
@@ -306,6 +337,96 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               </div>
             </div>
 
+            {/* Recipe Identity */}
+            <div className="border-t pt-4 mt-2">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Recipe Identity</p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="mbhDevCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dev Code <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhLustureCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lusture Code <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhShadeCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Shade Code <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhShadeName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Shade Name <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhCrossSection"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Cross Section <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="mbhIsBoughtout"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Bought-out</FormLabel>
+                    <FormDescription>
+                      Immutable after creation — indicates the MB is sourced externally rather than mixed in-house.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isEditing || isPending} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
             {isEditing && (
               <FormField
                 control={form.control}
@@ -324,7 +445,8 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               />
             )}
 
-            <DialogFooter>
+          </ScrollableDialogBody>
+          <ScrollableDialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
                 Cancel
               </Button>
@@ -332,10 +454,10 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEditing ? "Update" : "Create"}
               </Button>
-            </DialogFooter>
+          </ScrollableDialogFooter>
           </form>
         </Form>
-      </DialogContent>
+      </ScrollableDialogContent>
     </Dialog>
   )
 }

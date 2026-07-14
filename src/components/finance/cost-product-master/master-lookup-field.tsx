@@ -29,6 +29,7 @@ interface MasterLookupFieldProps {
     selectedKey: string,
     fills: LookupFillValuesResponse | null
   ) => void
+  disabled?: boolean
 }
 
 export function MasterLookupField({
@@ -36,6 +37,7 @@ export function MasterLookupField({
   draft,
   allEntries: _allEntries,
   onChangeLookup,
+  disabled,
 }: MasterLookupFieldProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -87,7 +89,7 @@ export function MasterLookupField({
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between font-normal h-9 px-3"
-            disabled={loading}
+            disabled={loading || disabled}
           >
             {loading ? (
               <span className="flex items-center gap-1.5 text-muted-foreground text-sm">

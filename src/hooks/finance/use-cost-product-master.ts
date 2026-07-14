@@ -148,4 +148,25 @@ export function useDeactivateCostProductMaster() {
   })
 }
 
+export function useUnlockCostProductMaster() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { productSysId: number; reason: string }) => {
+      const res = await fetch(`/api/v1/finance/cost-product-masters/${input.productSysId}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: input.reason }),
+      })
+      const json = await res.json()
+      if (!json.base?.isSuccess) throw new Error(json.base?.message || "Failed")
+      return normalizeCostProductMaster(json.data)
+    },
+    onSuccess: () => {
+      toast.success("Product unlocked for 24 hours")
+      qc.invalidateQueries({ queryKey: KEYS.all })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export const costProductMasterKeys = KEYS

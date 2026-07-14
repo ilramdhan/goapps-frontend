@@ -57,8 +57,9 @@ export function AddParameterDialog({ productSysId, open, onOpenChange }: Props) 
     try {
       const isReq = overrides[entry.paramId] ?? entry.isRequiredForCosting
       const displayOrder = Number(displayOrders[entry.paramId] ?? 0)
-      const isMasterLookup = entry.paramCategory === "MASTER_LOOKUP"
-      const endpoint = isMasterLookup
+      const useChildrenEndpoint =
+        entry.paramCategory === "MASTER_LOOKUP" || entry.paramCategory === "CALCULATED"
+      const endpoint = useChildrenEndpoint
         ? "/api/v1/finance/cost-product-parameters/applicable/add-with-children"
         : "/api/v1/finance/cost-product-parameters/applicable/add"
       const res = await fetch(endpoint, {

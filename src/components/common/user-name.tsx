@@ -7,6 +7,8 @@
 // feedback_no_uuid_input.md.
 import { useUser } from "@/hooks/iam/use-users"
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 interface Props {
   userId: string | undefined | null
   className?: string
@@ -15,12 +17,23 @@ interface Props {
 }
 
 export function UserName({ userId, className, compact = false }: Props) {
-  const { data: resp, isLoading, error } = useUser(userId || "")
+  const isUUID = !!userId && UUID_PATTERN.test(userId)
+  // Some actor fields (e.g. mst_mb_workflow_log.mbwl_actor_user_id) store a plain
+  // username or service-account string rather than an IAM UUID — skip the lookup
+  // and render it directly instead of failing and showing "Unknown user".
+  const { data: resp, isLoading, error } = useUser(isUUID ? userId! : "")
   const detail = resp?.data ?? null
   const username = detail?.user?.username || ""
   const fullName = detail?.detail?.fullName || ""
 
   if (!userId) return <span className={className}>—</span>
+  if (!isUUID) {
+    return (
+      <span className={className} title={userId}>
+        {userId}
+      </span>
+    )
+  }
   if (isLoading) {
     return (
       <span className={className} title={userId}>

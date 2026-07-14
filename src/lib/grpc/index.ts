@@ -61,4 +61,9 @@ export {
   getMBHeadClient,
   getYarnLookupFillClient,
   getLookupMasterClient,
+  getMbCompositionClient,
+  getMbLustureClient,
+  getMbParamClient,
+  getMbPushClient,
+  getMbWorkflowLogClient,
 } from "./clients"

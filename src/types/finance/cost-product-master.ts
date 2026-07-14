@@ -13,6 +13,8 @@ export interface CostProductMaster {
   flex02: string
   flex03: string
   isActive: boolean
+  source: string
+  isLocked: boolean
   createdAt?: string
   createdBy?: string
   updatedAt?: string
@@ -80,6 +82,8 @@ export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
     flex02: str(raw.flex02 ?? raw.flex_02),
     flex03: str(raw.flex03 ?? raw.flex_03),
     isActive: (raw.isActive ?? raw.is_active ?? true) as boolean,
+    source: str(raw.source),
+    isLocked: (raw.isLocked ?? raw.is_locked ?? false) as boolean,
     createdAt: raw.audit?.createdAt ?? raw.audit?.created_at,
     createdBy: raw.audit?.createdBy ?? raw.audit?.created_by,
     updatedAt: raw.audit?.updatedAt ?? raw.audit?.updated_at,

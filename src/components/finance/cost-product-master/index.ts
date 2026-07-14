@@ -7,3 +7,4 @@ export {
 } from "./product-master-table"
 export { ProductDetailDrawer } from "./product-detail-drawer"
 export { DeactivateProductMasterDialog } from "./deactivate-dialog"
+export { UnlockProductMasterDialog } from "./unlock-dialog"

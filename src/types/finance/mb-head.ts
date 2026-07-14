@@ -23,6 +23,16 @@ export type {
   ImportMBHeadsResponse,
   DownloadMBHeadTemplateRequest,
   DownloadMBHeadTemplateResponse,
+  SubmitMBHeadRequest,
+  SubmitMBHeadResponse,
+  ApproveMBHeadRequest,
+  ApproveMBHeadResponse,
+  ValidateMBHeadRequest,
+  ValidateMBHeadResponse,
+  UnApproveMBHeadRequest,
+  UnApproveMBHeadResponse,
+  RevokeMBHeadRequest,
+  RevokeMBHeadResponse,
 } from "@/types/generated/finance/v1/yarn_master"
 
 // Message functions for parsing (named exports as Parsers)
@@ -36,6 +46,11 @@ export {
   ExportMBHeadsResponse as ExportMBHeadsResponseParser,
   ImportMBHeadsResponse as ImportMBHeadsResponseParser,
   DownloadMBHeadTemplateResponse as DownloadMBHeadTemplateResponseParser,
+  SubmitMBHeadResponse as SubmitMBHeadResponseParser,
+  ApproveMBHeadResponse as ApproveMBHeadResponseParser,
+  ValidateMBHeadResponse as ValidateMBHeadResponseParser,
+  UnApproveMBHeadResponse as UnApproveMBHeadResponseParser,
+  RevokeMBHeadResponse as RevokeMBHeadResponseParser,
 } from "@/types/generated/finance/v1/yarn_master"
 
 // Re-export shared enums/types from UOM (same package)
@@ -75,21 +90,63 @@ export interface ExportMBHeadsParams {
 }
 
 // ============================================================================
+// Workflow State
+// ============================================================================
+
+export type MBHeadEntryStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "VALIDATED"
+  | "UN_APPROVED"
+  | "REVOKED"
+
+// ============================================================================
 // Form Types
 // ============================================================================
 
+// Create-only field — immutable after creation, so it is excluded from
+// UpdateMBHeadRequest and must not appear in an edit form.
 export interface MBHeadFormData {
+  mbhMbCosting: string
+  mbhOracleSysId: string
+  mbhMgtName: string
+  mbhDenier: number | null
+  mbhFilament: number | null
+  mbhDozing: number | null
+  mbhCheckStatus: string
+  mbhStatus: string
+  mbhLdrPrsn: number | null
+  mbhFinalProduct: string
   mbhCode: string
-  mbhName: string
-  description: string
-  isActive: boolean
+  mbhIsBoughtout: boolean
+  mbhDevCode: string
+  mbhShadeCode: string
+  mbhShadeName: string
+  mbhCrossSection: string
+  mbhLustureCode: string
+  mbhIsActive: boolean
 }
 
 export const DEFAULT_MB_HEAD_FORM_VALUES: MBHeadFormData = {
+  mbhMbCosting: "",
+  mbhOracleSysId: "",
+  mbhMgtName: "",
+  mbhDenier: null,
+  mbhFilament: null,
+  mbhDozing: null,
+  mbhCheckStatus: "",
+  mbhStatus: "",
+  mbhLdrPrsn: null,
+  mbhFinalProduct: "",
   mbhCode: "",
-  mbhName: "",
-  description: "",
-  isActive: true,
+  mbhIsBoughtout: false,
+  mbhDevCode: "",
+  mbhShadeCode: "",
+  mbhShadeName: "",
+  mbhCrossSection: "",
+  mbhLustureCode: "",
+  mbhIsActive: true,
 }
 
 // ============================================================================
