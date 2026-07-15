@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { useCreateConversation } from "@/hooks/iam/use-chat"
 import { useChatStore } from "@/stores/chat-store"
 import { UserPicker } from "@/components/iam/user-picker"
@@ -28,9 +29,16 @@ export function NewConversationDialog({ open, onOpenChange }: NewConversationDia
       { peerUserId },
       {
         onSuccess: (conversation) => {
-          if (conversation?.conversationId) setActive(conversation.conversationId)
+          if (conversation?.conversationId) {
+            setActive(conversation.conversationId)
+          } else {
+            toast.error("Failed to create conversation — no response from server")
+          }
           onOpenChange(false)
           setPeerUserId("")
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Failed to create conversation")
         },
       }
     )

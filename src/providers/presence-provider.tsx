@@ -15,19 +15,34 @@ import { usePresenceStore } from "@/stores/presence-store"
 import { ChatSSEEvent } from "@/types/iam/chat"
 
 const HEARTBEAT_INTERVAL_MS = 30_000
+const ONLINE_REFRESH_MS = 60_000
 const POLL_INTERVAL_MS = 200
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const setOnline = usePresenceStore((s) => s.setOnline)
   const setOffline = usePresenceStore((s) => s.setOffline)
+  const setOnlineUsers = usePresenceStore((s) => s.setOnlineUsers)
   const attachedRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     const sendHeartbeat = () => {
       void fetch("/api/v1/iam/presence/heartbeat", { method: "POST", credentials: "include" })
     }
-    sendHeartbeat() // immediate on mount
+    sendHeartbeat()
     const heartbeatId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS)
+
+    const fetchAllOnline = async () => {
+      try {
+        const res = await fetch("/api/v1/iam/presence/online", { credentials: "include" })
+        const json = await res.json()
+        const ids: string[] = json?.data?.userIds ?? json?.data?.user_ids ?? []
+        if (ids.length > 0) setOnlineUsers(ids)
+      } catch {
+        // non-critical — SSE events will still work
+      }
+    }
+    void fetchAllOnline()
+    const onlineRefreshId = setInterval(fetchAllOnline, ONLINE_REFRESH_MS)
 
     const handler = (e: MessageEvent) => {
       try {
@@ -56,11 +71,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       clearInterval(heartbeatId)
+      clearInterval(onlineRefreshId)
       clearInterval(pollId)
       if (attachedRef.current) attachedRef.current.removeEventListener("chat", handler as EventListener)
       attachedRef.current = null
     }
-  }, [setOnline, setOffline])
+  }, [setOnline, setOffline, setOnlineUsers])
 
   return <>{children}</>
 }
