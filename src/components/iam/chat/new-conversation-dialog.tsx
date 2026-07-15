@@ -1,32 +1,31 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { useCreateConversation } from "@/hooks/iam/use-chat"
 import { useChatStore } from "@/stores/chat-store"
+import { UserPicker } from "@/components/iam/user-picker"
 
 interface NewConversationDialogProps {
   open: boolean
   onOpenChange: (v: boolean) => void
 }
 
-// NOTE: Backend expects a userId (UUID) for peerUserId — resolving an email/
-// username to a userId via a lookup endpoint is a follow-up enhancement
-// (tracked alongside the platform-wide "no raw UUID input" rule). For now this
-// dialog accepts a user ID directly, matching Plan 05's documented scope.
 export function NewConversationDialog({ open, onOpenChange }: NewConversationDialogProps) {
   const [peerUserId, setPeerUserId] = useState("")
   const { mutate, isPending } = useCreateConversation()
   const setActive = useChatStore((s) => s.setActiveConversation)
 
+  useEffect(() => {
+    if (!open) setPeerUserId("")
+  }, [open])
+
   const handleCreate = () => {
-    const trimmed = peerUserId.trim()
-    if (!trimmed) return
+    if (!peerUserId) return
     mutate(
-      { peerUserId: trimmed },
+      { peerUserId },
       {
         onSuccess: (conversation) => {
           if (conversation?.conversationId) setActive(conversation.conversationId)
@@ -39,22 +38,23 @@ export function NewConversationDialog({ open, onOpenChange }: NewConversationDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New Conversation</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <Input
-            placeholder="User ID"
+          <UserPicker
             value={peerUserId}
-            onChange={(e) => setPeerUserId(e.target.value)}
+            onChange={(id) => setPeerUserId(id)}
+            placeholder="Search by name or email..."
+            showOnlineStatus
           />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={isPending || !peerUserId.trim()}>
+          <Button onClick={handleCreate} disabled={isPending || !peerUserId}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Start Chat
           </Button>
