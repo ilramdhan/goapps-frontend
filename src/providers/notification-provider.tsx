@@ -26,6 +26,15 @@ interface NotificationContextValue {
   connected?: boolean
 }
 
+declare global {
+  interface Window {
+    // Shared EventSource for /api/v1/iam/notifications/stream — exposed so
+    // chat-provider.tsx can attach its own `chat` event listener without
+    // opening a second SSE connection.
+    __sharedEventSource?: EventSource | null
+  }
+}
+
 const NotificationContext = createContext<NotificationContextValue>({})
 
 interface ProviderProps {
@@ -74,6 +83,7 @@ export function NotificationProvider({ children }: ProviderProps) {
         esRef.current.close()
         esRef.current = null
       }
+      if (typeof window !== "undefined") window.__sharedEventSource = null
       connectionStore.set(false)
       return
     }
@@ -81,6 +91,9 @@ export function NotificationProvider({ children }: ProviderProps) {
     // Open SSE.
     const es = new EventSource("/api/v1/iam/notifications/stream", { withCredentials: true })
     esRef.current = es
+    // Expose the shared connection so chat-provider.tsx can attach a `chat`
+    // event listener to the same stream instead of opening a second one.
+    if (typeof window !== "undefined") window.__sharedEventSource = es
     es.onopen = () => connectionStore.set(true)
 
     const handleEvent = (raw: RawStreamEvent) => {
@@ -135,6 +148,9 @@ export function NotificationProvider({ children }: ProviderProps) {
       es.removeEventListener("notification", onMessage as EventListener)
       es.close()
       if (esRef.current === es) esRef.current = null
+      if (typeof window !== "undefined" && window.__sharedEventSource === es) {
+        window.__sharedEventSource = null
+      }
       connectionStore.set(false)
     }
   }, [isAuthenticated, qc])

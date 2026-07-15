@@ -6,6 +6,8 @@ import { QueryProvider } from "./query-provider"
 import { AuthProvider } from "./auth-provider"
 import { PermissionProvider } from "./permission-provider"
 import { NotificationProvider } from "./notification-provider"
+import { ChatProvider } from "./chat-provider"
+import { PresenceProvider } from "./presence-provider"
 
 interface ProvidersProps {
     children: React.ReactNode
@@ -23,7 +25,11 @@ export function Providers({ children }: ProvidersProps) {
                 <AuthProvider>
                     <PermissionProvider>
                         <NotificationProvider>
-                            {children}
+                            <ChatProvider>
+                                <PresenceProvider>
+                                    {children}
+                                </PresenceProvider>
+                            </ChatProvider>
                         </NotificationProvider>
                     </PermissionProvider>
                 </AuthProvider>

@@ -17,6 +17,10 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { ChatFab } from "@/components/iam/chat/chat-fab"
+import { ChatDrawer } from "@/components/iam/chat/chat-drawer"
+import { ChatbotFab } from "@/components/chatbot/chatbot-fab"
+import { ChatbotPanel } from "@/components/chatbot/chatbot-panel"
 
 function DashboardSkeleton() {
     return (
@@ -111,6 +115,13 @@ export default function DashboardLayout({
                 </div>
             </SidebarInset>
             </BreadcrumbOverrideProvider>
+            {/* Floating action buttons — survive navigation */}
+            <div className="fixed bottom-6 right-6 flex items-center gap-3 z-50">
+                <ChatbotFab />
+                <ChatFab />
+            </div>
+            <ChatbotPanel />
+            <ChatDrawer currentUserId={user?.userId ?? ""} />
         </SidebarProvider>
     )
 }
