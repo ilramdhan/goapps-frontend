@@ -12,21 +12,43 @@
 // until the EventSource instance shows up (or changes, e.g. after a
 // logout/login cycle) instead of attaching only once.
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 import { useChatStore } from "@/stores/chat-store"
+import { showChatNotification } from "@/lib/notifications/browser-notification"
+import { playNotificationSound } from "@/lib/notifications/notification-sound"
 import { ChatSSEEvent } from "@/types/iam/chat"
 
 const POLL_INTERVAL_MS = 200
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const handleSSEEvent = useChatStore((s) => s.handleSSEEvent)
+  const activeConvId = useChatStore((s) => s.activeConversationId)
+  const conversations = useChatStore((s) => s.conversations)
   const attachedRef = useRef<EventSource | null>(null)
+  const activeConvRef = useRef(activeConvId)
+  activeConvRef.current = activeConvId
+
+  const updateTabTitle = useCallback(() => {
+    const total = conversations.reduce((sum, c) => sum + c.unreadCount, 0)
+    const base = document.title.replace(/^\(\d+\)\s*/, "")
+    document.title = total > 0 ? `(${total}) ${base}` : base
+  }, [conversations])
+
+  useEffect(() => {
+    updateTabTitle()
+  }, [updateTabTitle])
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       try {
         const evt = JSON.parse(e.data) as ChatSSEEvent
         handleSSEEvent(evt)
+        if (evt.type === "message_received" && evt.conversationId !== activeConvRef.current) {
+          const senderName = evt.senderName ?? evt.userName ?? "Someone"
+          const body = evt.body ?? ""
+          showChatNotification(senderName, body, evt.conversationId ?? "")
+          playNotificationSound()
+        }
       } catch {
         // ignore malformed events
       }

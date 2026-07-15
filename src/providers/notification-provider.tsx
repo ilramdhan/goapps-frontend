@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { useAuth } from "./auth-provider"
+import { requestNotificationPermission } from "@/lib/notifications/browser-notification"
 import { notificationKeys } from "@/hooks/iam/use-notifications"
 import { useNotificationEventStore } from "@/stores/notification-event-store"
 import {
@@ -87,6 +88,8 @@ export function NotificationProvider({ children }: ProviderProps) {
       connectionStore.set(false)
       return
     }
+
+    requestNotificationPermission()
 
     // Open SSE.
     const es = new EventSource("/api/v1/iam/notifications/stream", { withCredentials: true })
