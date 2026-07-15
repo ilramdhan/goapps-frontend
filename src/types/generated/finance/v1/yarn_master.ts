@@ -1410,6 +1410,8 @@ export interface MBHead {
   paramThroughputPerHour: string;
   /** Frozen param snapshot at VALIDATED — number of process; stores option code, e.g. "D". */
   paramNoOfProcess: string;
+  /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). Optional. */
+  machineId?: string | undefined;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1475,7 +1477,11 @@ export interface CreateMBHeadRequest {
     | string
     | undefined;
   /** Lusture code, references MbLusture.code (max 10 chars). */
-  mbhLustureCode?: string | undefined;
+  mbhLustureCode?:
+    | string
+    | undefined;
+  /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
+  mbhMachineId?: string | undefined;
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1569,7 +1575,11 @@ export interface UpdateMBHeadRequest {
     | string
     | undefined;
   /** Lusture code, references MbLusture.code (max 10 chars). */
-  mbhLustureCode?: string | undefined;
+  mbhLustureCode?:
+    | string
+    | undefined;
+  /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
+  mbhMachineId?: string | undefined;
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -13053,6 +13063,7 @@ function createBaseMBHead(): MBHead {
     paramMbProdPerDay: "",
     paramThroughputPerHour: "",
     paramNoOfProcess: "",
+    machineId: undefined,
   };
 }
 
@@ -13162,6 +13173,9 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.paramNoOfProcess !== "") {
       writer.uint32(282).string(message.paramNoOfProcess);
+    }
+    if (message.machineId !== undefined) {
+      writer.uint32(290).string(message.machineId);
     }
     return writer;
   },
@@ -13453,6 +13467,14 @@ export const MBHead: MessageFns<MBHead> = {
           message.paramNoOfProcess = reader.string();
           continue;
         }
+        case 36: {
+          if (tag !== 290) {
+            break;
+          }
+
+          message.machineId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13635,6 +13657,11 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.param_no_of_process)
         ? globalThis.String(object.param_no_of_process)
         : "",
+      machineId: isSet(object.machineId)
+        ? globalThis.String(object.machineId)
+        : isSet(object.machine_id)
+        ? globalThis.String(object.machine_id)
+        : undefined,
     };
   },
 
@@ -13745,6 +13772,9 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.paramNoOfProcess !== "") {
       obj.paramNoOfProcess = message.paramNoOfProcess;
     }
+    if (message.machineId !== undefined) {
+      obj.machineId = message.machineId;
+    }
     return obj;
   },
 
@@ -13790,6 +13820,7 @@ export const MBHead: MessageFns<MBHead> = {
     message.paramMbProdPerDay = object.paramMbProdPerDay ?? "";
     message.paramThroughputPerHour = object.paramThroughputPerHour ?? "";
     message.paramNoOfProcess = object.paramNoOfProcess ?? "";
+    message.machineId = object.machineId ?? undefined;
     return message;
   },
 };
@@ -13813,6 +13844,7 @@ function createBaseCreateMBHeadRequest(): CreateMBHeadRequest {
     mbhShadeName: undefined,
     mbhCrossSection: undefined,
     mbhLustureCode: undefined,
+    mbhMachineId: undefined,
   };
 }
 
@@ -13868,6 +13900,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     if (message.mbhLustureCode !== undefined) {
       writer.uint32(138).string(message.mbhLustureCode);
+    }
+    if (message.mbhMachineId !== undefined) {
+      writer.uint32(146).string(message.mbhMachineId);
     }
     return writer;
   },
@@ -14015,6 +14050,14 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
           message.mbhLustureCode = reader.string();
           continue;
         }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.mbhMachineId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14111,6 +14154,11 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         : isSet(object.mbh_lusture_code)
         ? globalThis.String(object.mbh_lusture_code)
         : undefined,
+      mbhMachineId: isSet(object.mbhMachineId)
+        ? globalThis.String(object.mbhMachineId)
+        : isSet(object.mbh_machine_id)
+        ? globalThis.String(object.mbh_machine_id)
+        : undefined,
     };
   },
 
@@ -14167,6 +14215,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhLustureCode !== undefined) {
       obj.mbhLustureCode = message.mbhLustureCode;
     }
+    if (message.mbhMachineId !== undefined) {
+      obj.mbhMachineId = message.mbhMachineId;
+    }
     return obj;
   },
 
@@ -14192,6 +14243,7 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     message.mbhShadeName = object.mbhShadeName ?? undefined;
     message.mbhCrossSection = object.mbhCrossSection ?? undefined;
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
+    message.mbhMachineId = object.mbhMachineId ?? undefined;
     return message;
   },
 };
@@ -14435,6 +14487,7 @@ function createBaseUpdateMBHeadRequest(): UpdateMBHeadRequest {
     mbhShadeName: undefined,
     mbhCrossSection: undefined,
     mbhLustureCode: undefined,
+    mbhMachineId: undefined,
   };
 }
 
@@ -14490,6 +14543,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.mbhLustureCode !== undefined) {
       writer.uint32(138).string(message.mbhLustureCode);
+    }
+    if (message.mbhMachineId !== undefined) {
+      writer.uint32(146).string(message.mbhMachineId);
     }
     return writer;
   },
@@ -14637,6 +14693,14 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
           message.mbhLustureCode = reader.string();
           continue;
         }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.mbhMachineId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14733,6 +14797,11 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         : isSet(object.mbh_lusture_code)
         ? globalThis.String(object.mbh_lusture_code)
         : undefined,
+      mbhMachineId: isSet(object.mbhMachineId)
+        ? globalThis.String(object.mbhMachineId)
+        : isSet(object.mbh_machine_id)
+        ? globalThis.String(object.mbh_machine_id)
+        : undefined,
     };
   },
 
@@ -14789,6 +14858,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhLustureCode !== undefined) {
       obj.mbhLustureCode = message.mbhLustureCode;
     }
+    if (message.mbhMachineId !== undefined) {
+      obj.mbhMachineId = message.mbhMachineId;
+    }
     return obj;
   },
 
@@ -14814,6 +14886,7 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     message.mbhShadeName = object.mbhShadeName ?? undefined;
     message.mbhCrossSection = object.mbhCrossSection ?? undefined;
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
+    message.mbhMachineId = object.mbhMachineId ?? undefined;
     return message;
   },
 };

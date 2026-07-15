@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { MachineCombobox } from "@/components/finance/comboboxes/machine-combobox"
 
 import type { MBHead } from "@/types/finance/mb-head"
 import { useCreateMBHead, useUpdateMBHead } from "@/hooks/finance/use-mb-head"
@@ -47,6 +48,7 @@ const formSchema = z.object({
   mbhShadeName: z.string().max(100).optional(),
   mbhCrossSection: z.string().max(20).optional(),
   mbhLustureCode: z.string().max(10).optional(),
+  mbhMachineId: z.string().optional(),
   mbhIsActive: z.boolean(),
 })
 
@@ -71,7 +73,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
       mbhDenier: "", mbhFilament: "", mbhDozing: "",
       mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
       mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
-      mbhCrossSection: "", mbhLustureCode: "",
+      mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
       mbhIsActive: true,
     },
   })
@@ -98,13 +100,14 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               mbhShadeName: mbHead.shadeName || "",
               mbhCrossSection: mbHead.crossSection || "",
               mbhLustureCode: mbHead.lustureCode || "",
+              mbhMachineId: mbHead.machineId || "",
               mbhIsActive: mbHead.mbhIsActive ?? true,
             }
           : {
               mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
               mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
               mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
-              mbhCrossSection: "", mbhLustureCode: "",
+              mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
               mbhIsActive: true,
             }
       )
@@ -134,6 +137,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
             mbhShadeName: values.mbhShadeName || undefined,
             mbhCrossSection: values.mbhCrossSection || undefined,
             mbhLustureCode: values.mbhLustureCode || undefined,
+            mbhMachineId: values.mbhMachineId || undefined,
             mbhIsActive: values.mbhIsActive,
           },
         })
@@ -156,6 +160,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
           mbhShadeName: values.mbhShadeName || undefined,
           mbhCrossSection: values.mbhCrossSection || undefined,
           mbhLustureCode: values.mbhLustureCode || undefined,
+          mbhMachineId: values.mbhMachineId || undefined,
         })
       }
       onOpenChange(false)
@@ -402,6 +407,25 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
                       <FormControl>
                         <Input {...field} placeholder="Optional" disabled={isPending} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhMachineId"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Machine</FormLabel>
+                      <FormControl>
+                        <MachineCombobox
+                          value={field.value}
+                          onChange={(machineId) => field.onChange(machineId)}
+                          mcTypeFilter="MB"
+                          disabled={isPending}
+                        />
+                      </FormControl>
+                      <FormDescription>Resolves the MACHINE_MB_FIXED_TOTAL cost parameter.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

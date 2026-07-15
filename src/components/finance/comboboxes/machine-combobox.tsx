@@ -1,33 +1,36 @@
 "use client"
 
-// RmGroupHeadCombobox — picks an RM Group (mst_rm_group_head) by group_code/group_name.
-// Used by MB Recipe composition rows when source_type = GROUP.
+// MachineCombobox — picks a Machine (mst_machine) by machine_code/machine_name, scoped to mc_type.
+// Used by MB Head form to assign the machine that resolves MACHINE_MB_FIXED_TOTAL.
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useRMGroups } from "@/hooks/finance/use-rm-group"
-import { ActiveFilter } from "@/types/generated/finance/v1/uom"
+import { useMachines } from "@/hooks/finance/use-machine"
+import { ActiveFilter } from "@/types/finance/machine"
 import { cn } from "@/lib/utils"
 
-interface RmGroupHeadComboboxProps {
+interface MachineComboboxProps {
   value: string | undefined
-  onChange: (groupHeadId: string, groupCode: string, groupName: string) => void
+  onChange: (machineId: string, machineCode: string, machineName: string) => void
+  mcTypeFilter?: string
   placeholder?: string
   disabled?: boolean
   className?: string
 }
 
-export function RmGroupHeadCombobox({
-  value, onChange, placeholder = "Select RM group…", disabled, className,
-}: RmGroupHeadComboboxProps) {
+export function MachineCombobox({
+  value, onChange, mcTypeFilter = "MB", placeholder = "Select machine…", disabled, className,
+}: MachineComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const { data, isLoading } = useRMGroups({ search, activeFilter: ActiveFilter.ACTIVE_FILTER_ACTIVE, pageSize: 50 })
+  const { data, isLoading } = useMachines({
+    search, mcTypeFilter, activeFilter: ActiveFilter.ACTIVE_FILTER_ACTIVE, pageSize: 50,
+  })
   const items = useMemo(() => data?.data ?? [], [data])
-  const selected = useMemo(() => items.find((g) => g.groupHeadId === value), [items, value])
+  const selected = useMemo(() => items.find((m) => m.machineId === value), [items, value])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -42,7 +45,7 @@ export function RmGroupHeadCombobox({
         >
           {selected ? (
             <span className="truncate">
-              <span className="text-muted-foreground">{selected.groupCode}</span> — {selected.groupName}
+              <span className="text-muted-foreground">{selected.machineCode}</span> — {selected.machineName}
             </span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -59,28 +62,23 @@ export function RmGroupHeadCombobox({
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
             )}
-            <CommandEmpty>No RM group matches.</CommandEmpty>
+            <CommandEmpty>No machine matches.</CommandEmpty>
             <CommandGroup>
-              {items.map((g) => (
+              {items.map((m) => (
                 <CommandItem
-                  key={g.groupHeadId}
-                  value={`${g.groupCode} ${g.groupName}`}
+                  key={m.machineId}
+                  value={`${m.machineCode} ${m.machineName}`}
                   onSelect={() => {
-                    onChange(g.groupHeadId, g.groupCode, g.groupName)
+                    onChange(m.machineId, m.machineCode, m.machineName)
                     setOpen(false)
                   }}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === g.groupHeadId ? "opacity-100" : "opacity-0")} />
+                  <Check className={cn("mr-2 h-4 w-4", value === m.machineId ? "opacity-100" : "opacity-0")} />
                   <div className="flex flex-col">
                     <div>
-                      <span className="font-mono text-xs mr-2 text-muted-foreground">{g.groupCode}</span>
-                      <span>{g.groupName}</span>
+                      <span className="font-mono text-xs mr-2 text-muted-foreground">{m.machineCode}</span>
+                      <span>{m.machineName}</span>
                     </div>
-                    {(g.colourant || g.ciName) && (
-                      <div className="text-xs text-muted-foreground">
-                        {[g.colourant, g.ciName].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
                   </div>
                 </CommandItem>
               ))}

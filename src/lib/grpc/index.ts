@@ -66,4 +66,5 @@ export {
   getMbParamClient,
   getMbPushClient,
   getMbWorkflowLogClient,
+  getMbBatchClient,
 } from "./clients"

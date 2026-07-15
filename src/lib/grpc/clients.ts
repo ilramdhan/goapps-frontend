@@ -54,6 +54,7 @@ import {
   MbParamServiceDefinition,
   MbPushServiceDefinition,
   MbWorkflowLogServiceDefinition,
+  MbBatchServiceDefinition,
 } from "@/types/generated/finance/v1/yarn_master"
 import { CostRouteServiceDefinition } from "@/types/generated/finance/v1/cost_route"
 import { CostRequestTypeServiceDefinition } from "@/types/generated/finance/v1/cost_request_type"
@@ -500,6 +501,12 @@ export function getMbParamClient() {
 export function getMbPushClient() {
   return getOrCreate("mbPush", () =>
     createServiceClient(MbPushServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbBatchClient() {
+  return getOrCreate("mbBatch", () =>
+    createServiceClient(MbBatchServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 
