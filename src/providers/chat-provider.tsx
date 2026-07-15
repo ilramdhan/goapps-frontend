@@ -16,7 +16,7 @@ import { useEffect, useRef, useCallback } from "react"
 import { useChatStore } from "@/stores/chat-store"
 import { showChatNotification } from "@/lib/notifications/browser-notification"
 import { playNotificationSound } from "@/lib/notifications/notification-sound"
-import { ChatSSEEvent } from "@/types/iam/chat"
+import type { ChatSSEEvent, ChatMessage } from "@/types/iam/chat"
 
 const POLL_INTERVAL_MS = 200
 
@@ -41,12 +41,27 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       try {
-        const evt = JSON.parse(e.data) as ChatSSEEvent
-        handleSSEEvent(evt)
-        if (evt.type === "message_received" && evt.conversationId !== activeConvRef.current) {
-          const senderName = evt.senderName ?? evt.userName ?? "Someone"
-          const body = evt.body ?? ""
-          showChatNotification(senderName, body, evt.conversationId ?? "")
+        const raw = JSON.parse(e.data) as ChatSSEEvent
+        if ((raw.type === "message_received" || raw.type === "message_edited") && !raw.message && raw.messageId) {
+          raw.message = {
+            messageId: raw.messageId ?? "",
+            conversationId: raw.conversationId ?? "",
+            senderUserId: raw.senderUserId ?? "",
+            senderName: raw.senderName ?? "",
+            body: raw.body ?? "",
+            isEdited: raw.isEdited ?? false,
+            isDeleted: raw.isDeleted ?? false,
+            replyToId: raw.replyToId ?? "",
+            readReceipts: raw.readReceipts ?? [],
+            createdAt: raw.createdAt ?? "",
+            updatedAt: raw.updatedAt ?? "",
+          } satisfies ChatMessage
+        }
+        handleSSEEvent(raw)
+        if (raw.type === "message_received" && raw.conversationId !== activeConvRef.current) {
+          const senderName = raw.senderName ?? raw.userName ?? "Someone"
+          const body = raw.body ?? ""
+          showChatNotification(senderName, body, raw.conversationId ?? "")
           playNotificationSound()
         }
       } catch {
