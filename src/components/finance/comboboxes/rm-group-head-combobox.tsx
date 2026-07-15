@@ -76,6 +76,11 @@ export function RmGroupHeadCombobox({
                       <span className="font-mono text-xs mr-2 text-muted-foreground">{g.groupCode}</span>
                       <span>{g.groupName}</span>
                     </div>
+                    {(g.colourant || g.ciName) && (
+                      <div className="text-xs text-muted-foreground">
+                        {[g.colourant, g.ciName].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
                   </div>
                 </CommandItem>
               ))}

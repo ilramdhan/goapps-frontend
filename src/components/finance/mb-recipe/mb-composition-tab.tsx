@@ -77,6 +77,8 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
                   <TableHead className="w-16 pl-4">Seq</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Reference</TableHead>
+                  <TableHead>Colourant</TableHead>
+                  <TableHead>CI Name</TableHead>
                   <TableHead className="w-28">Composition %</TableHead>
                   <TableHead className="w-24">Carrier</TableHead>
                   {editable && <TableHead className="w-24 pr-4 text-right">Actions</TableHead>}
@@ -89,6 +91,8 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
                       <TableCell className="pl-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       {editable && <TableCell className="pr-4"><Skeleton className="h-4 w-16" /></TableCell>}
@@ -96,7 +100,7 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
                   ))}
                 {!isLoading && items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={editable ? 6 : 5} className="p-0">
+                    <TableCell colSpan={editable ? 8 : 7} className="p-0">
                       <EmptyState
                         title="No composition lines"
                         description={editable ? "Add lines that sum to 100%." : "No composition data recorded."}
@@ -112,6 +116,14 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
                     <TableCell className="text-sm">
                       <ReferenceCell composition={c} />
                     </TableCell>
+                    {c.sourceType === "GROUP" ? (
+                      <RmGroupTagCells groupHeadId={c.groupHeadId} />
+                    ) : (
+                      <>
+                        <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                      </>
+                    )}
                     <TableCell className="text-sm font-mono">{c.compositionPct}%</TableCell>
                     <TableCell>{c.isCarrier && <Badge variant="secondary">Carrier</Badge>}</TableCell>
                     {editable && (
@@ -184,6 +196,25 @@ function RmGroupRefLabel({ groupHeadId }: { groupHeadId: string }) {
       <span className="font-mono text-xs text-muted-foreground mr-1">{group.groupCode}</span>
       {group.groupName}
     </span>
+  )
+}
+
+function RmGroupTagCells({ groupHeadId }: { groupHeadId: string }) {
+  const { data, isLoading } = useRMGroup(groupHeadId)
+  const group = data?.data
+  if (isLoading) {
+    return (
+      <>
+        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      </>
+    )
+  }
+  return (
+    <>
+      <TableCell className="text-sm">{group?.colourant || <span className="text-muted-foreground">—</span>}</TableCell>
+      <TableCell className="text-sm">{group?.ciName || <span className="text-muted-foreground">—</span>}</TableCell>
+    </>
   )
 }
 
