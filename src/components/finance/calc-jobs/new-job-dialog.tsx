@@ -113,9 +113,9 @@ export function NewJobDialog({ open, onOpenChange }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ACTUAL">Actual</SelectItem>
-                <SelectItem value="FORECAST">Forecast</SelectItem>
-                <SelectItem value="SELLING">Selling</SelectItem>
+                <SelectItem value="ACTUAL">Actual (Valuation Rate)</SelectItem>
+                <SelectItem value="FORECAST">Forecast (Marketing Rate)</SelectItem>
+                <SelectItem value="SELLING">Selling (Simulation Rate)</SelectItem>
               </SelectContent>
             </Select>
           </div>
