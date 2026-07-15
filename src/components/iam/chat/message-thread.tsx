@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo, useCallback } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { useChatStore } from "@/stores/chat-store"
 import { useMessages, useSendMessage, useMarkRead } from "@/hooks/iam/use-chat"
 import { MessageBubble } from "./message-bubble"
@@ -15,9 +16,11 @@ interface MessageThreadProps {
 
 export function MessageThread({ conversationId, currentUserId, participantCount }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
-  const messages = useChatStore((s) => s.messages[conversationId] ?? [])
+  const messagesMap = useChatStore(useShallow((s) => s.messages))
+  const messages = useMemo(() => messagesMap[conversationId] ?? [], [messagesMap, conversationId])
   const setMessages = useChatStore((s) => s.setMessages)
-  const typingUsers = useChatStore((s) => s.typingUsers[conversationId] ?? [])
+  const typingMap = useChatStore(useShallow((s) => s.typingUsers))
+  const typingUsers = useMemo(() => typingMap[conversationId] ?? [], [typingMap, conversationId])
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(conversationId)
   const { mutate: sendMessage } = useSendMessage(conversationId)
