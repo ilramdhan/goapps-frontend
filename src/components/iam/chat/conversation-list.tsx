@@ -1,15 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { SquarePen } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useChatStore } from "@/stores/chat-store"
 import { usePresenceStore } from "@/stores/presence-store"
 import { useCreateConversation } from "@/hooks/iam/use-chat"
-import { useUsersLookup } from "@/hooks/iam/use-users-lookup"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { UserName } from "@/components/common/user-name"
 import { ConversationItem } from "./conversation-item"
 import { NewConversationDialog } from "./new-conversation-dialog"
 
@@ -25,22 +25,12 @@ export function ConversationList({ currentUserId, className }: ConversationListP
   const activeId = useChatStore((s) => s.activeConversationId)
   const setActive = useChatStore((s) => s.setActiveConversation)
   const onlineUsers = usePresenceStore((s) => s.onlineUsers)
-  const { lookup } = useUsersLookup()
   const { mutate: createConv } = useCreateConversation()
 
-  const [onlineList, setOnlineList] = useState<Array<{ id: string; name: string; initials: string }>>([])
-
-  useEffect(() => {
-    const list = Array.from(onlineUsers)
-      .filter((id) => id !== currentUserId)
-      .map((id) => {
-        const user = lookup.get(id)
-        const name = user?.fullName || user?.username || id.slice(0, 8)
-        const initials = name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
-        return { id, name, initials }
-      })
-    setOnlineList(list)
-  }, [onlineUsers, lookup, currentUserId])
+  const onlineList = useMemo(
+    () => Array.from(onlineUsers).filter((id) => id !== currentUserId),
+    [onlineUsers, currentUserId]
+  )
 
   const handleOnlineUserClick = (userId: string) => {
     createConv(
@@ -81,17 +71,17 @@ export function ConversationList({ currentUserId, className }: ConversationListP
         <div className="px-3 py-2 border-b">
           <p className="text-xs text-muted-foreground mb-1.5">{onlineList.length} online</p>
           <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {onlineList.map((u) => (
-              <Tooltip key={u.id}>
+            {onlineList.map((uid) => (
+              <Tooltip key={uid}>
                 <TooltipTrigger asChild>
-                  <button onClick={() => handleOnlineUserClick(u.id)} className="relative shrink-0">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">{u.initials}</AvatarFallback>
-                    </Avatar>
+                  <button onClick={() => handleOnlineUserClick(uid)} className="relative shrink-0">
+                    <UserAvatar userId={uid} colorHash className="h-8 w-8" fallbackClassName="text-xs" />
                     <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">{u.name}</TooltipContent>
+                <TooltipContent side="bottom" className="text-xs">
+                  <UserName userId={uid} compact />
+                </TooltipContent>
               </Tooltip>
             ))}
           </div>
