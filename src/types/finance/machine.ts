@@ -76,6 +76,7 @@ export interface ListMachinesParams {
   activeFilter?: ActiveFilter
   sortBy?: string
   sortOrder?: string
+  mcTypeFilter?: string
 }
 
 export interface ExportMachinesParams {
