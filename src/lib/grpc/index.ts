@@ -31,6 +31,8 @@ export {
   getEmployeeGroupClient,
   getCompanyMappingClient,
   getNotificationClient,
+  getChatClient,
+  getPresenceClient,
   getOracleSyncClient,
   getRmGroupClient,
   getRmCostClient,

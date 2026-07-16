@@ -38,6 +38,7 @@ import { EmployeeLevelServiceDefinition } from "@/types/generated/iam/v1/employe
 import { EmployeeGroupServiceDefinition } from "@/types/generated/iam/v1/employee_group"
 import { CompanyMappingServiceDefinition } from "@/types/generated/iam/v1/company_mapping"
 import { NotificationServiceDefinition } from "@/types/generated/iam/v1/notification"
+import { ChatServiceDefinition, PresenceServiceDefinition } from "@/types/generated/iam/v1/chat"
 import {
   WorkflowTemplateServiceDefinition,
   WorkflowInstanceServiceDefinition,
@@ -291,6 +292,21 @@ export function getCompanyMappingClient() {
 export function getNotificationClient() {
   return getOrCreate("notification", () =>
     createServiceClient(NotificationServiceDefinition, SERVICE_ADDRESSES.iam, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+// Chat service clients (IAM service). Note: ChatService.streamChatEvents is
+// server-streaming — use getChatStreamingClient() from chat-stream-client.ts
+// for that RPC; this unary client covers everything else.
+export function getChatClient() {
+  return getOrCreate("chat", () =>
+    createServiceClient(ChatServiceDefinition, SERVICE_ADDRESSES.iam, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getPresenceClient() {
+  return getOrCreate("presence", () =>
+    createServiceClient(PresenceServiceDefinition, SERVICE_ADDRESSES.iam, insecure, CHANNEL_OPTIONS)
   )
 }
 

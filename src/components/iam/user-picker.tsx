@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { apiClient } from "@/lib/api"
 import { useDebounce } from "@/lib/hooks/use-debounce"
+import { usePresenceStore } from "@/stores/presence-store"
 import { cn } from "@/lib/utils"
 
 export interface UserOption {
@@ -58,6 +59,8 @@ interface UserPickerProps {
     disabled?: boolean
     /** Optional initial display label (e.g. when editing — username already known). */
     initialLabel?: string
+    /** Show green online indicator next to each user in the dropdown. */
+    showOnlineStatus?: boolean
 }
 
 export function UserPicker({
@@ -66,7 +69,9 @@ export function UserPicker({
     placeholder = "Search users…",
     disabled,
     initialLabel,
+    showOnlineStatus,
 }: UserPickerProps) {
+    const isOnline = usePresenceStore((s) => s.isOnline)
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState("")
     const debounced = useDebounce(query, 300)
@@ -170,7 +175,13 @@ export function UserPicker({
                                             )}
                                         />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate font-medium">
+                                            <p className="truncate font-medium flex items-center gap-1.5">
+                                                {showOnlineStatus && (
+                                                    <span className={cn(
+                                                        "inline-block h-2 w-2 rounded-full shrink-0",
+                                                        isOnline(u.id) ? "bg-green-500" : "bg-muted-foreground/30"
+                                                    )} />
+                                                )}
                                                 {u.username || "—"}
                                                 {u.fullName && (
                                                     <span className="ml-1 font-normal text-muted-foreground">

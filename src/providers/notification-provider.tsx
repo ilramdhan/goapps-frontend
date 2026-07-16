@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { useAuth } from "./auth-provider"
+import { requestNotificationPermission } from "@/lib/notifications/browser-notification"
 import { notificationKeys } from "@/hooks/iam/use-notifications"
 import { useNotificationEventStore } from "@/stores/notification-event-store"
 import {
@@ -24,6 +25,15 @@ import {
 interface NotificationContextValue {
   // Status of the SSE connection.
   connected?: boolean
+}
+
+declare global {
+  interface Window {
+    // Shared EventSource for /api/v1/iam/notifications/stream — exposed so
+    // chat-provider.tsx can attach its own `chat` event listener without
+    // opening a second SSE connection.
+    __sharedEventSource?: EventSource | null
+  }
 }
 
 const NotificationContext = createContext<NotificationContextValue>({})
@@ -74,13 +84,19 @@ export function NotificationProvider({ children }: ProviderProps) {
         esRef.current.close()
         esRef.current = null
       }
+      if (typeof window !== "undefined") window.__sharedEventSource = null
       connectionStore.set(false)
       return
     }
 
+    requestNotificationPermission()
+
     // Open SSE.
     const es = new EventSource("/api/v1/iam/notifications/stream", { withCredentials: true })
     esRef.current = es
+    // Expose the shared connection so chat-provider.tsx can attach a `chat`
+    // event listener to the same stream instead of opening a second one.
+    if (typeof window !== "undefined") window.__sharedEventSource = es
     es.onopen = () => connectionStore.set(true)
 
     const handleEvent = (raw: RawStreamEvent) => {
@@ -135,6 +151,9 @@ export function NotificationProvider({ children }: ProviderProps) {
       es.removeEventListener("notification", onMessage as EventListener)
       es.close()
       if (esRef.current === es) esRef.current = null
+      if (typeof window !== "undefined" && window.__sharedEventSource === es) {
+        window.__sharedEventSource = null
+      }
       connectionStore.set(false)
     }
   }, [isAuthenticated, qc])
