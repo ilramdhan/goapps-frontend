@@ -12,7 +12,7 @@ export function showChatNotification(
 ): void {
   if (typeof window === "undefined" || !("Notification" in window)) return
   if (Notification.permission !== "granted") return
-  if (!document.hidden) return
+  if (document.hasFocus()) return
 
   const truncated = body.length > 80 ? body.slice(0, 80) + "..." : body
   const notification = new Notification(senderName, {

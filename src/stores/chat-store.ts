@@ -103,11 +103,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setOpen: (open) => set({ isOpen: open }),
 
   handleSSEEvent: (evt) => {
-    const { appendMessage, updateMessage, deleteMessage, setTyping } = get()
+    const { appendMessage, updateMessage, deleteMessage, setTyping, activeConversationId } = get()
     const convId = evt.conversationId ?? ""
     switch (evt.type) {
       case "message_received":
-        if (evt.message) appendMessage(convId, evt.message)
+        if (evt.message) {
+          appendMessage(convId, evt.message)
+          set((s) => ({
+            conversations: s.conversations.map((c) => {
+              if (c.conversationId !== convId) return c
+              const isActive = activeConversationId === convId
+              return {
+                ...c,
+                lastMessage: evt.message!,
+                unreadCount: isActive ? c.unreadCount : c.unreadCount + 1,
+                updatedAt: evt.message!.createdAt || c.updatedAt,
+              }
+            }),
+          }))
+        }
         break
       case "message_edited":
         if (evt.message) updateMessage(convId, evt.message)
