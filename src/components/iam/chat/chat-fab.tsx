@@ -19,6 +19,7 @@ export function ChatFab() {
         <div className="relative">
           <Button
             size="icon"
+            variant={isOpen ? "default" : "secondary"}
             className="h-12 w-12 rounded-full shadow-lg"
             onClick={() => setOpen(!isOpen)}
             aria-label="Chat"

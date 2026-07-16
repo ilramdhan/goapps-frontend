@@ -1,3 +1,6 @@
+import type { ReactNode } from "react"
+import { UserName } from "@/components/common/user-name"
+
 interface TypingUser {
   id: string
   name: string
@@ -7,14 +10,30 @@ interface TypingIndicatorProps {
   users: TypingUser[]
 }
 
+// Renders the user's name if the SSE event carried one; otherwise resolves it
+// via the id (backend sometimes sends an empty callerName — see chat-store).
+function TypingUserLabel({ user }: { user: TypingUser }) {
+  if (user.name) return <>{user.name}</>
+  return <UserName userId={user.id} compact />
+}
+
 export function TypingIndicator({ users }: TypingIndicatorProps) {
-  const names = users.map((u) => u.name)
-  const label =
-    names.length === 1
-      ? `${names[0]} is typing...`
-      : names.length === 2
-        ? `${names[0]}, ${names[1]} are typing...`
-        : `${names.length} people are typing...`
+  let label: ReactNode
+  if (users.length === 1) {
+    label = (
+      <>
+        <TypingUserLabel user={users[0]} /> is typing...
+      </>
+    )
+  } else if (users.length === 2) {
+    label = (
+      <>
+        <TypingUserLabel user={users[0]} />, <TypingUserLabel user={users[1]} /> are typing...
+      </>
+    )
+  } else {
+    label = `${users.length} people are typing...`
+  }
 
   return (
     <div className="px-4 py-1 text-xs text-muted-foreground flex items-center gap-1">

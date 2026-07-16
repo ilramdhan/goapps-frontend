@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { SquarePen } from "lucide-react"
+import { SquarePen, X } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useChatStore } from "@/stores/chat-store"
 import { usePresenceStore } from "@/stores/presence-store"
@@ -16,9 +16,13 @@ import { NewConversationDialog } from "./new-conversation-dialog"
 interface ConversationListProps {
   currentUserId: string
   className?: string
+  // Closes the whole chat drawer — the Sheet's default close button is
+  // suppressed (it overlapped the "+" new conversation button and the
+  // message thread's own close button), so this list owns the drawer close.
+  onClose?: () => void
 }
 
-export function ConversationList({ currentUserId, className }: ConversationListProps) {
+export function ConversationList({ currentUserId, className, onClose }: ConversationListProps) {
   const [search, setSearch] = useState("")
   const [showNew, setShowNew] = useState(false)
   const conversations = useChatStore((s) => s.conversations)
@@ -27,10 +31,14 @@ export function ConversationList({ currentUserId, className }: ConversationListP
   const onlineUsers = usePresenceStore((s) => s.onlineUsers)
   const { mutate: createConv } = useCreateConversation()
 
+  const MAX_VISIBLE_ONLINE = 8
+
   const onlineList = useMemo(
     () => Array.from(onlineUsers).filter((id) => id !== currentUserId),
     [onlineUsers, currentUserId]
   )
+  const visibleOnline = onlineList.slice(0, MAX_VISIBLE_ONLINE)
+  const extraOnlineCount = onlineList.length - visibleOnline.length
 
   const handleOnlineUserClick = (userId: string) => {
     createConv(
@@ -66,24 +74,44 @@ export function ConversationList({ currentUserId, className }: ConversationListP
         >
           <SquarePen className="h-4 w-4" />
         </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={onClose}
+            aria-label="Close chat"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
       {onlineList.length > 0 && (
         <div className="px-3 py-2 border-b">
           <p className="text-xs text-muted-foreground mb-1.5">{onlineList.length} online</p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {onlineList.map((uid) => (
-              <Tooltip key={uid}>
-                <TooltipTrigger asChild>
-                  <button onClick={() => handleOnlineUserClick(uid)} className="relative shrink-0">
-                    <UserAvatar userId={uid} colorHash className="h-8 w-8" fallbackClassName="text-xs" />
-                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  <UserName userId={uid} compact />
-                </TooltipContent>
-              </Tooltip>
-            ))}
+          <div className="relative">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {visibleOnline.map((uid) => (
+                <Tooltip key={uid}>
+                  <TooltipTrigger asChild>
+                    <button onClick={() => handleOnlineUserClick(uid)} className="relative shrink-0">
+                      <UserAvatar userId={uid} colorHash className="h-8 w-8" fallbackClassName="text-xs" />
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    <UserName userId={uid} compact />
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {extraOnlineCount > 0 && (
+                <span className="shrink-0 h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                  +{extraOnlineCount}
+                </span>
+              )}
+            </div>
+            {/* Edge fade indicators — hint that the row scrolls horizontally */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent" />
           </div>
         </div>
       )}

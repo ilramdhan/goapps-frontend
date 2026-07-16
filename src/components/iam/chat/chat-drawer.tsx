@@ -29,7 +29,11 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={setOpen}>
-      <SheetContent side="right" className="w-full sm:max-w-[800px] lg:max-w-[900px] p-0 flex flex-row gap-0">
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-full sm:max-w-[800px] lg:max-w-[900px] p-0 flex flex-row gap-0"
+      >
         <SheetHeader className="sr-only">
           <SheetTitle>Chat</SheetTitle>
           <SheetDescription>Conversations and messages</SheetDescription>
@@ -37,7 +41,7 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
 
         {/* Conversation list — hidden on mobile when a conversation is active */}
         <div className={`${activeId ? "hidden sm:flex" : "flex"} w-full sm:w-72 border-r flex-col shrink-0`}>
-          <ConversationList currentUserId={currentUserId} className="h-full" />
+          <ConversationList currentUserId={currentUserId} className="h-full" onClose={() => setOpen(false)} />
         </div>
 
         {/* Message thread — hidden on mobile when no conversation is active */}
