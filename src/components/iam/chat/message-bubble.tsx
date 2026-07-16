@@ -21,12 +21,14 @@ interface ReadReceiptIconProps {
   receipts: { userId: string }[]
   participantCount: number
   isSender: boolean
+  senderUserId: string
 }
 
-function ReadReceiptIcon({ receipts, participantCount, isSender }: ReadReceiptIconProps) {
+function ReadReceiptIcon({ receipts, participantCount, isSender, senderUserId }: ReadReceiptIconProps) {
   if (!isSender) return null
-  const readByAll = receipts.length >= participantCount - 1
-  const delivered = receipts.length > 0
+  const othersRead = receipts.filter((r) => r.userId !== senderUserId)
+  const readByAll = othersRead.length >= participantCount - 1
+  const delivered = othersRead.length > 0
   if (readByAll) return <CheckCheck className="h-3 w-3 text-blue-500 shrink-0" />
   if (delivered) return <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
   return <Check className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -125,6 +127,7 @@ export function MessageBubble({ message, isSender, participantCount, senderName 
             receipts={message.readReceipts}
             participantCount={participantCount}
             isSender={isSender}
+            senderUserId={message.senderUserId}
           />
         </div>
       </div>
