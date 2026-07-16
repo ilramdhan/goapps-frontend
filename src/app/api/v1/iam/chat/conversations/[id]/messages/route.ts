@@ -61,6 +61,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 conversationId: id,
                 body: body.body || "",
                 replyToId: body.replyToId || body.reply_to_id || "",
+                attachmentIds: body.attachmentIds || body.attachment_ids || [],
             },
             metadata
         )

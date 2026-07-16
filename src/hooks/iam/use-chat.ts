@@ -5,12 +5,15 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   Conversation,
   ChatMessage,
+  Attachment,
   RawConversation,
   RawMessage,
+  RawAttachment,
   RawEditHistoryEntry,
   EditHistoryEntry,
   normalizeConversation,
   normalizeMessage,
+  normalizeAttachment,
   normalizeEditHistoryEntry,
 } from "@/types/iam/chat"
 
@@ -85,12 +88,20 @@ export function useMessages(conversationId: string) {
 export function useSendMessage(conversationId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ body, replyToId }: { body: string; replyToId?: string }): Promise<ChatMessage> => {
+    mutationFn: async ({
+      body,
+      replyToId,
+      attachmentIds,
+    }: {
+      body: string
+      replyToId?: string
+      attachmentIds?: string[]
+    }): Promise<ChatMessage> => {
       const res = await fetch(`/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, reply_to_id: replyToId }),
+        body: JSON.stringify({ body, reply_to_id: replyToId, attachment_ids: attachmentIds ?? [] }),
       })
       const json = await parseEnvelope<RawMessage>(res)
       return normalizeMessage(json.data ?? {})
@@ -98,6 +109,23 @@ export function useSendMessage(conversationId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
       void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+// useUploadAttachment uploads a single file to a conversation and returns its
+// attachment metadata. The returned attachmentId is passed to useSendMessage.
+export function useUploadAttachment(conversationId: string) {
+  return useMutation({
+    mutationFn: async (file: File): Promise<Attachment> => {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch(
+        `/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/attachments`,
+        { method: "POST", credentials: "include", body: form }
+      )
+      const json = await parseEnvelope<RawAttachment>(res)
+      return normalizeAttachment(json.data ?? {})
     },
   })
 }
@@ -184,6 +212,95 @@ export function useDeleteMessage(conversationId: string, messageId: string) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+    },
+  })
+}
+
+export function useAddParticipants(conversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (userIds: string[]): Promise<void> => {
+      const res = await fetch(`/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/participants`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_ids: userIds }),
+      })
+      await parseEnvelope<unknown>(res)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+export function useRemoveParticipant(conversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: string): Promise<void> => {
+      const res = await fetch(
+        `/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/participants/${encodeURIComponent(userId)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      )
+      await parseEnvelope<unknown>(res)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+export function useUpdateGroup(conversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ name, avatarUrl }: { name?: string; avatarUrl?: string }): Promise<Conversation> => {
+      const res = await fetch(`/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, avatarUrl }),
+      })
+      const json = await parseEnvelope<RawConversation>(res)
+      return normalizeConversation(json.data ?? {})
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+export function useLeaveConversation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (conversationId: string): Promise<void> => {
+      const res = await fetch(`/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      await parseEnvelope<unknown>(res)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
+    },
+  })
+}
+
+export function useClearHistory(conversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      const res = await fetch(`/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/history`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      await parseEnvelope<unknown>(res)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+      void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
     },
   })
 }

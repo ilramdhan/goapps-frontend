@@ -14,6 +14,15 @@ import { getChatStreamingClient } from "@/lib/grpc/chat-stream-client"
 import type { StreamNotificationsResponse } from "@/types/generated/iam/v1/notification"
 import type { StreamChatEventsResponse } from "@/types/generated/iam/v1/chat"
 
+interface FlatAttachment {
+  attachmentId?: string
+  fileName?: string
+  fileUrl?: string
+  contentType?: string
+  fileSize?: number | string
+  thumbnailUrl?: string
+}
+
 interface FlatChatEvent {
   type: string
   conversationId?: string
@@ -23,6 +32,7 @@ interface FlatChatEvent {
   body?: string
   isEdited?: boolean
   isDeleted?: boolean
+  attachments?: FlatAttachment[]
   createdAt?: string
   updatedAt?: string
   userId?: string
@@ -41,6 +51,7 @@ function flattenChatEvent(event: StreamChatEventsResponse): FlatChatEvent {
       messageId: m?.messageId, senderUserId: m?.senderUserId,
       senderName: m?.senderName, body: m?.body,
       isEdited: m?.isEdited, isDeleted: m?.isDeleted,
+      attachments: m?.attachments,
       createdAt: m?.createdAt, updatedAt: m?.updatedAt,
     }
   }
@@ -51,6 +62,7 @@ function flattenChatEvent(event: StreamChatEventsResponse): FlatChatEvent {
       conversationId: event.messageEdited.conversationId,
       messageId: m?.messageId, senderUserId: m?.senderUserId,
       body: m?.body, isEdited: m?.isEdited, isDeleted: m?.isDeleted,
+      attachments: m?.attachments,
       createdAt: m?.createdAt, updatedAt: m?.updatedAt,
     }
   }

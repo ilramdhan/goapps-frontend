@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog/confirm-dialog"
 import { EditHistoryDialog } from "./edit-history-dialog"
+import { AttachmentList } from "./attachment-preview"
 import { useEditMessage, useDeleteMessage } from "@/hooks/iam/use-chat"
 
 interface ReadReceiptIconProps {
@@ -118,7 +119,12 @@ export function MessageBubble({ message, isSender, participantCount, senderName 
             <p className="text-[10px] opacity-70">Enter to save, Escape to cancel</p>
           </div>
         ) : (
-          <p className="whitespace-pre-wrap break-words">{message.body}</p>
+          <>
+            {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
+            {message.attachments.length > 0 && (
+              <AttachmentList attachments={message.attachments} isSender={isSender} />
+            )}
+          </>
         )}
         <div className={cn("flex items-center gap-1 mt-0.5", isSender ? "justify-end" : "justify-start")}>
           {message.isEdited && !message.isDeleted && <span className="text-[10px] opacity-60">edited</span>}

@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/providers/auth-provider"
 import { useChatStore } from "@/stores/chat-store"
 import { useConversations } from "@/hooks/iam/use-chat"
 import { ConversationList } from "@/components/iam/chat/conversation-list"
 import { MessageThread } from "@/components/iam/chat/message-thread"
+import { GroupSettingsPanel } from "@/components/iam/chat/group-settings-panel"
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/empty-state"
 import { getConversationDisplayName } from "@/types/iam/chat"
@@ -19,6 +20,7 @@ export function ChatPageClient() {
   const setActive = useChatStore((s) => s.setActiveConversation)
   const conversations = useChatStore((s) => s.conversations)
   const setConversations = useChatStore((s) => s.setConversations)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { data } = useConversations()
   useEffect(() => {
@@ -45,7 +47,9 @@ export function ChatPageClient() {
               currentUserId={currentUserId}
               participantCount={activeConv.participants.length}
               conversationName={getConversationDisplayName(activeConv, currentUserId)}
+              conversationType={activeConv.type}
               onClose={() => setActive(null)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-6">
@@ -57,6 +61,15 @@ export function ChatPageClient() {
           )}
         </div>
       </div>
+
+      {activeConv && activeConv.type === "GROUP" && (
+        <GroupSettingsPanel
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          conversation={activeConv}
+          currentUserId={currentUserId}
+        />
+      )}
     </div>
   )
 }

@@ -20,6 +20,21 @@ export interface RawParticipant {
   joined_at?: string
 }
 
+export interface RawAttachment {
+  attachmentId?: string
+  attachment_id?: string
+  fileName?: string
+  file_name?: string
+  fileUrl?: string
+  file_url?: string
+  contentType?: string
+  content_type?: string
+  fileSize?: number | string
+  file_size?: number | string
+  thumbnailUrl?: string
+  thumbnail_url?: string
+}
+
 export interface RawMessage {
   messageId?: string
   message_id?: string
@@ -38,6 +53,7 @@ export interface RawMessage {
   reply_to_id?: string
   readReceipts?: RawReadReceipt[]
   read_receipts?: RawReadReceipt[]
+  attachments?: RawAttachment[]
   createdAt?: string
   created_at?: string
   updatedAt?: string
@@ -70,6 +86,15 @@ export interface ReadReceipt {
   readAt: string
 }
 
+export interface Attachment {
+  attachmentId: string
+  fileName: string
+  fileUrl: string
+  contentType: string
+  fileSize: number
+  thumbnailUrl: string
+}
+
 export interface Participant {
   userId: string
   username: string
@@ -90,6 +115,7 @@ export interface ChatMessage {
   isDeleted: boolean
   replyToId: string
   readReceipts: ReadReceipt[]
+  attachments: Attachment[]
   createdAt: string
   updatedAt: string
 }
@@ -150,12 +176,25 @@ export interface ChatSSEEvent {
   senderName?: string
   replyToId?: string
   readReceipts?: ReadReceipt[]
+  attachments?: Attachment[]
 }
 
 export function normalizeReadReceipt(raw: RawReadReceipt): ReadReceipt {
   return {
     userId: raw.userId ?? raw.user_id ?? "",
     readAt: raw.readAt ?? raw.read_at ?? "",
+  }
+}
+
+export function normalizeAttachment(raw: RawAttachment): Attachment {
+  const size = raw.fileSize ?? raw.file_size ?? 0
+  return {
+    attachmentId: raw.attachmentId ?? raw.attachment_id ?? "",
+    fileName: raw.fileName ?? raw.file_name ?? "",
+    fileUrl: raw.fileUrl ?? raw.file_url ?? "",
+    contentType: raw.contentType ?? raw.content_type ?? "",
+    fileSize: typeof size === "string" ? Number(size) || 0 : size,
+    thumbnailUrl: raw.thumbnailUrl ?? raw.thumbnail_url ?? "",
   }
 }
 
@@ -183,6 +222,7 @@ export function normalizeMessage(raw: RawMessage): ChatMessage {
     isDeleted: raw.isDeleted ?? raw.is_deleted ?? false,
     replyToId: raw.replyToId ?? raw.reply_to_id ?? "",
     readReceipts: receipts,
+    attachments: (raw.attachments ?? []).map(normalizeAttachment),
     createdAt: raw.createdAt ?? raw.created_at ?? "",
     updatedAt: raw.updatedAt ?? raw.updated_at ?? "",
   }

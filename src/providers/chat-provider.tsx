@@ -17,6 +17,7 @@ import { useChatStore } from "@/stores/chat-store"
 import { showChatNotification } from "@/lib/notifications/browser-notification"
 import { playNotificationSound } from "@/lib/notifications/notification-sound"
 import type { ChatSSEEvent, ChatMessage } from "@/types/iam/chat"
+import { normalizeAttachment } from "@/types/iam/chat"
 
 const POLL_INTERVAL_MS = 200
 
@@ -26,7 +27,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const conversations = useChatStore((s) => s.conversations)
   const attachedRef = useRef<EventSource | null>(null)
   const activeConvRef = useRef(activeConvId)
-  activeConvRef.current = activeConvId
+
+  useEffect(() => {
+    activeConvRef.current = activeConvId
+  }, [activeConvId])
 
   const updateTabTitle = useCallback(() => {
     const total = conversations.reduce((sum, c) => sum + c.unreadCount, 0)
@@ -53,6 +57,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             isDeleted: raw.isDeleted ?? false,
             replyToId: raw.replyToId ?? "",
             readReceipts: raw.readReceipts ?? [],
+            attachments: (raw.attachments ?? []).map(normalizeAttachment),
             createdAt: raw.createdAt ?? "",
             updatedAt: raw.updatedAt ?? "",
           } satisfies ChatMessage

@@ -1,21 +1,30 @@
 "use client"
 
-import { useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { useChatStore } from "@/stores/chat-store"
-import { useMessages, useSendMessage, useMarkRead } from "@/hooks/iam/use-chat"
+import { useMessages, useSendMessage, useMarkRead, useClearHistory } from "@/hooks/iam/use-chat"
 import { MessageBubble } from "./message-bubble"
 import { MessageInput } from "./message-input"
 import { TypingIndicator } from "./typing-indicator"
 import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import { ConfirmDialog } from "@/components/shared/confirm-dialog/confirm-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { X, Settings, MoreVertical, Trash2 } from "lucide-react"
 
 interface MessageThreadProps {
   conversationId: string
   currentUserId: string
   participantCount: number
   conversationName: string
+  conversationType?: "DIRECT" | "GROUP"
   onClose?: () => void
+  onOpenSettings?: () => void
 }
 
 export function MessageThread({
@@ -23,7 +32,9 @@ export function MessageThread({
   currentUserId,
   participantCount,
   conversationName,
+  conversationType,
   onClose,
+  onOpenSettings,
 }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesMap = useChatStore(useShallow((s) => s.messages))
@@ -31,10 +42,12 @@ export function MessageThread({
   const setMessages = useChatStore((s) => s.setMessages)
   const typingMap = useChatStore(useShallow((s) => s.typingUsers))
   const typingUsers = useMemo(() => typingMap[conversationId] ?? [], [typingMap, conversationId])
+  const [clearHistoryOpen, setClearHistoryOpen] = useState(false)
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(conversationId)
   const { mutate: sendMessage } = useSendMessage(conversationId)
   const { mutate: markRead } = useMarkRead(conversationId)
+  const clearHistoryM = useClearHistory(conversationId)
 
   // Sync TanStack Query pages into Zustand store (pages are newest-first per
   // page but oldest-page-first in the array — flatten then reverse to get
@@ -71,14 +84,56 @@ export function MessageThread({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
-        <span className="text-sm font-semibold truncate">{conversationName}</span>
-        {onClose && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
-        )}
+        <div className="min-w-0">
+          <span className="text-sm font-semibold truncate block">{conversationName}</span>
+          {conversationType === "GROUP" && (
+            <span className="text-xs text-muted-foreground">
+              {participantCount} member{participantCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {conversationType === "GROUP" && onOpenSettings && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenSettings}>
+              <Settings className="h-4 w-4" />
+              <span className="sr-only">Group settings</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">More options</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onClick={() => setClearHistoryOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Clear history
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {onClose && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          )}
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={clearHistoryOpen}
+        onOpenChange={setClearHistoryOpen}
+        title="Clear conversation history"
+        description="This clears your own view of this conversation's message history. Other participants will still see the full history."
+        variant="destructive"
+        confirmText="Clear history"
+        isLoading={clearHistoryM.isPending}
+        onConfirm={() => {
+          clearHistoryM.mutate(undefined, { onSuccess: () => setClearHistoryOpen(false) })
+        }}
+      />
 
       {/* Load more */}
       {hasNextPage && (
@@ -110,7 +165,11 @@ export function MessageThread({
       {otherTypingUsers.length > 0 && <TypingIndicator users={otherTypingUsers} />}
 
       {/* Input */}
-      <MessageInput onSend={(body) => sendMessage({ body })} onTyping={handleTyping} />
+      <MessageInput
+        conversationId={conversationId}
+        onSend={(body, attachmentIds) => sendMessage({ body, attachmentIds })}
+        onTyping={handleTyping}
+      />
     </div>
   )
 }

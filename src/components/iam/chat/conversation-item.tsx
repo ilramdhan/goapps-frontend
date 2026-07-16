@@ -5,6 +5,7 @@ import { Conversation, getConversationDisplayName, getConversationAvatar } from 
 import { usePresenceStore } from "@/stores/presence-store"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Users } from "lucide-react"
 import { format, isToday, isYesterday } from "date-fns"
 
 interface ConversationItemProps {
@@ -64,7 +65,13 @@ export function ConversationItem({ conversation, currentUserId, isActive, onClic
       <div className="relative shrink-0">
         <Avatar className="h-10 w-10">
           <AvatarImage src={avatarUrl || undefined} />
-          <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+          <AvatarFallback>
+            {conversation.type === "GROUP" && !avatarUrl ? (
+              <Users className="h-4 w-4" />
+            ) : (
+              displayName.slice(0, 2).toUpperCase()
+            )}
+          </AvatarFallback>
         </Avatar>
         {online && (
           <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
@@ -77,9 +84,17 @@ export function ConversationItem({ conversation, currentUserId, isActive, onClic
             <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{lastMsgTime}</span>
           )}
         </div>
+        {conversation.type === "GROUP" && (
+          <p className="text-xs text-muted-foreground">
+            {conversation.participants.length} member{conversation.participants.length === 1 ? "" : "s"}
+          </p>
+        )}
         {conversation.lastMessage && (
           <p className="text-xs text-muted-foreground truncate max-w-full">
-            {conversation.lastMessage.isDeleted ? "[deleted]" : conversation.lastMessage.body}
+            {conversation.lastMessage.isDeleted
+              ? "[deleted]"
+              : conversation.lastMessage.body ||
+                (conversation.lastMessage.attachments.length > 0 ? "📎 Attachment" : "")}
           </p>
         )}
       </div>

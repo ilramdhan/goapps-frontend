@@ -47,6 +47,17 @@ export interface MessageProto {
   readReceipts: ReadReceiptProto[];
   createdAt: string;
   updatedAt: string;
+  attachments: AttachmentProto[];
+}
+
+/** AttachmentProto represents a file or image attached to a chat message. */
+export interface AttachmentProto {
+  attachmentId: string;
+  fileName: string;
+  fileUrl: string;
+  contentType: string;
+  fileSize: number;
+  thumbnailUrl: string;
 }
 
 /** ReadReceiptProto represents a read receipt for a message. */
@@ -116,6 +127,8 @@ export interface SendMessageRequest {
   body: string;
   /** ID of the message being replied to (optional, empty = no reply). */
   replyToId: string;
+  /** Pre-uploaded attachment IDs to associate with this message (optional). */
+  attachmentIds: string[];
 }
 
 /** EditMessageRequest edits an existing message. */
@@ -150,6 +163,11 @@ export interface MarkConversationReadRequest {
   conversationId: string;
 }
 
+/** ClearConversationHistoryRequest clears the calling user's message history for a conversation. */
+export interface ClearConversationHistoryRequest {
+  conversationId: string;
+}
+
 /** SetTypingRequest sets the typing indicator for the current user. */
 export interface SetTypingRequest {
   conversationId: string;
@@ -160,6 +178,15 @@ export interface SetTypingRequest {
 export interface GetMessageEditHistoryRequest {
   conversationId: string;
   messageId: string;
+}
+
+/** UploadChatAttachmentRequest uploads a single file to a conversation. */
+export interface UploadChatAttachmentRequest {
+  conversationId: string;
+  fileName: string;
+  contentType: string;
+  /** Raw file bytes (max 25MB). */
+  fileData: Uint8Array;
 }
 
 /** HeartbeatRequest sends a heartbeat to update online presence. */
@@ -247,6 +274,11 @@ export interface MarkConversationReadResponse {
   base: BaseResponse | undefined;
 }
 
+/** ClearConversationHistoryResponse confirms the caller's history was cleared. */
+export interface ClearConversationHistoryResponse {
+  base: BaseResponse | undefined;
+}
+
 /** SetTypingResponse confirms the typing indicator was set. */
 export interface SetTypingResponse {
   base: BaseResponse | undefined;
@@ -256,6 +288,12 @@ export interface SetTypingResponse {
 export interface GetMessageEditHistoryResponse {
   base: BaseResponse | undefined;
   data: EditHistoryEntryProto[];
+}
+
+/** UploadChatAttachmentResponse returns the uploaded attachment metadata. */
+export interface UploadChatAttachmentResponse {
+  base: BaseResponse | undefined;
+  data: AttachmentProto | undefined;
 }
 
 /** HeartbeatResponse confirms the heartbeat was received. */
@@ -729,6 +767,7 @@ function createBaseMessageProto(): MessageProto {
     readReceipts: [],
     createdAt: "",
     updatedAt: "",
+    attachments: [],
   };
 }
 
@@ -766,6 +805,9 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.updatedAt !== "") {
       writer.uint32(90).string(message.updatedAt);
+    }
+    for (const v of message.attachments) {
+      AttachmentProto.encode(v!, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -865,6 +907,14 @@ export const MessageProto: MessageFns<MessageProto> = {
           message.updatedAt = reader.string();
           continue;
         }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.attachments.push(AttachmentProto.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -927,6 +977,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : isSet(object.updated_at)
         ? globalThis.String(object.updated_at)
         : "",
+      attachments: globalThis.Array.isArray(object?.attachments)
+        ? object.attachments.map((e: any) => AttachmentProto.fromJSON(e))
+        : [],
     };
   },
 
@@ -965,6 +1018,9 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.updatedAt !== "") {
       obj.updatedAt = message.updatedAt;
     }
+    if (message.attachments?.length) {
+      obj.attachments = message.attachments.map((e) => AttachmentProto.toJSON(e));
+    }
     return obj;
   },
 
@@ -984,6 +1040,171 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.readReceipts = object.readReceipts?.map((e) => ReadReceiptProto.fromPartial(e)) || [];
     message.createdAt = object.createdAt ?? "";
     message.updatedAt = object.updatedAt ?? "";
+    message.attachments = object.attachments?.map((e) => AttachmentProto.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseAttachmentProto(): AttachmentProto {
+  return { attachmentId: "", fileName: "", fileUrl: "", contentType: "", fileSize: 0, thumbnailUrl: "" };
+}
+
+export const AttachmentProto: MessageFns<AttachmentProto> = {
+  encode(message: AttachmentProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.attachmentId !== "") {
+      writer.uint32(10).string(message.attachmentId);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(18).string(message.fileName);
+    }
+    if (message.fileUrl !== "") {
+      writer.uint32(26).string(message.fileUrl);
+    }
+    if (message.contentType !== "") {
+      writer.uint32(34).string(message.contentType);
+    }
+    if (message.fileSize !== 0) {
+      writer.uint32(40).int64(message.fileSize);
+    }
+    if (message.thumbnailUrl !== "") {
+      writer.uint32(50).string(message.thumbnailUrl);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AttachmentProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAttachmentProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.attachmentId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileUrl = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.contentType = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.fileSize = longToNumber(reader.int64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.thumbnailUrl = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AttachmentProto {
+    return {
+      attachmentId: isSet(object.attachmentId)
+        ? globalThis.String(object.attachmentId)
+        : isSet(object.attachment_id)
+        ? globalThis.String(object.attachment_id)
+        : "",
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+      fileUrl: isSet(object.fileUrl)
+        ? globalThis.String(object.fileUrl)
+        : isSet(object.file_url)
+        ? globalThis.String(object.file_url)
+        : "",
+      contentType: isSet(object.contentType)
+        ? globalThis.String(object.contentType)
+        : isSet(object.content_type)
+        ? globalThis.String(object.content_type)
+        : "",
+      fileSize: isSet(object.fileSize)
+        ? globalThis.Number(object.fileSize)
+        : isSet(object.file_size)
+        ? globalThis.Number(object.file_size)
+        : 0,
+      thumbnailUrl: isSet(object.thumbnailUrl)
+        ? globalThis.String(object.thumbnailUrl)
+        : isSet(object.thumbnail_url)
+        ? globalThis.String(object.thumbnail_url)
+        : "",
+    };
+  },
+
+  toJSON(message: AttachmentProto): unknown {
+    const obj: any = {};
+    if (message.attachmentId !== "") {
+      obj.attachmentId = message.attachmentId;
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    if (message.fileUrl !== "") {
+      obj.fileUrl = message.fileUrl;
+    }
+    if (message.contentType !== "") {
+      obj.contentType = message.contentType;
+    }
+    if (message.fileSize !== 0) {
+      obj.fileSize = Math.round(message.fileSize);
+    }
+    if (message.thumbnailUrl !== "") {
+      obj.thumbnailUrl = message.thumbnailUrl;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AttachmentProto>): AttachmentProto {
+    return AttachmentProto.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AttachmentProto>): AttachmentProto {
+    const message = createBaseAttachmentProto();
+    message.attachmentId = object.attachmentId ?? "";
+    message.fileName = object.fileName ?? "";
+    message.fileUrl = object.fileUrl ?? "";
+    message.contentType = object.contentType ?? "";
+    message.fileSize = object.fileSize ?? 0;
+    message.thumbnailUrl = object.thumbnailUrl ?? "";
     return message;
   },
 };
@@ -1829,7 +2050,7 @@ export const LeaveConversationRequest: MessageFns<LeaveConversationRequest> = {
 };
 
 function createBaseSendMessageRequest(): SendMessageRequest {
-  return { conversationId: "", body: "", replyToId: "" };
+  return { conversationId: "", body: "", replyToId: "", attachmentIds: [] };
 }
 
 export const SendMessageRequest: MessageFns<SendMessageRequest> = {
@@ -1842,6 +2063,9 @@ export const SendMessageRequest: MessageFns<SendMessageRequest> = {
     }
     if (message.replyToId !== "") {
       writer.uint32(26).string(message.replyToId);
+    }
+    for (const v of message.attachmentIds) {
+      writer.uint32(34).string(v!);
     }
     return writer;
   },
@@ -1877,6 +2101,14 @@ export const SendMessageRequest: MessageFns<SendMessageRequest> = {
           message.replyToId = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.attachmentIds.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1899,6 +2131,11 @@ export const SendMessageRequest: MessageFns<SendMessageRequest> = {
         : isSet(object.reply_to_id)
         ? globalThis.String(object.reply_to_id)
         : "",
+      attachmentIds: globalThis.Array.isArray(object?.attachmentIds)
+        ? object.attachmentIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.attachment_ids)
+        ? object.attachment_ids.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -1913,6 +2150,9 @@ export const SendMessageRequest: MessageFns<SendMessageRequest> = {
     if (message.replyToId !== "") {
       obj.replyToId = message.replyToId;
     }
+    if (message.attachmentIds?.length) {
+      obj.attachmentIds = message.attachmentIds;
+    }
     return obj;
   },
 
@@ -1924,6 +2164,7 @@ export const SendMessageRequest: MessageFns<SendMessageRequest> = {
     message.conversationId = object.conversationId ?? "";
     message.body = object.body ?? "";
     message.replyToId = object.replyToId ?? "";
+    message.attachmentIds = object.attachmentIds?.map((e) => e) || [];
     return message;
   },
 };
@@ -2344,6 +2585,70 @@ export const MarkConversationReadRequest: MessageFns<MarkConversationReadRequest
   },
 };
 
+function createBaseClearConversationHistoryRequest(): ClearConversationHistoryRequest {
+  return { conversationId: "" };
+}
+
+export const ClearConversationHistoryRequest: MessageFns<ClearConversationHistoryRequest> = {
+  encode(message: ClearConversationHistoryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClearConversationHistoryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClearConversationHistoryRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClearConversationHistoryRequest {
+    return {
+      conversationId: isSet(object.conversationId)
+        ? globalThis.String(object.conversationId)
+        : isSet(object.conversation_id)
+        ? globalThis.String(object.conversation_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ClearConversationHistoryRequest): unknown {
+    const obj: any = {};
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClearConversationHistoryRequest>): ClearConversationHistoryRequest {
+    return ClearConversationHistoryRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClearConversationHistoryRequest>): ClearConversationHistoryRequest {
+    const message = createBaseClearConversationHistoryRequest();
+    message.conversationId = object.conversationId ?? "";
+    return message;
+  },
+};
+
 function createBaseSetTypingRequest(): SetTypingRequest {
   return { conversationId: "", isTyping: false };
 }
@@ -2508,6 +2813,130 @@ export const GetMessageEditHistoryRequest: MessageFns<GetMessageEditHistoryReque
     const message = createBaseGetMessageEditHistoryRequest();
     message.conversationId = object.conversationId ?? "";
     message.messageId = object.messageId ?? "";
+    return message;
+  },
+};
+
+function createBaseUploadChatAttachmentRequest(): UploadChatAttachmentRequest {
+  return { conversationId: "", fileName: "", contentType: "", fileData: new Uint8Array(0) };
+}
+
+export const UploadChatAttachmentRequest: MessageFns<UploadChatAttachmentRequest> = {
+  encode(message: UploadChatAttachmentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(18).string(message.fileName);
+    }
+    if (message.contentType !== "") {
+      writer.uint32(26).string(message.contentType);
+    }
+    if (message.fileData.length !== 0) {
+      writer.uint32(34).bytes(message.fileData);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UploadChatAttachmentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUploadChatAttachmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.contentType = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.fileData = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UploadChatAttachmentRequest {
+    return {
+      conversationId: isSet(object.conversationId)
+        ? globalThis.String(object.conversationId)
+        : isSet(object.conversation_id)
+        ? globalThis.String(object.conversation_id)
+        : "",
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+      contentType: isSet(object.contentType)
+        ? globalThis.String(object.contentType)
+        : isSet(object.content_type)
+        ? globalThis.String(object.content_type)
+        : "",
+      fileData: isSet(object.fileData)
+        ? bytesFromBase64(object.fileData)
+        : isSet(object.file_data)
+        ? bytesFromBase64(object.file_data)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: UploadChatAttachmentRequest): unknown {
+    const obj: any = {};
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    if (message.contentType !== "") {
+      obj.contentType = message.contentType;
+    }
+    if (message.fileData.length !== 0) {
+      obj.fileData = base64FromBytes(message.fileData);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UploadChatAttachmentRequest>): UploadChatAttachmentRequest {
+    return UploadChatAttachmentRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UploadChatAttachmentRequest>): UploadChatAttachmentRequest {
+    const message = createBaseUploadChatAttachmentRequest();
+    message.conversationId = object.conversationId ?? "";
+    message.fileName = object.fileName ?? "";
+    message.contentType = object.contentType ?? "";
+    message.fileData = object.fileData ?? new Uint8Array(0);
     return message;
   },
 };
@@ -3613,6 +4042,66 @@ export const MarkConversationReadResponse: MessageFns<MarkConversationReadRespon
   },
 };
 
+function createBaseClearConversationHistoryResponse(): ClearConversationHistoryResponse {
+  return { base: undefined };
+}
+
+export const ClearConversationHistoryResponse: MessageFns<ClearConversationHistoryResponse> = {
+  encode(message: ClearConversationHistoryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClearConversationHistoryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClearConversationHistoryResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClearConversationHistoryResponse {
+    return { base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined };
+  },
+
+  toJSON(message: ClearConversationHistoryResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClearConversationHistoryResponse>): ClearConversationHistoryResponse {
+    return ClearConversationHistoryResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClearConversationHistoryResponse>): ClearConversationHistoryResponse {
+    const message = createBaseClearConversationHistoryResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseSetTypingResponse(): SetTypingResponse {
   return { base: undefined };
 }
@@ -3749,6 +4238,86 @@ export const GetMessageEditHistoryResponse: MessageFns<GetMessageEditHistoryResp
       ? BaseResponse.fromPartial(object.base)
       : undefined;
     message.data = object.data?.map((e) => EditHistoryEntryProto.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseUploadChatAttachmentResponse(): UploadChatAttachmentResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UploadChatAttachmentResponse: MessageFns<UploadChatAttachmentResponse> = {
+  encode(message: UploadChatAttachmentResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      AttachmentProto.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UploadChatAttachmentResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUploadChatAttachmentResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = AttachmentProto.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UploadChatAttachmentResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? AttachmentProto.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UploadChatAttachmentResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = AttachmentProto.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UploadChatAttachmentResponse>): UploadChatAttachmentResponse {
+    return UploadChatAttachmentResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UploadChatAttachmentResponse>): UploadChatAttachmentResponse {
+    const message = createBaseUploadChatAttachmentResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? AttachmentProto.fromPartial(object.data)
+      : undefined;
     return message;
   },
 };
@@ -4721,6 +5290,18 @@ export const ChatServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * ClearConversationHistory clears the calling user's own view of a conversation's
+     * message history. Messages remain visible to other participants.
+     */
+    clearConversationHistory: {
+      name: "ClearConversationHistory",
+      requestType: ClearConversationHistoryRequest,
+      requestStream: false,
+      responseType: ClearConversationHistoryResponse,
+      responseStream: false,
+      options: {},
+    },
     /** SetTyping sets the typing indicator for the current user in a conversation. */
     setTyping: {
       name: "SetTyping",
@@ -4736,6 +5317,18 @@ export const ChatServiceDefinition = {
       requestType: GetMessageEditHistoryRequest,
       requestStream: false,
       responseType: GetMessageEditHistoryResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * UploadChatAttachment uploads a file to a conversation and returns its
+     * attachment metadata. The returned attachment_id is passed to SendMessage.
+     */
+    uploadChatAttachment: {
+      name: "UploadChatAttachment",
+      requestType: UploadChatAttachmentRequest,
+      requestStream: false,
+      responseType: UploadChatAttachmentResponse,
       responseStream: false,
       options: {},
     },
@@ -4768,6 +5361,31 @@ export const PresenceServiceDefinition = {
     },
   },
 } as const;
+
+function bytesFromBase64(b64: string): Uint8Array {
+  if ((globalThis as any).Buffer) {
+    return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+  } else {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+      arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+  }
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  if ((globalThis as any).Buffer) {
+    return globalThis.Buffer.from(arr).toString("base64");
+  } else {
+    const bin: string[] = [];
+    arr.forEach((byte) => {
+      bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+  }
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { useChatStore } from "@/stores/chat-store"
 import { ConversationList } from "./conversation-list"
 import { MessageThread } from "./message-thread"
+import { GroupSettingsPanel } from "./group-settings-panel"
 import { useConversations } from "@/hooks/iam/use-chat"
 import { getConversationDisplayName } from "@/types/iam/chat"
 
@@ -19,6 +20,7 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
   const setActive = useChatStore((s) => s.setActiveConversation)
   const conversations = useChatStore((s) => s.conversations)
   const setConversations = useChatStore((s) => s.setConversations)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { data } = useConversations()
   useEffect(() => {
@@ -52,7 +54,9 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
               currentUserId={currentUserId}
               participantCount={activeConv.participants.length}
               conversationName={getConversationDisplayName(activeConv, currentUserId)}
+              conversationType={activeConv.type}
               onClose={() => setActive(null)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
@@ -61,6 +65,15 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
           )}
         </div>
       </SheetContent>
+
+      {activeConv && activeConv.type === "GROUP" && (
+        <GroupSettingsPanel
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          conversation={activeConv}
+          currentUserId={currentUserId}
+        />
+      )}
     </Sheet>
   )
 }
