@@ -1,20 +1,30 @@
 "use client"
 
-import { useEffect, useRef, useMemo, useCallback } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { useChatStore } from "@/stores/chat-store"
 import { useMessages, useSendMessage, useMarkRead } from "@/hooks/iam/use-chat"
 import { MessageBubble } from "./message-bubble"
 import { MessageInput } from "./message-input"
 import { TypingIndicator } from "./typing-indicator"
+import { Button } from "@/components/ui/button"
+import { X } from "lucide-react"
 
 interface MessageThreadProps {
   conversationId: string
   currentUserId: string
   participantCount: number
+  conversationName: string
+  onClose?: () => void
 }
 
-export function MessageThread({ conversationId, currentUserId, participantCount }: MessageThreadProps) {
+export function MessageThread({
+  conversationId,
+  currentUserId,
+  participantCount,
+  conversationName,
+  onClose,
+}: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesMap = useChatStore(useShallow((s) => s.messages))
   const messages = useMemo(() => messagesMap[conversationId] ?? [], [messagesMap, conversationId])
@@ -55,8 +65,21 @@ export function MessageThread({ conversationId, currentUserId, participantCount 
     })
   }
 
+  const otherTypingUsers = typingUsers.filter((u) => u.id !== currentUserId)
+
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+        <span className="text-sm font-semibold truncate">{conversationName}</span>
+        {onClose && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
+        )}
+      </div>
+
       {/* Load more */}
       {hasNextPage && (
         <button
@@ -84,9 +107,7 @@ export function MessageThread({ conversationId, currentUserId, participantCount 
       </div>
 
       {/* Typing indicator */}
-      {typingUsers.filter((id) => id !== currentUserId).length > 0 && (
-        <TypingIndicator userIds={typingUsers.filter((id) => id !== currentUserId)} />
-      )}
+      {otherTypingUsers.length > 0 && <TypingIndicator users={otherTypingUsers} />}
 
       {/* Input */}
       <MessageInput onSend={(body) => sendMessage({ body })} onTyping={handleTyping} />

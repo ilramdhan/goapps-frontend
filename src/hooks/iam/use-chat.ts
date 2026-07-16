@@ -7,8 +7,11 @@ import {
   ChatMessage,
   RawConversation,
   RawMessage,
+  RawEditHistoryEntry,
+  EditHistoryEntry,
   normalizeConversation,
   normalizeMessage,
+  normalizeEditHistoryEntry,
 } from "@/types/iam/chat"
 
 interface BFFEnvelope<T> {
@@ -141,5 +144,62 @@ export function useCreateConversation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: chatKeys.conversations() })
     },
+  })
+}
+
+export function useEditMessage(conversationId: string, messageId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ body }: { body: string }): Promise<ChatMessage> => {
+      const res = await fetch(
+        `/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        }
+      )
+      const json = await parseEnvelope<RawMessage>(res)
+      return normalizeMessage(json.data ?? {})
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+    },
+  })
+}
+
+export function useDeleteMessage(conversationId: string, messageId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      const res = await fetch(
+        `/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      )
+      await parseEnvelope<unknown>(res)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
+    },
+  })
+}
+
+export function useEditHistory(conversationId: string, messageId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["iam", "chat", "messages", conversationId, messageId, "history"] as const,
+    queryFn: async (): Promise<EditHistoryEntry[]> => {
+      const res = await fetch(
+        `/api/v1/iam/chat/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/history`,
+        { credentials: "include" }
+      )
+      const json = await parseEnvelope<RawEditHistoryEntry[]>(res)
+      return (json.data ?? []).map(normalizeEditHistoryEntry)
+    },
+    enabled: enabled && !!conversationId && !!messageId,
+    staleTime: 0,
   })
 }

@@ -8,6 +8,7 @@ import { ConversationList } from "@/components/iam/chat/conversation-list"
 import { MessageThread } from "@/components/iam/chat/message-thread"
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/empty-state"
+import { getConversationDisplayName } from "@/types/iam/chat"
 import ChatLoading from "./loading"
 
 export function ChatPageClient() {
@@ -15,6 +16,7 @@ export function ChatPageClient() {
   const currentUserId = user?.userId ?? ""
 
   const activeId = useChatStore((s) => s.activeConversationId)
+  const setActive = useChatStore((s) => s.setActiveConversation)
   const conversations = useChatStore((s) => s.conversations)
   const setConversations = useChatStore((s) => s.setConversations)
 
@@ -42,6 +44,8 @@ export function ChatPageClient() {
               conversationId={activeConv.conversationId}
               currentUserId={currentUserId}
               participantCount={activeConv.participants.length}
+              conversationName={getConversationDisplayName(activeConv, currentUserId)}
+              onClose={() => setActive(null)}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-6">

@@ -3,11 +3,16 @@
 import { create } from "zustand"
 import { Conversation, ChatMessage, ChatSSEEvent } from "@/types/iam/chat"
 
+export interface TypingUser {
+  id: string
+  name: string
+}
+
 interface ChatState {
   conversations: Conversation[]
   activeConversationId: string | null
   messages: Record<string, ChatMessage[]> // conversationId → messages (oldest first)
-  typingUsers: Record<string, string[]> // conversationId → userIds
+  typingUsers: Record<string, TypingUser[]> // conversationId → users currently typing
   isOpen: boolean
 
   setConversations: (convs: Conversation[]) => void
@@ -18,7 +23,7 @@ interface ChatState {
   updateMessage: (convId: string, msg: ChatMessage) => void
   deleteMessage: (convId: string, msgId: string) => void
   setActiveConversation: (id: string | null) => void
-  setTyping: (convId: string, userId: string, isTyping: boolean) => void
+  setTyping: (convId: string, userId: string, userName: string, isTyping: boolean) => void
   decrementUnread: (convId: string) => void
   resetUnread: (convId: string) => void
   setOpen: (open: boolean) => void
@@ -77,14 +82,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
 
-  setTyping: (convId, userId, isTyping) =>
+  setTyping: (convId, userId, userName, isTyping) =>
     set((s) => {
       const current = s.typingUsers[convId] ?? []
       const next = isTyping
-        ? current.includes(userId)
+        ? current.some((u) => u.id === userId)
           ? current
-          : [...current, userId]
-        : current.filter((id) => id !== userId)
+          : [...current, { id: userId, name: userName }]
+        : current.filter((u) => u.id !== userId)
       return { typingUsers: { ...s.typingUsers, [convId]: next } }
     }),
 
@@ -130,7 +135,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (evt.messageId) deleteMessage(convId, evt.messageId)
         break
       case "typing":
-        if (evt.userId) setTyping(convId, evt.userId, evt.isTyping ?? false)
+        if (evt.userId) setTyping(convId, evt.userId, evt.userName ?? "Someone", evt.isTyping ?? false)
         break
       default:
         break

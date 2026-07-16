@@ -113,6 +113,16 @@ export interface EditHistoryEntry {
   editedAt: string
 }
 
+export interface RawEditHistoryEntry {
+  historyId?: number
+  history_id?: number
+  body?: string
+  editedBy?: string
+  edited_by?: string
+  editedAt?: string
+  edited_at?: string
+}
+
 export type ChatEventType =
   | "message_received"
   | "message_edited"
@@ -175,6 +185,15 @@ export function normalizeMessage(raw: RawMessage): ChatMessage {
     readReceipts: receipts,
     createdAt: raw.createdAt ?? raw.created_at ?? "",
     updatedAt: raw.updatedAt ?? raw.updated_at ?? "",
+  }
+}
+
+export function normalizeEditHistoryEntry(raw: RawEditHistoryEntry): EditHistoryEntry {
+  return {
+    historyId: raw.historyId ?? raw.history_id ?? 0,
+    body: raw.body ?? "",
+    editedBy: raw.editedBy ?? raw.edited_by ?? "",
+    editedAt: raw.editedAt ?? raw.edited_at ?? "",
   }
 }
 

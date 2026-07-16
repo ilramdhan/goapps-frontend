@@ -1,9 +1,21 @@
-interface TypingIndicatorProps {
-  userIds: string[]
+interface TypingUser {
+  id: string
+  name: string
 }
 
-export function TypingIndicator({ userIds }: TypingIndicatorProps) {
-  const label = userIds.length === 1 ? "Someone is typing..." : `${userIds.length} people are typing...`
+interface TypingIndicatorProps {
+  users: TypingUser[]
+}
+
+export function TypingIndicator({ users }: TypingIndicatorProps) {
+  const names = users.map((u) => u.name)
+  const label =
+    names.length === 1
+      ? `${names[0]} is typing...`
+      : names.length === 2
+        ? `${names[0]}, ${names[1]} are typing...`
+        : `${names.length} people are typing...`
+
   return (
     <div className="px-4 py-1 text-xs text-muted-foreground flex items-center gap-1">
       <span className="flex gap-0.5">

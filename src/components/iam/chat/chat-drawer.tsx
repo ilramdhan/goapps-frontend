@@ -2,8 +2,6 @@
 
 import { useEffect } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
 import { useChatStore } from "@/stores/chat-store"
 import { ConversationList } from "./conversation-list"
 import { MessageThread } from "./message-thread"
@@ -45,22 +43,13 @@ export function ChatDrawer({ currentUserId }: ChatDrawerProps) {
         {/* Message thread — hidden on mobile when no conversation is active */}
         <div className={`${activeId ? "flex" : "hidden sm:flex"} flex-1 flex-col min-w-0`}>
           {activeConv ? (
-            <>
-              {/* Mobile back button */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b sm:hidden">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setActive(null)}>
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium truncate">
-                  {getConversationDisplayName(activeConv, currentUserId)}
-                </span>
-              </div>
-              <MessageThread
-                conversationId={activeConv.conversationId}
-                currentUserId={currentUserId}
-                participantCount={activeConv.participants.length}
-              />
-            </>
+            <MessageThread
+              conversationId={activeConv.conversationId}
+              currentUserId={currentUserId}
+              participantCount={activeConv.participants.length}
+              conversationName={getConversationDisplayName(activeConv, currentUserId)}
+              onClose={() => setActive(null)}
+            />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Select a conversation to start chatting

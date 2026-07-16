@@ -5,13 +5,38 @@ import { Conversation, getConversationDisplayName, getConversationAvatar } from 
 import { usePresenceStore } from "@/stores/presence-store"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { formatDistanceToNow } from "date-fns"
+import { format, isToday, isYesterday } from "date-fns"
 
 interface ConversationItemProps {
   conversation: Conversation
   currentUserId: string
   isActive: boolean
   onClick: () => void
+}
+
+/**
+ * Compact time format for conversation previews — avoids the long
+ * "less than a minute ago" strings from formatDistanceToNow which wrap
+ * and crowd out the preview text.
+ *
+ * - < 1h: "5m" (minutes ago, "now" if < 1m)
+ * - today: "14:30"
+ * - yesterday: "Yesterday"
+ * - older: "Jul 15"
+ */
+export function formatChatTime(dateStr: string): string {
+  if (!dateStr) return ""
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const diffMs = Date.now() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+
+  if (diffMin < 1) return "now"
+  if (diffMin < 60) return `${diffMin}m`
+  if (isToday(date)) return format(date, "HH:mm")
+  if (isYesterday(date)) return "Yesterday"
+  return format(date, "MMM d")
 }
 
 export function ConversationItem({ conversation, currentUserId, isActive, onClick }: ConversationItemProps) {
@@ -24,7 +49,7 @@ export function ConversationItem({ conversation, currentUserId, isActive, onClic
       : null
   const online = otherUser ? isOnline(otherUser.userId) : false
   const lastMsgTime = conversation.lastMessage?.createdAt
-    ? formatDistanceToNow(new Date(conversation.lastMessage.createdAt), { addSuffix: true })
+    ? formatChatTime(conversation.lastMessage.createdAt)
     : ""
 
   return (
@@ -47,11 +72,13 @@ export function ConversationItem({ conversation, currentUserId, isActive, onClic
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium text-sm truncate">{displayName}</span>
-          {lastMsgTime && <span className="text-xs text-muted-foreground shrink-0">{lastMsgTime}</span>}
+          <span className="font-medium text-sm truncate min-w-0">{displayName}</span>
+          {lastMsgTime && (
+            <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{lastMsgTime}</span>
+          )}
         </div>
         {conversation.lastMessage && (
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-xs text-muted-foreground truncate max-w-full">
             {conversation.lastMessage.isDeleted ? "[deleted]" : conversation.lastMessage.body}
           </p>
         )}
