@@ -23,6 +23,7 @@ interface ChatState {
   updateMessage: (convId: string, msg: ChatMessage) => void
   deleteMessage: (convId: string, msgId: string) => void
   setActiveConversation: (id: string | null) => void
+  markReadBy: (convId: string, userId: string, readAt: string) => void
   setTyping: (convId: string, userId: string, userName: string, isTyping: boolean) => void
   decrementUnread: (convId: string) => void
   resetUnread: (convId: string) => void
@@ -82,6 +83,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
 
+  // markReadBy records that userId has read the conversation up to readAt.
+  // A single read event covers every message the reader can see, so we add the
+  // receipt to all messages that user does not already have one for. This is
+  // what flips the sender's checkmark from gray to blue in real time.
+  markReadBy: (convId, userId, readAt) =>
+    set((s) => {
+      const msgs = s.messages[convId]
+      if (!msgs) return {}
+      const next = msgs.map((m) =>
+        m.readReceipts.some((r) => r.userId === userId)
+          ? m
+          : { ...m, readReceipts: [...m.readReceipts, { userId, readAt }] }
+      )
+      return { messages: { ...s.messages, [convId]: next } }
+    }),
+
   setTyping: (convId, userId, userName, isTyping) =>
     set((s) => {
       const current = s.typingUsers[convId] ?? []
@@ -108,7 +125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setOpen: (open) => set({ isOpen: open }),
 
   handleSSEEvent: (evt) => {
-    const { appendMessage, updateMessage, deleteMessage, setTyping, activeConversationId } = get()
+    const { appendMessage, updateMessage, deleteMessage, markReadBy, setTyping, activeConversationId } = get()
     const convId = evt.conversationId ?? ""
     switch (evt.type) {
       case "message_received":
@@ -133,6 +150,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         break
       case "message_deleted":
         if (evt.messageId) deleteMessage(convId, evt.messageId)
+        break
+      case "read_receipt":
+        if (evt.userId) markReadBy(convId, evt.userId, evt.readAt ?? "")
         break
       case "typing":
         if (evt.userId) setTyping(convId, evt.userId, evt.userName ?? "Someone", evt.isTyping ?? false)
