@@ -1,7 +1,7 @@
 "use client"
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import { useCallback, useMemo, useRef, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 
 /**
  * Configuration for URL state serialization
@@ -121,10 +121,10 @@ export function useUrlState<T extends object>(
   }, [searchParams, defaultValues, deserialize])
 
   // Use ref to access current state in callback without adding it to dependencies
-  // This prevents setState from changing reference on every state change
+  // This prevents setState from changing reference on every state change.
+  // Sync the ref during render (not in an effect) so that setState always reads
+  // the latest state, even when called from other effects in the same cycle.
   const stateRef = useRef(state)
-
-  // Sync ref in effect to satisfy ESLint rules while keeping the pattern
   useEffect(() => {
     stateRef.current = state
   }, [state])
