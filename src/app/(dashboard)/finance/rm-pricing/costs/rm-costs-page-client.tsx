@@ -55,9 +55,15 @@ function RMCostsPageContent() {
   // Track whether the initial auto-select has fired (declared before listLoading uses it).
   const autoSelectedRef = useRef(false)
 
+  // Keep a ref to the latest filters.period so the auto-select effect always
+  // reads the most up-to-date value (avoids stale-closure issues).
+  const filtersPeriodRef = useRef(filters.period)
+  filtersPeriodRef.current = filters.period
+
   // Once autoSelectedRef is true the user has either received a default period
   // or deliberately picked "All Periods" (period=""), so we no longer block on
-  // !filters.period.
+  // !filters.period.  Also skip the "waiting" gate when a period is already
+  // present from the URL (e.g. after a page reload with ?period=202604).
   const listLoading = periodsLoading || (!autoSelectedRef.current && availablePeriods.length > 0 && !filters.period) || isLoading
 
   // Auto-select the latest available period ONCE on first load when the user
@@ -68,7 +74,9 @@ function RMCostsPageContent() {
     if (autoSelectedRef.current) return
     if (availablePeriods.length === 0) return
     autoSelectedRef.current = true
-    if (!filters.period) {
+    // Read period from ref to guarantee we see the latest value (the URL may
+    // already carry a period param after a page reload).
+    if (!filtersPeriodRef.current) {
       setFilters((prev) => ({ ...prev, period: availablePeriods[0], page: 1 }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
