@@ -2,7 +2,18 @@
 // Keyed by (type, status) so adding a new status is a one-line change and
 // every page renders the same color + label for the same status.
 
-export type StatusType = "request" | "route" | "job" | "chunk" | "cost" | "product" | "mbhead" | "generic";
+export type StatusType =
+  | "request"
+  | "route"
+  | "job"
+  | "chunk"
+  | "cost"
+  | "product"
+  | "mbhead"
+  | "ppcDemand"
+  | "ppcPlan"
+  | "ppcWo"
+  | "generic";
 
 // Base shadcn badge variants + two semantic extensions (success, warning) that
 // StatusBadge renders via className overrides (shadcn badge has no such
@@ -97,6 +108,39 @@ export const statusRegistry: Record<StatusType, Record<string, StatusDisplay>> =
     VALIDATED: { variant: "success", label: "Validated" },
     UN_APPROVED: { variant: "warning", label: "Un-Approved" },
     REVOKED: { variant: "destructive", label: "Revoked" },
+  },
+  // PPC — keyed by the short status token (see ppcStatusToken in types/ppc).
+  ppcDemand: {
+    PENDING_PRODUCT_LINK: { variant: "warning", label: "Pending Product Link" },
+    PENDING_CONFIRMATION: { variant: "warning", label: "Pending Confirmation" },
+    CONFIRMED: { variant: "default", label: "Confirmed" },
+    IN_PRODUCTION: { variant: "default", label: "In Production" },
+    PARTIAL: { variant: "warning", label: "Partial" },
+    FULFILLED: { variant: "success", label: "Fulfilled" },
+    CANCELLED: { variant: "outline", label: "Cancelled" },
+    CARRIED_OVER: { variant: "outline", label: "Carried Over" },
+    DEFERRED: { variant: "secondary", label: "Deferred" },
+    SPLIT: { variant: "secondary", label: "Split" },
+  },
+  ppcPlan: {
+    DRAFT: { variant: "secondary", label: "Draft" },
+    ACTIVE: { variant: "default", label: "Active" },
+    IN_PRODUCTION: { variant: "warning", label: "In Production" },
+    COMPLETED: { variant: "success", label: "Completed" },
+    CANCELLED: { variant: "outline", label: "Cancelled" },
+  },
+  ppcWo: {
+    DRAFT: { variant: "secondary", label: "Draft" },
+    SUBMITTED: { variant: "default", label: "Submitted" },
+    PC_APPROVED: { variant: "warning", label: "PC Approved" },
+    APPROVED: { variant: "success", label: "Approved" },
+    SCHEDULED: { variant: "default", label: "Scheduled" },
+    CHANGEOVER: { variant: "warning", label: "Changeover" },
+    RUNNING: { variant: "default", label: "Running" },
+    COMPLETED: { variant: "success", label: "Completed" },
+    CLOSED: { variant: "outline", label: "Closed" },
+    REJECTED: { variant: "destructive", label: "Rejected" },
+    CANCELLED: { variant: "outline", label: "Cancelled" },
   },
   generic: {},
 };
