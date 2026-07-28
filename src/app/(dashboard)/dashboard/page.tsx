@@ -18,8 +18,6 @@ import {
     Users,
     ShoppingCart,
     TrendingUp,
-    ArrowUpRight,
-    ArrowDownRight,
     Construction,
 } from "lucide-react"
 import dashboardData from "@/data/dashboard.json"

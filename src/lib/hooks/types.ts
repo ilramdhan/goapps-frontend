@@ -91,6 +91,7 @@ export type ServiceScope =
   | "inventory"
   | "iam"
   | "common"
+  | "ppc"
 
 /**
  * Options for creating CRUD hooks

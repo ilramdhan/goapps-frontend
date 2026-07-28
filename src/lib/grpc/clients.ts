@@ -49,6 +49,7 @@ import { RMCostServiceDefinition } from "@/types/generated/finance/v1/rm_cost"
 import { CostProductTypeServiceDefinition } from "@/types/generated/finance/v1/cost_product_type"
 import { CostRmTypeServiceDefinition } from "@/types/generated/finance/v1/cost_rm_type"
 import { CostProductMasterServiceDefinition } from "@/types/generated/finance/v1/cost_product_master"
+import { CostMasterLookupServiceDefinition } from "@/types/generated/finance/v1/cost_master_lookup"
 import {
   MbCompositionServiceDefinition,
   MbLustureServiceDefinition,
@@ -58,6 +59,7 @@ import {
   MbBatchServiceDefinition,
 } from "@/types/generated/finance/v1/yarn_master"
 import { CostRouteServiceDefinition } from "@/types/generated/finance/v1/cost_route"
+import { PPCServiceDefinition } from "@/types/generated/ppc/v1/ppc_service"
 import { CostRequestTypeServiceDefinition } from "@/types/generated/finance/v1/cost_request_type"
 import { CostPaperTubeTypeServiceDefinition } from "@/types/generated/finance/v1/cost_paper_tube_type"
 import { CostProductRequestServiceDefinition } from "@/types/generated/finance/v1/cost_product_request"
@@ -98,6 +100,7 @@ const CHANNEL_OPTIONS = {
 const SERVICE_ADDRESSES = {
   iam: `${process.env.IAM_GRPC_HOST || "localhost"}:${process.env.IAM_GRPC_PORT || "50052"}`,
   finance: `${process.env.FINANCE_GRPC_HOST || "localhost"}:${process.env.FINANCE_GRPC_PORT || "50051"}`,
+  ppc: `${process.env.PPC_GRPC_HOST || "localhost"}:${process.env.PPC_GRPC_PORT || "50053"}`,
 }
 
 // Type-safe global store for clients (survives HMR)
@@ -348,6 +351,14 @@ export function getCostProductMasterClient() {
   )
 }
 
+// CostMasterLookupService — read-only finance projections consumed by PPC pickers
+// (product master, released route, grades, parameters). PPC BFF proxies through this.
+export function getCostMasterLookupClient() {
+  return getOrCreate("costMasterLookup", () =>
+    createServiceClient(CostMasterLookupServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
 export function getCostRouteClient() {
   return getOrCreate("costRoute", () =>
     createServiceClient(CostRouteServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
@@ -529,5 +540,14 @@ export function getMbBatchClient() {
 export function getMbWorkflowLogClient() {
   return getOrCreate("mbWorkflowLog", () =>
     createServiceClient(MbWorkflowLogServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+// PPC service client (Production Planning & Control — services/ppc, gRPC :50053).
+// Single PPCService exposes every PPC RPC (masters, demand, plan, work-order,
+// daily-performance, dashboard). BFF routes proxy through this one client.
+export function getPpcClient() {
+  return getOrCreate("ppc", () =>
+    createServiceClient(PPCServiceDefinition, SERVICE_ADDRESSES.ppc, insecure, CHANNEL_OPTIONS)
   )
 }
