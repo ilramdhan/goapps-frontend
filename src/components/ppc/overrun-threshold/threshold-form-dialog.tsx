@@ -172,7 +172,7 @@ export function ThresholdFormDialog({ open, onOpenChange, threshold }: Threshold
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
               <FormField
                 control={form.control}
                 name="level"
@@ -267,7 +267,7 @@ export function ThresholdFormDialog({ open, onOpenChange, threshold }: Threshold
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
               <FormField
                 control={form.control}
                 name="warningValue"

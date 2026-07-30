@@ -605,7 +605,7 @@ export function PlanItemFormDialog({
                   )}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+                <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                   <FormField
                     control={form.control}
                     name="qtyTarget"
@@ -687,7 +687,7 @@ export function PlanItemFormDialog({
               </Section>
 
               <Section title="Schedule">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+                <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                   <FormField
                     control={form.control}
                     name="plannedStartDate"
@@ -739,7 +739,7 @@ export function PlanItemFormDialog({
               </Section>
 
               <Section title="Production">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+                <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                   <FormField
                     control={form.control}
                     name="machineGroupId"

@@ -130,7 +130,7 @@ export function PlanItemMultiSelect({ value, onChange, disabled }: PlanItemMulti
 
   return (
     <div className="space-y-3">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -138,12 +138,12 @@ export function PlanItemMultiSelect({ value, onChange, disabled }: PlanItemMulti
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="w-full justify-between font-normal"
+            className="w-full min-w-0 justify-between font-normal"
           >
             {value.length === 0 ? (
-              <span className="text-muted-foreground">Select plan items…</span>
+              <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">Select plan items…</span>
             ) : (
-              <span className="truncate">
+              <span className="min-w-0 flex-1 truncate text-left">
                 {value.length === 1
                   ? `${anchor.productCode} — ${anchor.productName}`
                   : `${value.length} plan items selected`}
@@ -207,18 +207,21 @@ export function PlanItemMultiSelect({ value, onChange, disabled }: PlanItemMulti
               className="flex items-start gap-3 rounded-md border p-2.5 text-sm"
             >
               <div className="min-w-0 flex-1">
+                {/* min-w-0 lets the name truncate instead of shoving the badge
+                    off the row; the badge stays pinned beside it however long
+                    the product name is. */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="truncate font-medium">
+                  <span className="min-w-0 flex-1 truncate font-medium">
                     {p.productCode} — {p.productName}
                   </span>
                   {i === 0 ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal">
+                    <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
                       Anchor
                     </Badge>
                   ) : (
                     !candidatesLoading &&
                     !candidateIds.has(p.planItemId) && (
-                      <Badge variant="destructive" className="text-[10px] font-normal">
+                      <Badge variant="destructive" className="shrink-0 text-[10px] font-normal">
                         Not mergeable
                       </Badge>
                     )

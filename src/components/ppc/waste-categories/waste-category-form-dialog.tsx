@@ -166,7 +166,7 @@ export function WasteCategoryFormDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
               <FormField
                 control={form.control}
                 name="area"
@@ -225,7 +225,7 @@ export function WasteCategoryFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
               <FormField
                 control={form.control}
                 name="code"
