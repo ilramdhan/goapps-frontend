@@ -46,7 +46,7 @@ export function DemandCombobox({
   const selected = useMemo(() => items.find((d) => d.demandId === value), [items, value])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -54,15 +54,15 @@ export function DemandCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn("w-full min-w-0 justify-between font-normal", className)}
         >
           {selected ? (
-            <span className="min-w-0 truncate">
+            <span className="min-w-0 flex-1 truncate text-left">
               <span className="text-muted-foreground">{selected.productCode}</span> — {selected.productName}
               {selected.contractNo && <span className="ml-2 text-xs text-muted-foreground">[{selected.contractNo}]</span>}
             </span>
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">{placeholder}</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

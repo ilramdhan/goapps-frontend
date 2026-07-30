@@ -66,7 +66,7 @@ export function ShiftEntryForm() {
         <CardHeader>
           <CardTitle className="text-sm font-semibold">Shift &amp; Positions</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <CardContent className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 md:grid-cols-4 [&>*]:min-w-0">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Area</Label>
             <Select value={String(area)} onValueChange={(v) => setArea(Number(v))}>
@@ -100,11 +100,19 @@ export function ShiftEntryForm() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Positions Total</Label>
-            <Input value={positionsTotal} onChange={(e) => setPositionsTotal(e.target.value)} />
+            <Input
+              placeholder="e.g., 216"
+              value={positionsTotal}
+              onChange={(e) => setPositionsTotal(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Positions Running</Label>
-            <Input value={positionsRunning} onChange={(e) => setPositionsRunning(e.target.value)} />
+            <Input
+              placeholder="e.g., 208"
+              value={positionsRunning}
+              onChange={(e) => setPositionsRunning(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -145,6 +153,7 @@ export function ShiftEntryForm() {
                 <Label className="text-xs text-muted-foreground">Duration (min)</Label>
                 <Input
                   type="number"
+                  placeholder="e.g., 45"
                   value={d.durationMin ?? ""}
                   onChange={(e) =>
                     setDowntime((arr) =>
@@ -156,6 +165,7 @@ export function ShiftEntryForm() {
               <div className="min-w-[140px] flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">Notes</Label>
                 <Input
+                  placeholder="Optional"
                   value={d.notes ?? ""}
                   onChange={(e) =>
                     setDowntime((arr) => arr.map((x, xi) => (xi === i ? { ...x, notes: e.target.value } : x)))
@@ -209,6 +219,7 @@ export function ShiftEntryForm() {
               <div className="w-28 space-y-1">
                 <Label className="text-xs text-muted-foreground">Qty (kg)</Label>
                 <Input
+                  placeholder="e.g., 12.5"
                   value={w.qtyKg}
                   onChange={(e) =>
                     setWaste((arr) => arr.map((x, xi) => (xi === i ? { ...x, qtyKg: e.target.value } : x)))
@@ -218,6 +229,7 @@ export function ShiftEntryForm() {
               <div className="min-w-[140px] flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">Notes</Label>
                 <Input
+                  placeholder="Optional"
                   value={w.notes ?? ""}
                   onChange={(e) =>
                     setWaste((arr) => arr.map((x, xi) => (xi === i ? { ...x, notes: e.target.value } : x)))

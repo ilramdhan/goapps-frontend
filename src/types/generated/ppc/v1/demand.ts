@@ -217,6 +217,15 @@ export interface Demand {
    * can name the row instead of rendering a placeholder dash.
    */
   orionItemCode: string;
+  /**
+   * Customer code/name resolved from the PPC customer master via customer_id.
+   * Denormalized for UI the same way product_code/product_name are: the demand
+   * list and detail must name the customer without a second round trip, and an
+   * id alone is never shown to a planner. Empty when customer_id is unset or
+   * the master row has since gone.
+   */
+  customerCode: string;
+  customerName: string;
   audit: AuditInfo | undefined;
 }
 
@@ -1892,6 +1901,8 @@ function createBaseDemand(): Demand {
     shadeName: "",
     productLinkReason: "",
     orionItemCode: "",
+    customerCode: "",
+    customerName: "",
     audit: undefined,
   };
 }
@@ -1990,6 +2001,12 @@ export const Demand: MessageFns<Demand> = {
     }
     if (message.orionItemCode !== "") {
       writer.uint32(258).string(message.orionItemCode);
+    }
+    if (message.customerCode !== "") {
+      writer.uint32(266).string(message.customerCode);
+    }
+    if (message.customerName !== "") {
+      writer.uint32(274).string(message.customerName);
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
@@ -2252,6 +2269,22 @@ export const Demand: MessageFns<Demand> = {
           message.orionItemCode = reader.string();
           continue;
         }
+        case 33: {
+          if (tag !== 266) {
+            break;
+          }
+
+          message.customerCode = reader.string();
+          continue;
+        }
+        case 34: {
+          if (tag !== 274) {
+            break;
+          }
+
+          message.customerName = reader.string();
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -2402,6 +2435,16 @@ export const Demand: MessageFns<Demand> = {
         : isSet(object.orion_item_code)
         ? globalThis.String(object.orion_item_code)
         : "",
+      customerCode: isSet(object.customerCode)
+        ? globalThis.String(object.customerCode)
+        : isSet(object.customer_code)
+        ? globalThis.String(object.customer_code)
+        : "",
+      customerName: isSet(object.customerName)
+        ? globalThis.String(object.customerName)
+        : isSet(object.customer_name)
+        ? globalThis.String(object.customer_name)
+        : "",
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
     };
   },
@@ -2501,6 +2544,12 @@ export const Demand: MessageFns<Demand> = {
     if (message.orionItemCode !== "") {
       obj.orionItemCode = message.orionItemCode;
     }
+    if (message.customerCode !== "") {
+      obj.customerCode = message.customerCode;
+    }
+    if (message.customerName !== "") {
+      obj.customerName = message.customerName;
+    }
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
@@ -2543,6 +2592,8 @@ export const Demand: MessageFns<Demand> = {
     message.shadeName = object.shadeName ?? "";
     message.productLinkReason = object.productLinkReason ?? "";
     message.orionItemCode = object.orionItemCode ?? "";
+    message.customerCode = object.customerCode ?? "";
+    message.customerName = object.customerName ?? "";
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;

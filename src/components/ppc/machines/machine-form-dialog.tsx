@@ -124,7 +124,12 @@ export function MachineFormDialog({ open, onOpenChange, machine }: MachineFormDi
                 <FormItem>
                   <FormLabel>Line</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} disabled={isPending} />
+                    <Input
+                      placeholder="e.g., Line A"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -161,6 +166,7 @@ export function MachineFormDialog({ open, onOpenChange, machine }: MachineFormDi
                     <Input
                       type="number"
                       step="any"
+                      placeholder="e.g., 12.5"
                       {...field}
                       value={field.value || ""}
                       disabled={isPending}
@@ -179,7 +185,12 @@ export function MachineFormDialog({ open, onOpenChange, machine }: MachineFormDi
                 <FormItem>
                   <FormLabel>Orion Code</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} disabled={isPending} />
+                    <Input
+                      placeholder="Optional — code in Orion"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

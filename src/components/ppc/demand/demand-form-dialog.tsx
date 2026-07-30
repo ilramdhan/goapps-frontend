@@ -220,7 +220,7 @@ export function DemandFormDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <ScrollableDialogBody className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="type"
@@ -312,7 +312,7 @@ export function DemandFormDialog({
                 />
               )}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="qtyOriginal"
@@ -353,7 +353,9 @@ export function DemandFormDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Grade sits with the AX/AM tolerances rather than alone: a lone
+                  half-width select left a dead column beside it. */}
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="gradeRequirement"
@@ -384,9 +386,6 @@ export function DemandFormDialog({
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="axMinPct"
@@ -428,7 +427,7 @@ export function DemandFormDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="contractNo"
@@ -463,7 +462,7 @@ export function DemandFormDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="customerId"
@@ -475,6 +474,12 @@ export function DemandFormDialog({
                           value={field.value ? Number(field.value) : undefined}
                           onChange={(customerId) => field.onChange(String(customerId))}
                           placeholder="Optional — search by code or name…"
+                          // A pulled demand already has a customer id but no
+                          // loaded search page to name it; the backend
+                          // decorates the record with code/name for exactly
+                          // this, so a disabled field still reads as itself.
+                          valueCode={demand?.customerCode}
+                          valueName={demand?.customerName}
                           disabled={isEditing || isPending}
                         />
                       </FormControl>
@@ -498,7 +503,7 @@ export function DemandFormDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="incoterm"

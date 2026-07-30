@@ -183,10 +183,22 @@ export default function DemandDetailClient({ demandId }: { demandId: number }) {
                 )}
               </dl>
 
-              {(demand.contractNo || demand.contractDate || demand.incoterm || demand.lcStatus || demand.stuffAdvanceNo) && (
+              {(demand.customerCode ||
+                demand.customerName ||
+                demand.contractNo ||
+                demand.contractDate ||
+                demand.incoterm ||
+                demand.lcStatus ||
+                demand.stuffAdvanceNo) && (
                 <div className="border-t pt-4">
-                  <p className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">Contract</p>
+                  <p className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">Commercial</p>
                   <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    {(demand.customerCode || demand.customerName) && (
+                      <Field label="Customer">
+                        <span className="font-mono text-xs">{demand.customerCode}</span>
+                        {demand.customerName && <span className="ml-2">{demand.customerName}</span>}
+                      </Field>
+                    )}
                     {demand.contractNo && <Field label="Contract No">{demand.contractNo}</Field>}
                     {demand.contractDate && <Field label="Contract Date">{fmtDate(demand.contractDate)}</Field>}
                     {demand.incoterm && <Field label="Incoterm">{demand.incoterm}</Field>}

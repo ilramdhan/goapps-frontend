@@ -170,7 +170,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} disabled={isPending} />
+                    <Input
+                      placeholder="e.g., PT Sinar Tekstil Nusantara"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -184,7 +189,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                 <FormItem>
                   <FormLabel>Short Name</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} disabled={isPending} />
+                    <Input
+                      placeholder="e.g., Sinar Tekstil"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -198,7 +208,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                 <FormItem>
                   <FormLabel>Tax No (NPWP)</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} disabled={isPending} />
+                    <Input
+                      placeholder="e.g., 01.234.567.8-901.000"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -213,6 +228,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                   <FormLabel>Parent Code</FormLabel>
                   <FormControl>
                     <Input
+                      placeholder="Optional — parent customer code"
                       {...field}
                       value={field.value || ""}
                       disabled={isPending}

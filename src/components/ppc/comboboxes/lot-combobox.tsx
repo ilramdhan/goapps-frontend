@@ -32,7 +32,7 @@ export function LotCombobox({
   const selected = useMemo(() => items.find((l) => l.lotNo === value), [items, value])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -40,12 +40,12 @@ export function LotCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn("w-full min-w-0 justify-between font-normal", className)}
         >
           {selected ? (
-            <span className="truncate font-mono">{selected.lotNo}</span>
+            <span className="min-w-0 flex-1 truncate text-left font-mono">{selected.lotNo}</span>
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">{placeholder}</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

@@ -233,7 +233,7 @@ export function CarryForwardWizard({ open, onOpenChange, onSuccess }: CarryForwa
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <div className="space-y-1">
                   <Label className="text-xs">Action</Label>
                   <Select value={String(action)} onValueChange={(v) => setAction(Number(v) as CarryAction)}>

@@ -17,19 +17,36 @@ interface CustomerComboboxProps {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /**
+   * Label for `value` when the caller already knows it (e.g. an edit form
+   * seeded from a demand the backend decorated with customer code/name).
+   *
+   * The search query only ever holds one page of customers, so a value outside
+   * that page has no label and the trigger would read as empty — which looks
+   * like "no customer" on a record that has one.
+   */
+  valueCode?: string
+  valueName?: string
 }
 
 export function CustomerCombobox({
-  value, onChange, placeholder = "Select customer…", disabled, className,
+  value, onChange, placeholder = "Select customer…", disabled, className, valueCode, valueName,
 }: CustomerComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const { data, isLoading } = useCustomers({ search, activeFilter: 1, pageSize: 50 })
   const items = useMemo(() => data?.data ?? [], [data])
-  const selected = useMemo(() => items.find((c) => c.customerId === value), [items, value])
+  const selected = useMemo(() => {
+    const found = items.find((c) => c.customerId === value)
+    if (found) return found
+    if (value && (valueCode || valueName)) {
+      return { customerCode: valueCode ?? "", customerName: valueName ?? "" }
+    }
+    return undefined
+  }, [items, value, valueCode, valueName])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -37,15 +54,17 @@ export function CustomerCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn("w-full min-w-0 justify-between font-normal", className)}
         >
           {selected ? (
-            <span className="truncate">
+            <span className="min-w-0 flex-1 truncate text-left">
               <span className="font-mono">{selected.customerCode}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{selected.customerName}</span>
+              {selected.customerName && (
+                <span className="ml-2 text-xs text-muted-foreground">{selected.customerName}</span>
+              )}
             </span>
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">{placeholder}</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

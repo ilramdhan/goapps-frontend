@@ -253,6 +253,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     <FormLabel>Lot No</FormLabel>
                     <FormControl>
                       <Input
+                        placeholder="e.g., L2607-0012"
                         {...field}
                         value={field.value || ""}
                         disabled={isEditing || isPending}
@@ -264,7 +265,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="itemCode"
@@ -272,7 +273,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     <FormItem>
                       <FormLabel>Item Code</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} disabled={isPending} />
+                        <Input
+                          placeholder="e.g., PTY-150-48"
+                          {...field}
+                          value={field.value || ""}
+                          disabled={isPending}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -285,7 +291,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     <FormItem>
                       <FormLabel>Shade Code</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} disabled={isPending} />
+                        <Input
+                          placeholder="e.g., NL"
+                          {...field}
+                          value={field.value || ""}
+                          disabled={isPending}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -293,7 +304,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="stdWeightFull"
@@ -304,11 +315,13 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <Input
                           type="number"
                           step="any"
+                          placeholder="e.g., 12.5"
                           {...field}
                           value={field.value || ""}
                           disabled={isPending}
                         />
                       </FormControl>
+                      <FormDescription>Standard weight of a full doff.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -323,6 +336,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <Input
                           type="number"
                           step="any"
+                          placeholder="e.g., 6.25"
                           {...field}
                           value={field.value || ""}
                           disabled={isPending}
@@ -344,7 +358,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     Yarn specification
                   </p>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="prodType"
@@ -370,7 +384,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>Yarn Type</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="e.g., DTY"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -383,7 +402,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>QC Grade</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="e.g., AA"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -391,7 +415,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="denier"
@@ -399,7 +423,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>Denier</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="e.g., 150"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -415,6 +444,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="1"
+                              placeholder="e.g., 48"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -444,7 +474,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="shadeColor"
@@ -452,7 +482,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>Shade Colour</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="e.g., Natural"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -465,7 +500,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>Description</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="Optional — free-text description"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -473,7 +513,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="tareBoxWeight"
@@ -484,6 +524,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="any"
+                              placeholder="e.g., 1.2"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -503,6 +544,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="any"
+                              placeholder="e.g., 0.35"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -522,6 +564,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="1"
+                              placeholder="e.g., 24"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -533,7 +576,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="sourceBobWeight"
@@ -544,6 +587,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="any"
+                              placeholder="e.g., 8.4"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -567,18 +611,22 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                             <Input
                               type="number"
                               step="1"
+                              placeholder="e.g., 96"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Expected machine efficiency for this lot.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                     <FormField
                       control={form.control}
                       name="orionItemCode"
@@ -588,6 +636,7 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                           <FormControl>
                             <Input
                               className="font-mono"
+                              placeholder="e.g., 1201150048"
                               {...field}
                               value={field.value || ""}
                               disabled={isPending}
@@ -604,7 +653,12 @@ export function LotFormDialog({ open, onOpenChange, lot }: LotFormDialogProps) {
                         <FormItem>
                           <FormLabel>Machine No</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ""} disabled={isPending} />
+                            <Input
+                              placeholder="e.g., TXT-07"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isPending}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

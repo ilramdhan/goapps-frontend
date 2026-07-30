@@ -230,7 +230,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-            <ScrollableDialogBody className="space-y-5">
+            <ScrollableDialogBody className="space-y-4">
               {!isEditing && (
                 <FormField
                   control={form.control}
@@ -254,7 +254,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
               )}
 
               {!isEditing && !!anchor && (
-                <div className="grid gap-3 rounded-lg border p-3 text-sm sm:grid-cols-2">
+                <div className="grid items-start gap-4 rounded-md border p-3 text-sm sm:grid-cols-2 [&>*]:min-w-0">
                   <div className="space-y-0.5">
                     <p className="text-xs text-muted-foreground">Route</p>
                     {routeLoading ? (
@@ -300,7 +300,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
                 </p>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="area"
@@ -388,7 +388,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
                 )}
               />
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="qtyTarget"
@@ -424,7 +424,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="gradeRequirement"
