@@ -35,6 +35,7 @@ import {
   ResolveWOParametersResponseParser,
   SaveWOParametersResponseParser,
   SaveWORmAllocationsResponseParser,
+  PopulateWORmFromRouteResponseParser,
   SaveWOExecutionResponseParser,
   ListWOExecutionsResponseParser,
   SubmitWOResponseParser,
@@ -117,6 +118,33 @@ export function useSaveWORmAllocations() {
       toast.success("RM allocations saved")
     },
     onError: (e: Error) => toast.error(e.message || "Failed to save RM allocations"),
+  })
+}
+
+/**
+ * useSuggestWORmAllocations fetches the RM allocation lines proposed by the
+ * WO's released route, with codes/names/stage attribution already resolved by
+ * the backend. Read-only — nothing is persisted until the panel saves.
+ *
+ * `enabled` is caller-controlled so the request is confined to the window where
+ * it is useful — the panel asks whenever its editor is open, including on a WO
+ * that already has saved lines, because the result is also the RM picker's
+ * option source (without it, hand-adding could only offer already-allocated
+ * RMs). Not re-prefilling over saved edits is the panel's job, not this hook's:
+ * it never seeds from a suggestion once a saved set exists.
+ */
+export function useSuggestWORmAllocations(woId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["ppc", "work-order", "rm-suggestions", woId],
+    queryFn: async () => {
+      const raw = await apiClient.post<unknown>(
+        `/api/v1/ppc/work-orders/${woId}/rm-allocations/populate-from-route`,
+        {}
+      )
+      return PopulateWORmFromRouteResponseParser.fromJSON(raw).data || []
+    },
+    enabled: enabled && woId > 0,
+    staleTime: 60_000,
   })
 }
 

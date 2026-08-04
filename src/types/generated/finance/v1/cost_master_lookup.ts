@@ -119,6 +119,16 @@ export interface CostMasterRouteRm {
   /** decimal-as-string */
   routeRmRatio: string;
   subType: string;
+  /**
+   * Resolved human-readable identity of the RM edge, so consumers never have to
+   * render a raw id. Both are derived server-side by rm_type:
+   *   PRODUCT -> cost_product_master (product_code / product_name)
+   *   ITEM    -> cost_erp_item       (item_code / item_name)
+   *   GROUP   -> cst_rm_group_head   (group_code / group_name)
+   * Empty when the referenced master row is missing.
+   */
+  rmCode: string;
+  rmName: string;
 }
 
 /** CostMasterRouteStage is a lightweight route stage projection. */
@@ -1492,6 +1502,8 @@ function createBaseCostMasterRouteRm(): CostMasterRouteRm {
     rmGroupCode: "",
     routeRmRatio: "",
     subType: "",
+    rmCode: "",
+    rmName: "",
   };
 }
 
@@ -1520,6 +1532,12 @@ export const CostMasterRouteRm: MessageFns<CostMasterRouteRm> = {
     }
     if (message.subType !== "") {
       writer.uint32(66).string(message.subType);
+    }
+    if (message.rmCode !== "") {
+      writer.uint32(74).string(message.rmCode);
+    }
+    if (message.rmName !== "") {
+      writer.uint32(82).string(message.rmName);
     }
     return writer;
   },
@@ -1595,6 +1613,22 @@ export const CostMasterRouteRm: MessageFns<CostMasterRouteRm> = {
           message.subType = reader.string();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.rmCode = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.rmName = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1646,6 +1680,16 @@ export const CostMasterRouteRm: MessageFns<CostMasterRouteRm> = {
         : isSet(object.sub_type)
         ? globalThis.String(object.sub_type)
         : "",
+      rmCode: isSet(object.rmCode)
+        ? globalThis.String(object.rmCode)
+        : isSet(object.rm_code)
+        ? globalThis.String(object.rm_code)
+        : "",
+      rmName: isSet(object.rmName)
+        ? globalThis.String(object.rmName)
+        : isSet(object.rm_name)
+        ? globalThis.String(object.rm_name)
+        : "",
     };
   },
 
@@ -1675,6 +1719,12 @@ export const CostMasterRouteRm: MessageFns<CostMasterRouteRm> = {
     if (message.subType !== "") {
       obj.subType = message.subType;
     }
+    if (message.rmCode !== "") {
+      obj.rmCode = message.rmCode;
+    }
+    if (message.rmName !== "") {
+      obj.rmName = message.rmName;
+    }
     return obj;
   },
 
@@ -1691,6 +1741,8 @@ export const CostMasterRouteRm: MessageFns<CostMasterRouteRm> = {
     message.rmGroupCode = object.rmGroupCode ?? "";
     message.routeRmRatio = object.routeRmRatio ?? "";
     message.subType = object.subType ?? "";
+    message.rmCode = object.rmCode ?? "";
+    message.rmName = object.rmName ?? "";
     return message;
   },
 };
