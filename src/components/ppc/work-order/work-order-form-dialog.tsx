@@ -41,6 +41,7 @@ import { useCreateWorkOrder, useUpdateWorkOrder } from "@/hooks/ppc/use-work-ord
 import { useProductRoute } from "@/hooks/ppc/use-products-search"
 import { MachineCombobox, LookupCombobox } from "@/components/ppc/comboboxes"
 import { PlanItemMultiSelect } from "./plan-item-multi-select"
+import { LotErrorHint } from "./lot-error-hint"
 
 // The route and the demand are NOT planner inputs. Planning already broke the
 // product's route into one plan item per level (an FG_DELIVERY item plus the
@@ -101,9 +102,13 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
   // Structural reset — a freshly opened dialog must not inherit the previous
   // session's picks, and setting state from an effect is a React Compiler error.
   const [wasOpen, setWasOpen] = useState(false)
+  // The last submit failure, kept so a lot problem stays readable (with its
+  // fixing link) instead of disappearing with the toast.
+  const [submitError, setSubmitError] = useState<string | undefined>(undefined)
   if (open && !wasOpen) {
     setWasOpen(true)
     setPlanItems([])
+    setSubmitError(undefined)
   } else if (!open && wasOpen) {
     setWasOpen(false)
   }
@@ -158,6 +163,7 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
   }, [open, workOrder, form])
 
   const onSubmit = async (values: FormValues) => {
+    setSubmitError(undefined)
     try {
       if (isEditing && workOrder) {
         await updateMutation.mutateAsync({
@@ -211,6 +217,10 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
       onOpenChange(false)
     } catch (e) {
       console.error("Failed to save work order:", e)
+      // Keep the dialog open and hold on to the server's own sentence: a lot
+      // failure names a master the planner must go and fix, which is unreadable
+      // in a toast that disappears.
+      setSubmitError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -231,6 +241,10 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <ScrollableDialogBody className="space-y-4">
+              {/* A lot failure is not something the planner can fix inside this
+                  dialog, so it stays on screen with a link to the right master
+                  rather than vanishing with the toast. */}
+              <LotErrorHint message={submitError} />
               {!isEditing && (
                 <FormField
                   control={form.control}
@@ -379,8 +393,10 @@ export function WorkOrderFormDialog({ open, onOpenChange, workOrder }: WorkOrder
                     </FormControl>
                     {!isEditing && (
                       <FormDescription>
-                        Leave blank and a lot number is generated and registered for you. An
-                        existing lot must already be registered in the lot master.
+                        <strong>Leave this blank</strong> and a lot number is generated for you and
+                        registered in the lot master automatically — this is the usual choice. Only
+                        type a lot number if it is <em>already</em> registered in the lot master; an
+                        unknown one is rejected rather than created.
                       </FormDescription>
                     )}
                     <FormMessage />
