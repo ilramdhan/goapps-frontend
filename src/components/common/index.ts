@@ -8,3 +8,27 @@ export { KpiGrid, type KpiGridProps } from "./kpi-grid"
 export { EmptyState, type EmptyStateProps } from "./empty-state"
 export { StatusBadge, type StatusBadgeProps } from "./status-badge"
 export { MentionableTextarea, MentionContent } from "./mentionable-textarea"
+
+// Touch / tablet primitives
+export {
+  NumericKeypad,
+  NumericKeypadDialog,
+  KeypadTarget,
+  keypadAppend,
+  keypadBackspace,
+  type NumericKeypadProps,
+  type NumericKeypadDialogProps,
+  type KeypadTargetProps,
+} from "./numeric-keypad"
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedOption,
+} from "./segmented-control"
+export {
+  OptionTileGrid,
+  OptionTileGridLoading,
+  type OptionTileGridProps,
+  type OptionTile,
+} from "./option-tile-grid"
+export { TouchStepper, type TouchStepperProps, type TouchStep } from "./touch-stepper"

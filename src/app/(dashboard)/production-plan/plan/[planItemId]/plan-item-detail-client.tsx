@@ -10,7 +10,7 @@ import { PageHeader, StatusBadge, EmptyState } from "@/components/common"
 import { PlanItemConfirmDialog } from "@/components/ppc/plan/plan-item-confirm-dialog"
 
 import { usePlanItem } from "@/hooks/ppc/use-plan-item"
-import { PLAN_ITEM_TYPE_LABELS, PlanItemStatus, planItemStatusToken } from "@/types/ppc/common"
+import { PLAN_ITEM_TYPE_LABELS, PLAN_CARRY_ACTION_LABELS, PlanItemStatus, planItemStatusToken } from "@/types/ppc/common"
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -111,6 +111,16 @@ export default function PlanItemDetailClient({ planItemId }: { planItemId: numbe
               <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Field label="Type">{PLAN_ITEM_TYPE_LABELS[item.type] || "-"}</Field>
                 <Field label="Month">{item.month || "-"}</Field>
+                {item.carryFromItemId > 0 && (
+                  <Field label="Source">
+                    <Link
+                      href={`/production-plan/plan/${item.carryFromItemId}`}
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      {PLAN_CARRY_ACTION_LABELS[item.carryAction] || "Carried"} in {item.month}
+                    </Link>
+                  </Field>
+                )}
                 <Field label="Qty Target">{fmtQty(item.qtyTarget)}</Field>
                 <Field label="Deadline">{fmtDate(item.deadline)}</Field>
                 <Field label="Sequence">{item.sequence || "-"}</Field>

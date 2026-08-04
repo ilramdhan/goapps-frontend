@@ -8,6 +8,7 @@ export {
   DemandSource,
   DemandStatus,
   CarryAction,
+  PlanCarryAction,
   GradeReq,
   PlanItemType,
   PlanItemStatus,
@@ -44,6 +45,7 @@ import {
   DemandSubType,
   DemandSource,
   CarryAction,
+  PlanCarryAction,
   GradeReq,
   PlanItemType,
   PlanItemStatus,
@@ -123,6 +125,132 @@ export const CARRY_ACTION_LABELS: Record<number, string> = {
   [CarryAction.CARRY_ACTION_DEFER]: "Defer",
   [CarryAction.CARRY_ACTION_PARTIAL_CARRY]: "Partial Carry",
   [CarryAction.CARRY_ACTION_CANCEL]: "Cancel",
+}
+
+// What each action actually does, taken from the backend rather than from the
+// label. Source of truth: services/ppc/internal/application/demand/
+// carry_forward.go — carryAsIs / carrySplit / carryDefer / carryPartial /
+// carryCancel. Keep these in step with that file; a label like "Partial Carry"
+// does not by itself tell the user that the uncarried remainder is dropped.
+//
+// `{sourceMonth}` is substituted by carryActionDescription() with a spelled-out
+// month. Do not read this map directly in a component — DEFER is wrong without
+// the substitution.
+export const CARRY_ACTION_DESCRIPTIONS: Record<number, string> = {
+  [CarryAction.CARRY_ACTION_UNSPECIFIED]: "",
+  [CarryAction.CARRY_ACTION_CARRY_AS_IS]:
+    "Creates one new demand in the target month for the whole remaining qty. The original is marked Carried Over.",
+  [CarryAction.CARRY_ACTION_SPLIT]:
+    "Creates one new demand per split, each with its own qty and deadline, in the target month. The splits must total no more than the remaining qty; any leftover is not carried. The original is marked Split.",
+  // Not "offered again next month". carryDefer (carry_forward.go:150-158) only
+  // flips the status — pd_month is never written. ListCarryCandidates filters
+  // WHERE pd_month = $1 (demand_repository.go:212), so a deferred demand stays
+  // a candidate *of its original month* only, and reappears solely when the
+  // user points the source month back at it.
+  [CarryAction.CARRY_ACTION_DEFER]:
+    "Creates nothing. The demand stays in {sourceMonth} and is marked Deferred — it is offered again only when you carry {sourceMonth} forward again, not automatically next month. Target month and deadline are ignored.",
+  [CarryAction.CARRY_ACTION_PARTIAL_CARRY]:
+    "Creates one new demand in the target month for just the qty you enter. The original is marked Carried Over, so the qty you do not carry is dropped.",
+  [CarryAction.CARRY_ACTION_CANCEL]:
+    "Creates nothing. The demand is marked Cancelled and its remaining qty is written off. This cannot be undone.",
+}
+
+/** Resolves an action's effect description against the month being carried. */
+export function carryActionDescription(action: number, sourceMonthLabel: string): string {
+  return (CARRY_ACTION_DESCRIPTIONS[action] ?? "").replaceAll("{sourceMonth}", sourceMonthLabel)
+}
+
+// Actions that produce no demand in the target month, so the target month and
+// deadline inputs are irrelevant for them (carryDefer / carryCancel take only
+// the source demand — carry_forward.go:150 and :160).
+export const CARRY_ACTIONS_WITHOUT_TARGET: readonly CarryAction[] = [
+  CarryAction.CARRY_ACTION_DEFER,
+  CarryAction.CARRY_ACTION_CANCEL,
+]
+
+// Actions that irreversibly destroy remaining qty and must be confirmed before
+// they run. Cancel() is a terminal transition (state_machine.go:41) — there is
+// no route back out of CANCELLED.
+export const CARRY_ACTIONS_IRREVERSIBLE: readonly CarryAction[] = [CarryAction.CARRY_ACTION_CANCEL]
+
+// Past-tense outcome shown on a row once its action has been applied in this
+// session. "Carried" is only true of the two actions that actually create a
+// demand in the target month.
+export const CARRY_ACTION_OUTCOME_LABELS: Record<number, string> = {
+  [CarryAction.CARRY_ACTION_CARRY_AS_IS]: "Carried",
+  [CarryAction.CARRY_ACTION_PARTIAL_CARRY]: "Partly carried",
+  [CarryAction.CARRY_ACTION_SPLIT]: "Split",
+  [CarryAction.CARRY_ACTION_DEFER]: "Deferred",
+  [CarryAction.CARRY_ACTION_CANCEL]: "Cancelled",
+}
+
+// ── Plan-item carry-forward ─────────────────────────────────────────────────
+
+export const PLAN_CARRY_ACTION_LABELS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED]: "—",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]: "Carry As Is",
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]: "Partial Carry",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]: "Close",
+}
+
+// What each plan-item action actually does. Every sentence below is derived
+// from a specific code path, not from its own label — a description that
+// flatters its label is worse than none, because the user acts on it.
+//
+// Source of truth: services/ppc/internal/application/planitem/carry_forward.go
+// and internal/domain/planitem/entity.go.
+//
+// `{targetMonth}` is substituted by planCarryActionDescription().
+export const PLAN_CARRY_ACTION_DESCRIPTIONS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED]: "",
+  // createCarriedItem (carry_forward.go) builds a NEW plan item with the source's
+  // product, demand link, machine group, preferred machine, shade and notes, in
+  // cmd.TargetMonth with MonthOverride: true. carryQty() sizes it at
+  // QtyUncovered() — qty_target minus non-void work-order coverage — never at
+  // qty_target. The source is deliberately not touched: it keeps its status,
+  // its month, and its work-order links (see the comment at the end of
+  // createCarriedItem explaining why, unlike a demand, it is not closed).
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]:
+    "Creates a new plan item in {targetMonth} for the quantity no work order has claimed yet, keeping the same product, demand, machine group and preferred machine. The original stays in its own month exactly as it is, with its work orders intact.",
+  // Same path, with carryQty() returning cmd.CarryQty after checking it against
+  // uncovered — over-asking is rejected (ErrCarryQtyExceedsUncovered), not
+  // clamped. Nothing writes off the remainder: unlike the demand's
+  // PARTIAL_CARRY, the source plan item is untouched, so the part not carried
+  // is still plannable where it is.
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]:
+    "Creates a new plan item in {targetMonth} for just the quantity you enter, which cannot exceed the unclaimed quantity. The original is left untouched, so whatever you do not carry stays plannable in its own month.",
+  // carryCancel() calls PlanItem.Close() → status CLOSED, and writes one
+  // production_plan_log row. CLOSED has no outbound transition
+  // (state_machine.go), so it cannot be reopened.
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]:
+    "Creates nothing. The plan item is closed where it is and recorded in its change log. A closed plan item cannot be reopened.",
+}
+
+/** Resolves a plan-item action's effect description against the target month. */
+export function planCarryActionDescription(action: number, targetMonthLabel: string): string {
+  return (PLAN_CARRY_ACTION_DESCRIPTIONS[action] ?? "").replaceAll(
+    "{targetMonth}",
+    targetMonthLabel
+  )
+}
+
+// Actions that create nothing in the target month, so the target month and
+// deadline inputs do not apply. carryCancel() takes only the source item.
+export const PLAN_CARRY_ACTIONS_WITHOUT_TARGET: readonly PlanCarryAction[] = [
+  PlanCarryAction.PLAN_CARRY_ACTION_CANCEL,
+]
+
+// Actions that cannot be undone. CLOSED is terminal in the plan-item state
+// machine — allowedTransitions[StatusClosed] is empty.
+export const PLAN_CARRY_ACTIONS_IRREVERSIBLE: readonly PlanCarryAction[] = [
+  PlanCarryAction.PLAN_CARRY_ACTION_CANCEL,
+]
+
+// Past-tense outcome shown once an action has been applied in this session.
+export const PLAN_CARRY_ACTION_OUTCOME_LABELS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]: "Carried",
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]: "Partly carried",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]: "Closed",
 }
 
 export const GRADE_REQ_LABELS: Record<number, string> = {
@@ -252,9 +380,34 @@ export function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 }
 
-/** Today as ISO date "YYYY-MM-DD". */
+/**
+ * Today as ISO date "YYYY-MM-DD", in **UTC**.
+ *
+ * Prefer `todayLocalIso()` for anything a user reads or compares against a
+ * production date — for an operator in WIB (UTC+7) this returns yesterday until
+ * 07:00 local. Kept as-is because other screens depend on the existing
+ * behaviour.
+ */
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Today as ISO date "YYYY-MM-DD" in the browser's own timezone.
+ *
+ * This is the correct default for a production date: an operator recording a
+ * shift means their calendar day, not UTC's. Using `todayIso()` for the same
+ * value makes the entry form and the log table it feeds disagree by a day.
+ */
+export function todayLocalIso(): string {
+  return localIsoOffset(0)
+}
+
+/** ISO date `days` before today, in local time. `0` is today. */
+export function localIsoOffset(days: number): string {
+  const now = new Date()
+  const off = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - off - days * 86_400_000).toISOString().slice(0, 10)
 }
 
 /**

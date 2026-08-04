@@ -117,6 +117,21 @@ export interface WORmAllocation {
   /** decimal-as-string */
   qtyAllocated: string;
   notes: string;
+  /**
+   * Presentation-only decoration resolved from the product's released route
+   * (finance CostMasterRouteRm). crm_rm_id stays the wire identity; these exist
+   * so no consumer ever has to render that raw id to a user. Empty when the
+   * route is unavailable or the edge is no longer part of it.
+   */
+  rmCode: string;
+  /** display name of the RM edge */
+  rmName: string;
+  /** owning route stage (attribution) */
+  routeStageName: string;
+  /** owning route stage level */
+  routeLevel: number;
+  /** decimal-as-string, ratio the qty suggestion came from */
+  routeRmRatio: string;
 }
 
 /**
@@ -656,6 +671,81 @@ export interface ListMergeCandidatesRequest {
 export interface ListMergeCandidatesResponse {
   base: BaseResponse | undefined;
   data: PlanItem[];
+}
+
+/**
+ * WorkOrderCarryCandidate is one WO that may be carried into a new month,
+ * decorated with everything the planner needs to decide without seeing an id.
+ */
+export interface WorkOrderCarryCandidate {
+  wo:
+    | WorkOrder
+    | undefined;
+  /**
+   * Qty not yet produced: QtyTarget − SUM(production actual, actual first then
+   * bobbin per row). Non-positive means fully produced — ineligible with reason.
+   */
+  remainingQty: string;
+  /** Human label for the machine this WO runs on. */
+  machineLabel: string;
+  /** Human label for the product this WO produces. */
+  productLabel: string;
+  /** Ineligibility reason, empty when the WO is eligible to carry. */
+  ineligibilityReason: string;
+  /**
+   * True when a WO in the target month already names this one as its carry
+   * source — a second run over the same source shows it as done.
+   */
+  alreadyCarried: boolean;
+}
+
+/** Which WOs can be carried into a target month out of a source month. */
+export interface ListWorkOrderCarryForwardCandidatesRequest {
+  sourceMonth: string;
+  targetMonth: string;
+}
+
+export interface ListWorkOrderCarryForwardCandidatesResponse {
+  base: BaseResponse | undefined;
+  data: WorkOrderCarryCandidate[];
+}
+
+/**
+ * One WO carry action. The action vocabulary is narrower than demand carry
+ * because WOs are production instructions, not quantity balances: a carried WO
+ * is always a continuation, and rejecting it to close-reroute is a manual
+ * planner decision on the source WO's own detail page.
+ */
+export interface ProcessWorkOrderCarryForwardRequest {
+  sourceWoId: number;
+  targetMonth: string;
+  /**
+   * Lot number for the continuation. Blank means auto-generate via the
+   * lot-provisioning path, exactly like creating a WO from scratch. An explicit
+   * value must already exist in lot_master (validateLot).
+   *
+   * Bound matches work_order.wo_lot_no VARCHAR(30), as every other lot_no field
+   * in this file does. At 50 a 31..50-char lot cleared validation and then failed
+   * at INSERT as a raw driver error, which reaches the planner as a 500 instead
+   * of a field-level complaint. Generated lots are 10 chars, so nothing real is
+   * excluded by the tighter bound.
+   */
+  lotNo: string;
+  /**
+   * Qty to carry. When unset or zero, the whole remaining qty is carried.
+   *
+   * The pattern admits the empty string: full-remainder is the ordinary case and
+   * the BFF sends "" for it. The previous rule had no empty alternative, so the
+   * documented unset path was unreachable through the RPC — every carry that
+   * left the qty blank was refused at the validation boundary before the handler
+   * (which already checks `req.CarryQty != ""`) could apply the default.
+   */
+  carryQty: string;
+}
+
+export interface ProcessWorkOrderCarryForwardResponse {
+  base: BaseResponse | undefined;
+  data: WorkOrder | undefined;
 }
 
 function createBaseWOParameter(): WOParameter {
@@ -1298,6 +1388,11 @@ function createBaseWORmAllocation(): WORmAllocation {
     shadeCode: "",
     qtyAllocated: "",
     notes: "",
+    rmCode: "",
+    rmName: "",
+    routeStageName: "",
+    routeLevel: 0,
+    routeRmRatio: "",
   };
 }
 
@@ -1332,6 +1427,21 @@ export const WORmAllocation: MessageFns<WORmAllocation> = {
     }
     if (message.notes !== "") {
       writer.uint32(82).string(message.notes);
+    }
+    if (message.rmCode !== "") {
+      writer.uint32(90).string(message.rmCode);
+    }
+    if (message.rmName !== "") {
+      writer.uint32(98).string(message.rmName);
+    }
+    if (message.routeStageName !== "") {
+      writer.uint32(106).string(message.routeStageName);
+    }
+    if (message.routeLevel !== 0) {
+      writer.uint32(112).int32(message.routeLevel);
+    }
+    if (message.routeRmRatio !== "") {
+      writer.uint32(122).string(message.routeRmRatio);
     }
     return writer;
   },
@@ -1423,6 +1533,46 @@ export const WORmAllocation: MessageFns<WORmAllocation> = {
           message.notes = reader.string();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.rmCode = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.rmName = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.routeStageName = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 112) {
+            break;
+          }
+
+          message.routeLevel = reader.int32();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.routeRmRatio = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1480,6 +1630,31 @@ export const WORmAllocation: MessageFns<WORmAllocation> = {
         ? globalThis.String(object.qty_allocated)
         : "",
       notes: isSet(object.notes) ? globalThis.String(object.notes) : "",
+      rmCode: isSet(object.rmCode)
+        ? globalThis.String(object.rmCode)
+        : isSet(object.rm_code)
+        ? globalThis.String(object.rm_code)
+        : "",
+      rmName: isSet(object.rmName)
+        ? globalThis.String(object.rmName)
+        : isSet(object.rm_name)
+        ? globalThis.String(object.rm_name)
+        : "",
+      routeStageName: isSet(object.routeStageName)
+        ? globalThis.String(object.routeStageName)
+        : isSet(object.route_stage_name)
+        ? globalThis.String(object.route_stage_name)
+        : "",
+      routeLevel: isSet(object.routeLevel)
+        ? globalThis.Number(object.routeLevel)
+        : isSet(object.route_level)
+        ? globalThis.Number(object.route_level)
+        : 0,
+      routeRmRatio: isSet(object.routeRmRatio)
+        ? globalThis.String(object.routeRmRatio)
+        : isSet(object.route_rm_ratio)
+        ? globalThis.String(object.route_rm_ratio)
+        : "",
     };
   },
 
@@ -1515,6 +1690,21 @@ export const WORmAllocation: MessageFns<WORmAllocation> = {
     if (message.notes !== "") {
       obj.notes = message.notes;
     }
+    if (message.rmCode !== "") {
+      obj.rmCode = message.rmCode;
+    }
+    if (message.rmName !== "") {
+      obj.rmName = message.rmName;
+    }
+    if (message.routeStageName !== "") {
+      obj.routeStageName = message.routeStageName;
+    }
+    if (message.routeLevel !== 0) {
+      obj.routeLevel = Math.round(message.routeLevel);
+    }
+    if (message.routeRmRatio !== "") {
+      obj.routeRmRatio = message.routeRmRatio;
+    }
     return obj;
   },
 
@@ -1533,6 +1723,11 @@ export const WORmAllocation: MessageFns<WORmAllocation> = {
     message.shadeCode = object.shadeCode ?? "";
     message.qtyAllocated = object.qtyAllocated ?? "";
     message.notes = object.notes ?? "";
+    message.rmCode = object.rmCode ?? "";
+    message.rmName = object.rmName ?? "";
+    message.routeStageName = object.routeStageName ?? "";
+    message.routeLevel = object.routeLevel ?? 0;
+    message.routeRmRatio = object.routeRmRatio ?? "";
     return message;
   },
 };
@@ -8059,6 +8254,546 @@ export const ListMergeCandidatesResponse: MessageFns<ListMergeCandidatesResponse
       ? BaseResponse.fromPartial(object.base)
       : undefined;
     message.data = object.data?.map((e) => PlanItem.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseWorkOrderCarryCandidate(): WorkOrderCarryCandidate {
+  return {
+    wo: undefined,
+    remainingQty: "",
+    machineLabel: "",
+    productLabel: "",
+    ineligibilityReason: "",
+    alreadyCarried: false,
+  };
+}
+
+export const WorkOrderCarryCandidate: MessageFns<WorkOrderCarryCandidate> = {
+  encode(message: WorkOrderCarryCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.wo !== undefined) {
+      WorkOrder.encode(message.wo, writer.uint32(10).fork()).join();
+    }
+    if (message.remainingQty !== "") {
+      writer.uint32(18).string(message.remainingQty);
+    }
+    if (message.machineLabel !== "") {
+      writer.uint32(26).string(message.machineLabel);
+    }
+    if (message.productLabel !== "") {
+      writer.uint32(34).string(message.productLabel);
+    }
+    if (message.ineligibilityReason !== "") {
+      writer.uint32(42).string(message.ineligibilityReason);
+    }
+    if (message.alreadyCarried !== false) {
+      writer.uint32(48).bool(message.alreadyCarried);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkOrderCarryCandidate {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkOrderCarryCandidate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.wo = WorkOrder.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.remainingQty = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.machineLabel = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.productLabel = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.ineligibilityReason = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.alreadyCarried = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkOrderCarryCandidate {
+    return {
+      wo: isSet(object.wo) ? WorkOrder.fromJSON(object.wo) : undefined,
+      remainingQty: isSet(object.remainingQty)
+        ? globalThis.String(object.remainingQty)
+        : isSet(object.remaining_qty)
+        ? globalThis.String(object.remaining_qty)
+        : "",
+      machineLabel: isSet(object.machineLabel)
+        ? globalThis.String(object.machineLabel)
+        : isSet(object.machine_label)
+        ? globalThis.String(object.machine_label)
+        : "",
+      productLabel: isSet(object.productLabel)
+        ? globalThis.String(object.productLabel)
+        : isSet(object.product_label)
+        ? globalThis.String(object.product_label)
+        : "",
+      ineligibilityReason: isSet(object.ineligibilityReason)
+        ? globalThis.String(object.ineligibilityReason)
+        : isSet(object.ineligibility_reason)
+        ? globalThis.String(object.ineligibility_reason)
+        : "",
+      alreadyCarried: isSet(object.alreadyCarried)
+        ? globalThis.Boolean(object.alreadyCarried)
+        : isSet(object.already_carried)
+        ? globalThis.Boolean(object.already_carried)
+        : false,
+    };
+  },
+
+  toJSON(message: WorkOrderCarryCandidate): unknown {
+    const obj: any = {};
+    if (message.wo !== undefined) {
+      obj.wo = WorkOrder.toJSON(message.wo);
+    }
+    if (message.remainingQty !== "") {
+      obj.remainingQty = message.remainingQty;
+    }
+    if (message.machineLabel !== "") {
+      obj.machineLabel = message.machineLabel;
+    }
+    if (message.productLabel !== "") {
+      obj.productLabel = message.productLabel;
+    }
+    if (message.ineligibilityReason !== "") {
+      obj.ineligibilityReason = message.ineligibilityReason;
+    }
+    if (message.alreadyCarried !== false) {
+      obj.alreadyCarried = message.alreadyCarried;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WorkOrderCarryCandidate>): WorkOrderCarryCandidate {
+    return WorkOrderCarryCandidate.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WorkOrderCarryCandidate>): WorkOrderCarryCandidate {
+    const message = createBaseWorkOrderCarryCandidate();
+    message.wo = (object.wo !== undefined && object.wo !== null) ? WorkOrder.fromPartial(object.wo) : undefined;
+    message.remainingQty = object.remainingQty ?? "";
+    message.machineLabel = object.machineLabel ?? "";
+    message.productLabel = object.productLabel ?? "";
+    message.ineligibilityReason = object.ineligibilityReason ?? "";
+    message.alreadyCarried = object.alreadyCarried ?? false;
+    return message;
+  },
+};
+
+function createBaseListWorkOrderCarryForwardCandidatesRequest(): ListWorkOrderCarryForwardCandidatesRequest {
+  return { sourceMonth: "", targetMonth: "" };
+}
+
+export const ListWorkOrderCarryForwardCandidatesRequest: MessageFns<ListWorkOrderCarryForwardCandidatesRequest> = {
+  encode(message: ListWorkOrderCarryForwardCandidatesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourceMonth !== "") {
+      writer.uint32(10).string(message.sourceMonth);
+    }
+    if (message.targetMonth !== "") {
+      writer.uint32(18).string(message.targetMonth);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkOrderCarryForwardCandidatesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkOrderCarryForwardCandidatesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sourceMonth = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.targetMonth = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkOrderCarryForwardCandidatesRequest {
+    return {
+      sourceMonth: isSet(object.sourceMonth)
+        ? globalThis.String(object.sourceMonth)
+        : isSet(object.source_month)
+        ? globalThis.String(object.source_month)
+        : "",
+      targetMonth: isSet(object.targetMonth)
+        ? globalThis.String(object.targetMonth)
+        : isSet(object.target_month)
+        ? globalThis.String(object.target_month)
+        : "",
+    };
+  },
+
+  toJSON(message: ListWorkOrderCarryForwardCandidatesRequest): unknown {
+    const obj: any = {};
+    if (message.sourceMonth !== "") {
+      obj.sourceMonth = message.sourceMonth;
+    }
+    if (message.targetMonth !== "") {
+      obj.targetMonth = message.targetMonth;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkOrderCarryForwardCandidatesRequest>): ListWorkOrderCarryForwardCandidatesRequest {
+    return ListWorkOrderCarryForwardCandidatesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ListWorkOrderCarryForwardCandidatesRequest>,
+  ): ListWorkOrderCarryForwardCandidatesRequest {
+    const message = createBaseListWorkOrderCarryForwardCandidatesRequest();
+    message.sourceMonth = object.sourceMonth ?? "";
+    message.targetMonth = object.targetMonth ?? "";
+    return message;
+  },
+};
+
+function createBaseListWorkOrderCarryForwardCandidatesResponse(): ListWorkOrderCarryForwardCandidatesResponse {
+  return { base: undefined, data: [] };
+}
+
+export const ListWorkOrderCarryForwardCandidatesResponse: MessageFns<ListWorkOrderCarryForwardCandidatesResponse> = {
+  encode(
+    message: ListWorkOrderCarryForwardCandidatesResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      WorkOrderCarryCandidate.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkOrderCarryForwardCandidatesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkOrderCarryForwardCandidatesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(WorkOrderCarryCandidate.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkOrderCarryForwardCandidatesResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data)
+        ? object.data.map((e: any) => WorkOrderCarryCandidate.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListWorkOrderCarryForwardCandidatesResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => WorkOrderCarryCandidate.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkOrderCarryForwardCandidatesResponse>): ListWorkOrderCarryForwardCandidatesResponse {
+    return ListWorkOrderCarryForwardCandidatesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ListWorkOrderCarryForwardCandidatesResponse>,
+  ): ListWorkOrderCarryForwardCandidatesResponse {
+    const message = createBaseListWorkOrderCarryForwardCandidatesResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => WorkOrderCarryCandidate.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseProcessWorkOrderCarryForwardRequest(): ProcessWorkOrderCarryForwardRequest {
+  return { sourceWoId: 0, targetMonth: "", lotNo: "", carryQty: "" };
+}
+
+export const ProcessWorkOrderCarryForwardRequest: MessageFns<ProcessWorkOrderCarryForwardRequest> = {
+  encode(message: ProcessWorkOrderCarryForwardRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourceWoId !== 0) {
+      writer.uint32(8).int64(message.sourceWoId);
+    }
+    if (message.targetMonth !== "") {
+      writer.uint32(18).string(message.targetMonth);
+    }
+    if (message.lotNo !== "") {
+      writer.uint32(26).string(message.lotNo);
+    }
+    if (message.carryQty !== "") {
+      writer.uint32(34).string(message.carryQty);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProcessWorkOrderCarryForwardRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProcessWorkOrderCarryForwardRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sourceWoId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.targetMonth = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.lotNo = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.carryQty = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProcessWorkOrderCarryForwardRequest {
+    return {
+      sourceWoId: isSet(object.sourceWoId)
+        ? globalThis.Number(object.sourceWoId)
+        : isSet(object.source_wo_id)
+        ? globalThis.Number(object.source_wo_id)
+        : 0,
+      targetMonth: isSet(object.targetMonth)
+        ? globalThis.String(object.targetMonth)
+        : isSet(object.target_month)
+        ? globalThis.String(object.target_month)
+        : "",
+      lotNo: isSet(object.lotNo)
+        ? globalThis.String(object.lotNo)
+        : isSet(object.lot_no)
+        ? globalThis.String(object.lot_no)
+        : "",
+      carryQty: isSet(object.carryQty)
+        ? globalThis.String(object.carryQty)
+        : isSet(object.carry_qty)
+        ? globalThis.String(object.carry_qty)
+        : "",
+    };
+  },
+
+  toJSON(message: ProcessWorkOrderCarryForwardRequest): unknown {
+    const obj: any = {};
+    if (message.sourceWoId !== 0) {
+      obj.sourceWoId = Math.round(message.sourceWoId);
+    }
+    if (message.targetMonth !== "") {
+      obj.targetMonth = message.targetMonth;
+    }
+    if (message.lotNo !== "") {
+      obj.lotNo = message.lotNo;
+    }
+    if (message.carryQty !== "") {
+      obj.carryQty = message.carryQty;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProcessWorkOrderCarryForwardRequest>): ProcessWorkOrderCarryForwardRequest {
+    return ProcessWorkOrderCarryForwardRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProcessWorkOrderCarryForwardRequest>): ProcessWorkOrderCarryForwardRequest {
+    const message = createBaseProcessWorkOrderCarryForwardRequest();
+    message.sourceWoId = object.sourceWoId ?? 0;
+    message.targetMonth = object.targetMonth ?? "";
+    message.lotNo = object.lotNo ?? "";
+    message.carryQty = object.carryQty ?? "";
+    return message;
+  },
+};
+
+function createBaseProcessWorkOrderCarryForwardResponse(): ProcessWorkOrderCarryForwardResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const ProcessWorkOrderCarryForwardResponse: MessageFns<ProcessWorkOrderCarryForwardResponse> = {
+  encode(message: ProcessWorkOrderCarryForwardResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      WorkOrder.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProcessWorkOrderCarryForwardResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProcessWorkOrderCarryForwardResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = WorkOrder.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProcessWorkOrderCarryForwardResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? WorkOrder.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: ProcessWorkOrderCarryForwardResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = WorkOrder.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProcessWorkOrderCarryForwardResponse>): ProcessWorkOrderCarryForwardResponse {
+    return ProcessWorkOrderCarryForwardResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProcessWorkOrderCarryForwardResponse>): ProcessWorkOrderCarryForwardResponse {
+    const message = createBaseProcessWorkOrderCarryForwardResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? WorkOrder.fromPartial(object.data) : undefined;
     return message;
   },
 };

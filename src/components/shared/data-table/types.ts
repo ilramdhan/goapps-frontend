@@ -39,6 +39,15 @@ export interface ColumnDef<TData> {
   canHide?: boolean
   /** Whether this column starts hidden. User can still toggle it on. */
   defaultHidden?: boolean
+  /** Backend sort key for this column (the proto `sort_by` value).
+   *
+   *  Set it *only* when the server can actually sort by this column — a
+   *  `sort_by` the repository's sortColumnMap does not know silently empties
+   *  the list. A column with no `sortKey` renders as a plain header, so it
+   *  never promises an order the server would reject.
+   *
+   *  Requires `onSort` on the DataTable; without it the header stays plain. */
+  sortKey?: string
 }
 
 /**
@@ -86,6 +95,16 @@ export interface DataTableProps<TData> {
   tableId?: string
   /** Pin the row-actions column to the right. Default false. */
   stickyActions?: boolean
+  /** Active backend sort key. Pairs with `ColumnDef.sortKey`. */
+  sortBy?: string
+  /** Active sort direction. */
+  sortOrder?: "asc" | "desc"
+  /** Called with a column's `sortKey` when its header is clicked. The caller
+   *  owns the cycling policy (asc → desc → none) and resetting the page. */
+  onSort?: (sortKey: string) => void
+  /** Render more compactly (tighter cell padding, smaller text) so more rows
+   *  fit without scrolling. Used by dense pickers such as Pull-from-Orion. */
+  dense?: boolean
 }
 
 /**

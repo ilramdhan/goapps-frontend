@@ -8,6 +8,7 @@ import { toast } from "sonner"
 
 import { createCrudHooks } from "@/lib/hooks"
 import { apiClient } from "@/lib/api"
+import { CarryAction } from "@/types/ppc/common"
 import type {
   Demand,
   CreateDemandRequest,
@@ -186,13 +187,135 @@ export function useProcessCarryForward() {
   return useMutation({
     mutationFn: async (req: ProcessCarryForwardRequest) => {
       const raw = await apiClient.post<unknown>("/api/v1/ppc/demands/carry-forward", req)
-      return ProcessCarryForwardResponseParser.fromJSON(raw)
+      const res = ProcessCarryForwardResponseParser.fromJSON(raw)
+      // Without this a domain rejection — ErrSplitExceedsRemaining, a refused
+      // state transition — arrives as HTTP 200 with base.isSuccess = false and
+      // toasts "Carry-forward processed" for a demand that was not carried.
+      assertOk(res.base, "Failed to process carry-forward")
+      return res
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: demandKeys.all })
       toast.success("Carry-forward processed")
     },
     onError: (e: Error) => toast.error(e.message || "Failed to process carry-forward"),
+  })
+}
+
+/** One demand's outcome in a bulk carry-forward run. */
+export interface BulkCarryOutcome {
+  demandId: number
+  /** Human label for the row — product code, contract no, or a described fallback. Never a raw id. */
+  label: string
+  ok: boolean
+  /** Present only when ok === false. */
+  error?: string
+}
+
+export interface BulkCarryInput {
+  demands: { demandId: number; label: string }[]
+  targetMonth: string
+  /** Called after each demand settles so the caller can show progress. */
+  onProgress?: (done: number, total: number) => void
+}
+
+export interface BulkCarryResult {
+  outcomes: BulkCarryOutcome[]
+  succeeded: number
+  failed: number
+}
+
+/**
+ * Thrown when the loop itself dies part-way, carrying the verdicts already
+ * collected. Every attempted row has a verdict by then — discarding them would
+ * force the caller to guess, and the only honest guess is none.
+ *
+ * Rows with no outcome were never attempted: they are simply still outstanding
+ * and stay in the candidate list, so they need no special reporting.
+ */
+export class BulkCarryError extends Error {
+  constructor(
+    message: string,
+    readonly outcomes: BulkCarryOutcome[]
+  ) {
+    super(message)
+    this.name = "BulkCarryError"
+  }
+}
+
+/**
+ * Bulk "carry all as-is".
+ *
+ * There is no batch RPC: ppc/v1/ppc_service.proto exposes only the single-demand
+ * ProcessCarryForward, so this loops client-side. Consequences the UI must own,
+ * not hide:
+ *   - It is NOT atomic. A failure part-way through leaves the earlier demands
+ *     already carried, so the result is per-demand and the caller reports every
+ *     row by name.
+ *   - It runs sequentially. Firing N writes concurrently against the same month
+ *     buys little and makes a partial failure harder to describe.
+ *
+ * This intentionally does not toast on its own — a batch has no single outcome
+ * to announce. The caller renders the per-row result.
+ */
+export function useBulkCarryForwardAsIs() {
+  const qc = useQueryClient()
+  return useMutation<BulkCarryResult, Error, BulkCarryInput>({
+    mutationFn: async ({ demands, targetMonth, onProgress }) => {
+      const outcomes: BulkCarryOutcome[] = []
+      const tally = () => ({
+        outcomes,
+        succeeded: outcomes.filter((o) => o.ok).length,
+        failed: outcomes.filter((o) => !o.ok).length,
+      })
+      try {
+        for (const [index, d] of demands.entries()) {
+          try {
+            const req: ProcessCarryForwardRequest = {
+              sourceDemandId: d.demandId,
+              action: CarryAction.CARRY_ACTION_CARRY_AS_IS,
+              targetMonth,
+              splits: [],
+            }
+            const raw = await apiClient.post<unknown>("/api/v1/ppc/demands/carry-forward", req)
+            const res = ProcessCarryForwardResponseParser.fromJSON(raw)
+            // A domain rejection comes back as HTTP 200 with
+            // base.isSuccess = false, so apiClient does not throw. Without this
+            // the row is counted ok, written into the session recap as carried,
+            // and dropped from the candidate list — having done nothing. That is
+            // precisely the "never claim success for a partially-failed batch"
+            // guarantee. The throw lands in the catch below, which turns the row
+            // into a named failure carrying the backend's own message.
+            assertOk(res.base, "Failed to carry demand forward")
+            outcomes.push({ demandId: d.demandId, label: d.label, ok: true })
+          } catch (e) {
+            outcomes.push({
+              demandId: d.demandId,
+              label: d.label,
+              ok: false,
+              error: e instanceof Error ? e.message : "Unknown error",
+            })
+          }
+          onProgress?.(index + 1, demands.length)
+        }
+      } catch (e) {
+        // The loop itself died — the inner try already absorbs every per-demand
+        // failure, so this is the caller's onProgress throwing or something
+        // equally structural. Carry the verdicts out rather than dropping them:
+        // every row attempted so far has one, and the rest were never touched.
+        throw new BulkCarryError(
+          e instanceof Error ? e.message : "The batch stopped unexpectedly",
+          outcomes
+        )
+      }
+      return tally()
+    },
+    // Always invalidate: even an all-failed run may have partially mutated
+    // server state before erroring, and a stale list is worse than a refetch.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: demandKeys.all })
+      qc.invalidateQueries({ queryKey: ["ppc", "demand", "carry-forward-candidates"] })
+    },
   })
 }
 

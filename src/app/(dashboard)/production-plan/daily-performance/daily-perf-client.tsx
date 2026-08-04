@@ -23,7 +23,7 @@ import {
   useEfficiencySnapshots,
   useRecalcEfficiency,
 } from "@/hooks/ppc/use-daily-performance"
-import { AREA_OPTIONS, AREA_LABELS, todayIso } from "@/types/ppc/common"
+import { AREA_OPTIONS, AREA_LABELS, todayLocalIso } from "@/types/ppc/common"
 import type { MachineShiftLog, EfficiencySnapshot } from "@/types/ppc/daily-performance"
 
 const pct = (s: string) => `${(Number(s) || 0).toFixed(1)}%`
@@ -50,7 +50,10 @@ const snapColumns: ColumnDef<EfficiencySnapshot>[] = [
 ]
 
 export default function DailyPerfClient() {
-  const [date, setDate] = useState(todayIso())
+  const [tab, setTab] = useState("entry")
+  // Local, not UTC: the entry form on this same screen records a local
+  // production date, and the tables below must not disagree with it by a day.
+  const [date, setDate] = useState(todayLocalIso())
   const [area, setArea] = useState(0)
   const [logPage, setLogPage] = useState(1)
   const [snapPage, setSnapPage] = useState(1)
@@ -59,46 +62,60 @@ export default function DailyPerfClient() {
   const logs = useMachineShiftLogs({ area, date, page: logPage, pageSize: 10 })
   const snaps = useEfficiencySnapshots({ area, dateFrom: date, dateTo: date, page: snapPage, pageSize: 10 })
 
+  // The date/area/recalc toolbar scopes the two read-only tables, not the entry
+  // form — the form carries its own machine, date and shift. Showing it on the
+  // entry tab invited the operator to set a date in the wrong place.
+  const showTableFilters = tab !== "entry"
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageHeader title="Daily Performance" subtitle="Shift entry, machine logs, and efficiency">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-[160px]" />
-          <Select value={String(area)} onValueChange={(v) => setArea(Number(v))}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="Area" />
-            </SelectTrigger>
-            <SelectContent>
-              {AREA_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={String(o.value)}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            disabled={recalc.isPending}
-            onClick={() => recalc.mutate({ area, date })}
-          >
-            {recalc.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Recalc Efficiency
-          </Button>
-        </div>
+        {showTableFilters && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-[160px]" />
+            <Select value={String(area)} onValueChange={(v) => setArea(Number(v))}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Area" />
+              </SelectTrigger>
+              <SelectContent>
+                {AREA_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={String(o.value)}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              disabled={recalc.isPending}
+              onClick={() => recalc.mutate({ area, date })}
+            >
+              {recalc.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Recalc Efficiency
+            </Button>
+          </div>
+        )}
       </PageHeader>
 
-      <Tabs defaultValue="entry">
-        <TabsList>
-          <TabsTrigger value="entry">Shift Entry</TabsTrigger>
-          <TabsTrigger value="logs">Machine Logs</TabsTrigger>
-          <TabsTrigger value="efficiency">Efficiency</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+        {/* h-12 not the h-9 default: the operator switches tabs with a thumb. */}
+        <TabsList className="h-12">
+          <TabsTrigger value="entry" className="px-4">
+            Shift Entry
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="px-4">
+            Machine Logs
+          </TabsTrigger>
+          <TabsTrigger value="efficiency" className="px-4">
+            Efficiency
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="entry" className="mt-4">
+        <TabsContent value="entry" className="mt-4 min-w-0">
           <ShiftEntryForm />
         </TabsContent>
 
