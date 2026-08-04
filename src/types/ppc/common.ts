@@ -127,6 +127,63 @@ export const CARRY_ACTION_LABELS: Record<number, string> = {
   [CarryAction.CARRY_ACTION_CANCEL]: "Cancel",
 }
 
+// What each action actually does, taken from the backend rather than from the
+// label. Source of truth: services/ppc/internal/application/demand/
+// carry_forward.go — carryAsIs / carrySplit / carryDefer / carryPartial /
+// carryCancel. Keep these in step with that file; a label like "Partial Carry"
+// does not by itself tell the user that the uncarried remainder is dropped.
+//
+// `{sourceMonth}` is substituted by carryActionDescription() with a spelled-out
+// month. Do not read this map directly in a component — DEFER is wrong without
+// the substitution.
+export const CARRY_ACTION_DESCRIPTIONS: Record<number, string> = {
+  [CarryAction.CARRY_ACTION_UNSPECIFIED]: "",
+  [CarryAction.CARRY_ACTION_CARRY_AS_IS]:
+    "Creates one new demand in the target month for the whole remaining qty. The original is marked Carried Over.",
+  [CarryAction.CARRY_ACTION_SPLIT]:
+    "Creates one new demand per split, each with its own qty and deadline, in the target month. The splits must total no more than the remaining qty; any leftover is not carried. The original is marked Split.",
+  // Not "offered again next month". carryDefer (carry_forward.go:150-158) only
+  // flips the status — pd_month is never written. ListCarryCandidates filters
+  // WHERE pd_month = $1 (demand_repository.go:212), so a deferred demand stays
+  // a candidate *of its original month* only, and reappears solely when the
+  // user points the source month back at it.
+  [CarryAction.CARRY_ACTION_DEFER]:
+    "Creates nothing. The demand stays in {sourceMonth} and is marked Deferred — it is offered again only when you carry {sourceMonth} forward again, not automatically next month. Target month and deadline are ignored.",
+  [CarryAction.CARRY_ACTION_PARTIAL_CARRY]:
+    "Creates one new demand in the target month for just the qty you enter. The original is marked Carried Over, so the qty you do not carry is dropped.",
+  [CarryAction.CARRY_ACTION_CANCEL]:
+    "Creates nothing. The demand is marked Cancelled and its remaining qty is written off. This cannot be undone.",
+}
+
+/** Resolves an action's effect description against the month being carried. */
+export function carryActionDescription(action: number, sourceMonthLabel: string): string {
+  return (CARRY_ACTION_DESCRIPTIONS[action] ?? "").replaceAll("{sourceMonth}", sourceMonthLabel)
+}
+
+// Actions that produce no demand in the target month, so the target month and
+// deadline inputs are irrelevant for them (carryDefer / carryCancel take only
+// the source demand — carry_forward.go:150 and :160).
+export const CARRY_ACTIONS_WITHOUT_TARGET: readonly CarryAction[] = [
+  CarryAction.CARRY_ACTION_DEFER,
+  CarryAction.CARRY_ACTION_CANCEL,
+]
+
+// Actions that irreversibly destroy remaining qty and must be confirmed before
+// they run. Cancel() is a terminal transition (state_machine.go:41) — there is
+// no route back out of CANCELLED.
+export const CARRY_ACTIONS_IRREVERSIBLE: readonly CarryAction[] = [CarryAction.CARRY_ACTION_CANCEL]
+
+// Past-tense outcome shown on a row once its action has been applied in this
+// session. "Carried" is only true of the two actions that actually create a
+// demand in the target month.
+export const CARRY_ACTION_OUTCOME_LABELS: Record<number, string> = {
+  [CarryAction.CARRY_ACTION_CARRY_AS_IS]: "Carried",
+  [CarryAction.CARRY_ACTION_PARTIAL_CARRY]: "Partly carried",
+  [CarryAction.CARRY_ACTION_SPLIT]: "Split",
+  [CarryAction.CARRY_ACTION_DEFER]: "Deferred",
+  [CarryAction.CARRY_ACTION_CANCEL]: "Cancelled",
+}
+
 // ── Plan-item carry-forward ─────────────────────────────────────────────────
 
 export const PLAN_CARRY_ACTION_LABELS: Record<number, string> = {
