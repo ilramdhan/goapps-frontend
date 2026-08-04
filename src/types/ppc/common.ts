@@ -380,9 +380,34 @@ export function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 }
 
-/** Today as ISO date "YYYY-MM-DD". */
+/**
+ * Today as ISO date "YYYY-MM-DD", in **UTC**.
+ *
+ * Prefer `todayLocalIso()` for anything a user reads or compares against a
+ * production date — for an operator in WIB (UTC+7) this returns yesterday until
+ * 07:00 local. Kept as-is because other screens depend on the existing
+ * behaviour.
+ */
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Today as ISO date "YYYY-MM-DD" in the browser's own timezone.
+ *
+ * This is the correct default for a production date: an operator recording a
+ * shift means their calendar day, not UTC's. Using `todayIso()` for the same
+ * value makes the entry form and the log table it feeds disagree by a day.
+ */
+export function todayLocalIso(): string {
+  return localIsoOffset(0)
+}
+
+/** ISO date `days` before today, in local time. `0` is today. */
+export function localIsoOffset(days: number): string {
+  const now = new Date()
+  const off = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - off - days * 86_400_000).toISOString().slice(0, 10)
 }
 
 /**
