@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
+import { SortableHeader } from "./sortable-header"
 import type { ColumnDef, DataTableProps, RowAction } from "./types"
 import { useColumnVisibility } from "./use-column-visibility"
 
@@ -55,6 +56,10 @@ export function DataTable<TData>({
   skeletonRowCount = 5,
   tableId,
   stickyActions,
+  sortBy,
+  sortOrder,
+  onSort,
+  dense,
 }: DataTableProps<TData>) {
   const { visibility, toggle, setAll, reset } = useColumnVisibility(tableId, columns)
   const visibleColumns = useMemo(
@@ -77,10 +82,10 @@ export function DataTable<TData>({
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
+      <div className={dense ? "space-y-1" : "space-y-3"}>
         {Array.from({ length: skeletonRowCount }).map((_, i) => (
           <div key={`skeleton-${i}`} className="flex items-center gap-4">
-            <Skeleton className="h-12 w-full" />
+            <Skeleton className={cn("w-full", dense ? "h-7" : "h-12")} />
           </div>
         ))}
       </div>
@@ -127,20 +132,38 @@ export function DataTable<TData>({
       <Table>
         <TableHeader className="bg-background">
           <TableRow className="bg-background hover:bg-background">
-            {visibleColumns.map((column) => (
-              <TableHead
-                key={column.id}
-                className={cn(
-                  column.widthPx === undefined && column.width,
-                  column.headerClassName,
-                  column.hideOnMobile && "hidden md:table-cell",
-                  stickyClass(column, "header"),
-                )}
-                style={cellStyle(column, offsets[column.id])}
-              >
-                {column.header}
-              </TableHead>
-            ))}
+            {visibleColumns.map((column) => {
+              const headClass = cn(
+                column.widthPx === undefined && column.width,
+                column.headerClassName,
+                column.hideOnMobile && "hidden md:table-cell",
+                dense && "h-8 px-2",
+                stickyClass(column, "header"),
+              )
+              const headStyle = cellStyle(column, offsets[column.id])
+              // A column is only sortable when it declares a backend sort key
+              // *and* the caller supplied a handler. Anything else renders as a
+              // plain header — never an affordance the server would reject.
+              if (column.sortKey && onSort) {
+                return (
+                  <SortableHeader
+                    key={column.id}
+                    label={column.header}
+                    sortKey={column.sortKey}
+                    currentSortBy={sortBy}
+                    currentSortOrder={sortOrder}
+                    onSort={onSort}
+                    className={headClass}
+                    style={headStyle}
+                  />
+                )
+              }
+              return (
+                <TableHead key={column.id} className={headClass} style={headStyle}>
+                  {column.header}
+                </TableHead>
+              )
+            })}
             {hasActions && (
               <TableHead
                 className={cn(
@@ -166,6 +189,7 @@ export function DataTable<TData>({
                       column.widthPx === undefined && column.width,
                       column.cellClassName,
                       column.hideOnMobile && "hidden md:table-cell",
+                      dense && "px-2 py-1 text-sm",
                       stickyClass(column, "cell"),
                       // Inherit hover from the row so sticky cells follow the
                       // muted highlight when the row is hovered.

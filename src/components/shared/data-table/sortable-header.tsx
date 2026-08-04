@@ -1,5 +1,7 @@
 "use client"
 
+import type { CSSProperties } from "react"
+
 import { TableHead } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 
@@ -16,6 +18,8 @@ interface SortableHeaderProps {
   onSort: (sortKey: string) => void
   /** Extra classes for the underlying TableHead (widths, edge padding). */
   className?: string
+  /** Inline style for the underlying TableHead (sticky offsets, exact widths). */
+  style?: CSSProperties
 }
 
 /**
@@ -54,6 +58,7 @@ export function SortableHeader({
   currentSortOrder,
   onSort,
   className,
+  style,
 }: SortableHeaderProps) {
   const isActive = currentSortBy === sortKey
   const direction = isActive ? (currentSortOrder === "desc" ? "desc" : "asc") : undefined
@@ -61,6 +66,7 @@ export function SortableHeader({
   return (
     <TableHead
       className={cn("cursor-pointer select-none", className)}
+      style={style}
       aria-sort={direction === "desc" ? "descending" : direction === "asc" ? "ascending" : undefined}
       tabIndex={0}
       onClick={() => onSort(sortKey)}
