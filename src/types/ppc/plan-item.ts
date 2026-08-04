@@ -12,6 +12,10 @@ export type {
   GanttBar,
   GetGanttViewRequest,
   GetGanttViewResponse,
+  PlanCarryCandidate,
+  ListPlanCarryForwardCandidatesResponse,
+  ProcessPlanCarryForwardRequest,
+  ProcessPlanCarryForwardResponse,
 } from "@/types/generated/ppc/v1/plan_item"
 
 export {
@@ -21,6 +25,8 @@ export {
   DeletePlanItemResponse as DeletePlanItemResponseParser,
   ListPlanItemsResponse as ListPlanItemsResponseParser,
   GetGanttViewResponse as GetGanttViewResponseParser,
+  ListPlanCarryForwardCandidatesResponse as ListPlanCarryForwardCandidatesResponseParser,
+  ProcessPlanCarryForwardResponse as ProcessPlanCarryForwardResponseParser,
 } from "@/types/generated/ppc/v1/plan_item"
 
 import type { PlanItemType, PlanItemStatus, AreaCode } from "@/types/generated/ppc/v1/common"

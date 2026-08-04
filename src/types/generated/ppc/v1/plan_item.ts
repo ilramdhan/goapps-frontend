@@ -11,6 +11,9 @@ import {
   AreaCode,
   areaCodeFromJSON,
   areaCodeToJSON,
+  PlanCarryAction,
+  planCarryActionFromJSON,
+  planCarryActionToJSON,
   PlanItemStatus,
   planItemStatusFromJSON,
   planItemStatusToJSON,
@@ -65,6 +68,91 @@ export interface PlanItem {
    */
   shadeCode: string;
   shadeName: string;
+  /**
+   * Source plan item this one was carried forward from, 0 when it was not.
+   * A new row per carry (never a month reassignment) is what keeps the source
+   * month's plan an accurate record of what was committed there.
+   */
+  carryFromItemId: number;
+  /** The action that produced this item, when it came from a carry-forward. */
+  carryAction: PlanCarryAction;
+}
+
+/**
+ * PlanCarryCandidate is one plan item eligible to be carried into a new month,
+ * decorated with everything the planner needs to decide without seeing an id.
+ */
+export interface PlanCarryCandidate {
+  item:
+    | PlanItem
+    | undefined;
+  /**
+   * Qty on this item not yet committed to any work order:
+   * qty_target - SUM(wo_plan_item_link.qty_contribution). This is what
+   * CARRY_AS_IS carries, so a plan item already half-covered by a work order
+   * does not get carried twice.
+   */
+  qtyUncovered: string;
+  /** Qty already covered by work orders, for context alongside qty_uncovered. */
+  qtyCovered: string;
+  /**
+   * How many work orders reference this plan item. Non-zero means the work is
+   * already in flight and the work-order carry scope may also apply to it.
+   */
+  workOrderCount: number;
+  /**
+   * True when a plan item in the target month already names this one as its
+   * carry source — a second run shows it as done rather than duplicating it.
+   */
+  alreadyCarried: boolean;
+  /**
+   * Human label of the demand this item serves, for traceability. Empty for a
+   * cascade INTERMEDIATE item, which serves a parent item rather than a demand.
+   */
+  demandLabel: string;
+}
+
+export interface ListPlanCarryForwardCandidatesRequest {
+  sourceMonth: string;
+  /**
+   * Target month the candidates are being carried into. Required: whether a
+   * candidate is `already_carried` can only be answered against a target.
+   */
+  targetMonth: string;
+}
+
+export interface ListPlanCarryForwardCandidatesResponse {
+  base: BaseResponse | undefined;
+  data: PlanCarryCandidate[];
+}
+
+export interface ProcessPlanCarryForwardRequest {
+  sourcePlanItemId: number;
+  action: PlanCarryAction;
+  targetMonth: string;
+  /**
+   * New deadline for CARRY_AS_IS / PARTIAL_CARRY. Defaults to the source
+   * deadline when omitted.
+   */
+  newDeadline?:
+    | string
+    | undefined;
+  /**
+   * Carried qty for PARTIAL_CARRY. Must not exceed the candidate's
+   * qty_uncovered.
+   */
+  carryQty?: string | undefined;
+}
+
+export interface ProcessPlanCarryForwardResponse {
+  base:
+    | BaseResponse
+    | undefined;
+  /**
+   * The plan item created in the target month. Absent for CANCEL, which
+   * creates nothing.
+   */
+  data: PlanItem | undefined;
 }
 
 export interface CreatePlanItemRequest {
@@ -260,6 +348,8 @@ function createBasePlanItem(): PlanItem {
     durationSource: "",
     shadeCode: "",
     shadeName: "",
+    carryFromItemId: 0,
+    carryAction: 0,
   };
 }
 
@@ -330,6 +420,12 @@ export const PlanItem: MessageFns<PlanItem> = {
     }
     if (message.shadeName !== "") {
       writer.uint32(178).string(message.shadeName);
+    }
+    if (message.carryFromItemId !== 0) {
+      writer.uint32(184).int64(message.carryFromItemId);
+    }
+    if (message.carryAction !== 0) {
+      writer.uint32(192).int32(message.carryAction);
     }
     return writer;
   },
@@ -517,6 +613,22 @@ export const PlanItem: MessageFns<PlanItem> = {
           message.shadeName = reader.string();
           continue;
         }
+        case 23: {
+          if (tag !== 184) {
+            break;
+          }
+
+          message.carryFromItemId = longToNumber(reader.int64());
+          continue;
+        }
+        case 24: {
+          if (tag !== 192) {
+            break;
+          }
+
+          message.carryAction = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -610,6 +722,16 @@ export const PlanItem: MessageFns<PlanItem> = {
         : isSet(object.shade_name)
         ? globalThis.String(object.shade_name)
         : "",
+      carryFromItemId: isSet(object.carryFromItemId)
+        ? globalThis.Number(object.carryFromItemId)
+        : isSet(object.carry_from_item_id)
+        ? globalThis.Number(object.carry_from_item_id)
+        : 0,
+      carryAction: isSet(object.carryAction)
+        ? planCarryActionFromJSON(object.carryAction)
+        : isSet(object.carry_action)
+        ? planCarryActionFromJSON(object.carry_action)
+        : 0,
     };
   },
 
@@ -681,6 +803,12 @@ export const PlanItem: MessageFns<PlanItem> = {
     if (message.shadeName !== "") {
       obj.shadeName = message.shadeName;
     }
+    if (message.carryFromItemId !== 0) {
+      obj.carryFromItemId = Math.round(message.carryFromItemId);
+    }
+    if (message.carryAction !== 0) {
+      obj.carryAction = planCarryActionToJSON(message.carryAction);
+    }
     return obj;
   },
 
@@ -713,6 +841,555 @@ export const PlanItem: MessageFns<PlanItem> = {
     message.durationSource = object.durationSource ?? "";
     message.shadeCode = object.shadeCode ?? "";
     message.shadeName = object.shadeName ?? "";
+    message.carryFromItemId = object.carryFromItemId ?? 0;
+    message.carryAction = object.carryAction ?? 0;
+    return message;
+  },
+};
+
+function createBasePlanCarryCandidate(): PlanCarryCandidate {
+  return {
+    item: undefined,
+    qtyUncovered: "",
+    qtyCovered: "",
+    workOrderCount: 0,
+    alreadyCarried: false,
+    demandLabel: "",
+  };
+}
+
+export const PlanCarryCandidate: MessageFns<PlanCarryCandidate> = {
+  encode(message: PlanCarryCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.item !== undefined) {
+      PlanItem.encode(message.item, writer.uint32(10).fork()).join();
+    }
+    if (message.qtyUncovered !== "") {
+      writer.uint32(18).string(message.qtyUncovered);
+    }
+    if (message.qtyCovered !== "") {
+      writer.uint32(26).string(message.qtyCovered);
+    }
+    if (message.workOrderCount !== 0) {
+      writer.uint32(32).int32(message.workOrderCount);
+    }
+    if (message.alreadyCarried !== false) {
+      writer.uint32(40).bool(message.alreadyCarried);
+    }
+    if (message.demandLabel !== "") {
+      writer.uint32(50).string(message.demandLabel);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PlanCarryCandidate {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePlanCarryCandidate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.item = PlanItem.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.qtyUncovered = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.qtyCovered = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.workOrderCount = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.alreadyCarried = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.demandLabel = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PlanCarryCandidate {
+    return {
+      item: isSet(object.item) ? PlanItem.fromJSON(object.item) : undefined,
+      qtyUncovered: isSet(object.qtyUncovered)
+        ? globalThis.String(object.qtyUncovered)
+        : isSet(object.qty_uncovered)
+        ? globalThis.String(object.qty_uncovered)
+        : "",
+      qtyCovered: isSet(object.qtyCovered)
+        ? globalThis.String(object.qtyCovered)
+        : isSet(object.qty_covered)
+        ? globalThis.String(object.qty_covered)
+        : "",
+      workOrderCount: isSet(object.workOrderCount)
+        ? globalThis.Number(object.workOrderCount)
+        : isSet(object.work_order_count)
+        ? globalThis.Number(object.work_order_count)
+        : 0,
+      alreadyCarried: isSet(object.alreadyCarried)
+        ? globalThis.Boolean(object.alreadyCarried)
+        : isSet(object.already_carried)
+        ? globalThis.Boolean(object.already_carried)
+        : false,
+      demandLabel: isSet(object.demandLabel)
+        ? globalThis.String(object.demandLabel)
+        : isSet(object.demand_label)
+        ? globalThis.String(object.demand_label)
+        : "",
+    };
+  },
+
+  toJSON(message: PlanCarryCandidate): unknown {
+    const obj: any = {};
+    if (message.item !== undefined) {
+      obj.item = PlanItem.toJSON(message.item);
+    }
+    if (message.qtyUncovered !== "") {
+      obj.qtyUncovered = message.qtyUncovered;
+    }
+    if (message.qtyCovered !== "") {
+      obj.qtyCovered = message.qtyCovered;
+    }
+    if (message.workOrderCount !== 0) {
+      obj.workOrderCount = Math.round(message.workOrderCount);
+    }
+    if (message.alreadyCarried !== false) {
+      obj.alreadyCarried = message.alreadyCarried;
+    }
+    if (message.demandLabel !== "") {
+      obj.demandLabel = message.demandLabel;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PlanCarryCandidate>): PlanCarryCandidate {
+    return PlanCarryCandidate.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PlanCarryCandidate>): PlanCarryCandidate {
+    const message = createBasePlanCarryCandidate();
+    message.item = (object.item !== undefined && object.item !== null) ? PlanItem.fromPartial(object.item) : undefined;
+    message.qtyUncovered = object.qtyUncovered ?? "";
+    message.qtyCovered = object.qtyCovered ?? "";
+    message.workOrderCount = object.workOrderCount ?? 0;
+    message.alreadyCarried = object.alreadyCarried ?? false;
+    message.demandLabel = object.demandLabel ?? "";
+    return message;
+  },
+};
+
+function createBaseListPlanCarryForwardCandidatesRequest(): ListPlanCarryForwardCandidatesRequest {
+  return { sourceMonth: "", targetMonth: "" };
+}
+
+export const ListPlanCarryForwardCandidatesRequest: MessageFns<ListPlanCarryForwardCandidatesRequest> = {
+  encode(message: ListPlanCarryForwardCandidatesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourceMonth !== "") {
+      writer.uint32(10).string(message.sourceMonth);
+    }
+    if (message.targetMonth !== "") {
+      writer.uint32(18).string(message.targetMonth);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPlanCarryForwardCandidatesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPlanCarryForwardCandidatesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sourceMonth = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.targetMonth = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListPlanCarryForwardCandidatesRequest {
+    return {
+      sourceMonth: isSet(object.sourceMonth)
+        ? globalThis.String(object.sourceMonth)
+        : isSet(object.source_month)
+        ? globalThis.String(object.source_month)
+        : "",
+      targetMonth: isSet(object.targetMonth)
+        ? globalThis.String(object.targetMonth)
+        : isSet(object.target_month)
+        ? globalThis.String(object.target_month)
+        : "",
+    };
+  },
+
+  toJSON(message: ListPlanCarryForwardCandidatesRequest): unknown {
+    const obj: any = {};
+    if (message.sourceMonth !== "") {
+      obj.sourceMonth = message.sourceMonth;
+    }
+    if (message.targetMonth !== "") {
+      obj.targetMonth = message.targetMonth;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListPlanCarryForwardCandidatesRequest>): ListPlanCarryForwardCandidatesRequest {
+    return ListPlanCarryForwardCandidatesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListPlanCarryForwardCandidatesRequest>): ListPlanCarryForwardCandidatesRequest {
+    const message = createBaseListPlanCarryForwardCandidatesRequest();
+    message.sourceMonth = object.sourceMonth ?? "";
+    message.targetMonth = object.targetMonth ?? "";
+    return message;
+  },
+};
+
+function createBaseListPlanCarryForwardCandidatesResponse(): ListPlanCarryForwardCandidatesResponse {
+  return { base: undefined, data: [] };
+}
+
+export const ListPlanCarryForwardCandidatesResponse: MessageFns<ListPlanCarryForwardCandidatesResponse> = {
+  encode(message: ListPlanCarryForwardCandidatesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      PlanCarryCandidate.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPlanCarryForwardCandidatesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPlanCarryForwardCandidatesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(PlanCarryCandidate.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListPlanCarryForwardCandidatesResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => PlanCarryCandidate.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: ListPlanCarryForwardCandidatesResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => PlanCarryCandidate.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListPlanCarryForwardCandidatesResponse>): ListPlanCarryForwardCandidatesResponse {
+    return ListPlanCarryForwardCandidatesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListPlanCarryForwardCandidatesResponse>): ListPlanCarryForwardCandidatesResponse {
+    const message = createBaseListPlanCarryForwardCandidatesResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => PlanCarryCandidate.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseProcessPlanCarryForwardRequest(): ProcessPlanCarryForwardRequest {
+  return { sourcePlanItemId: 0, action: 0, targetMonth: "", newDeadline: undefined, carryQty: undefined };
+}
+
+export const ProcessPlanCarryForwardRequest: MessageFns<ProcessPlanCarryForwardRequest> = {
+  encode(message: ProcessPlanCarryForwardRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourcePlanItemId !== 0) {
+      writer.uint32(8).int64(message.sourcePlanItemId);
+    }
+    if (message.action !== 0) {
+      writer.uint32(16).int32(message.action);
+    }
+    if (message.targetMonth !== "") {
+      writer.uint32(26).string(message.targetMonth);
+    }
+    if (message.newDeadline !== undefined) {
+      writer.uint32(34).string(message.newDeadline);
+    }
+    if (message.carryQty !== undefined) {
+      writer.uint32(42).string(message.carryQty);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProcessPlanCarryForwardRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProcessPlanCarryForwardRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sourcePlanItemId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.targetMonth = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.newDeadline = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.carryQty = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProcessPlanCarryForwardRequest {
+    return {
+      sourcePlanItemId: isSet(object.sourcePlanItemId)
+        ? globalThis.Number(object.sourcePlanItemId)
+        : isSet(object.source_plan_item_id)
+        ? globalThis.Number(object.source_plan_item_id)
+        : 0,
+      action: isSet(object.action) ? planCarryActionFromJSON(object.action) : 0,
+      targetMonth: isSet(object.targetMonth)
+        ? globalThis.String(object.targetMonth)
+        : isSet(object.target_month)
+        ? globalThis.String(object.target_month)
+        : "",
+      newDeadline: isSet(object.newDeadline)
+        ? globalThis.String(object.newDeadline)
+        : isSet(object.new_deadline)
+        ? globalThis.String(object.new_deadline)
+        : undefined,
+      carryQty: isSet(object.carryQty)
+        ? globalThis.String(object.carryQty)
+        : isSet(object.carry_qty)
+        ? globalThis.String(object.carry_qty)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ProcessPlanCarryForwardRequest): unknown {
+    const obj: any = {};
+    if (message.sourcePlanItemId !== 0) {
+      obj.sourcePlanItemId = Math.round(message.sourcePlanItemId);
+    }
+    if (message.action !== 0) {
+      obj.action = planCarryActionToJSON(message.action);
+    }
+    if (message.targetMonth !== "") {
+      obj.targetMonth = message.targetMonth;
+    }
+    if (message.newDeadline !== undefined) {
+      obj.newDeadline = message.newDeadline;
+    }
+    if (message.carryQty !== undefined) {
+      obj.carryQty = message.carryQty;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProcessPlanCarryForwardRequest>): ProcessPlanCarryForwardRequest {
+    return ProcessPlanCarryForwardRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProcessPlanCarryForwardRequest>): ProcessPlanCarryForwardRequest {
+    const message = createBaseProcessPlanCarryForwardRequest();
+    message.sourcePlanItemId = object.sourcePlanItemId ?? 0;
+    message.action = object.action ?? 0;
+    message.targetMonth = object.targetMonth ?? "";
+    message.newDeadline = object.newDeadline ?? undefined;
+    message.carryQty = object.carryQty ?? undefined;
+    return message;
+  },
+};
+
+function createBaseProcessPlanCarryForwardResponse(): ProcessPlanCarryForwardResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const ProcessPlanCarryForwardResponse: MessageFns<ProcessPlanCarryForwardResponse> = {
+  encode(message: ProcessPlanCarryForwardResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      PlanItem.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProcessPlanCarryForwardResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProcessPlanCarryForwardResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = PlanItem.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProcessPlanCarryForwardResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? PlanItem.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: ProcessPlanCarryForwardResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = PlanItem.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProcessPlanCarryForwardResponse>): ProcessPlanCarryForwardResponse {
+    return ProcessPlanCarryForwardResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProcessPlanCarryForwardResponse>): ProcessPlanCarryForwardResponse {
+    const message = createBaseProcessPlanCarryForwardResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? PlanItem.fromPartial(object.data) : undefined;
     return message;
   },
 };

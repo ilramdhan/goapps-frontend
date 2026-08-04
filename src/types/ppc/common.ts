@@ -8,6 +8,7 @@ export {
   DemandSource,
   DemandStatus,
   CarryAction,
+  PlanCarryAction,
   GradeReq,
   PlanItemType,
   PlanItemStatus,
@@ -44,6 +45,7 @@ import {
   DemandSubType,
   DemandSource,
   CarryAction,
+  PlanCarryAction,
   GradeReq,
   PlanItemType,
   PlanItemStatus,
@@ -123,6 +125,75 @@ export const CARRY_ACTION_LABELS: Record<number, string> = {
   [CarryAction.CARRY_ACTION_DEFER]: "Defer",
   [CarryAction.CARRY_ACTION_PARTIAL_CARRY]: "Partial Carry",
   [CarryAction.CARRY_ACTION_CANCEL]: "Cancel",
+}
+
+// ── Plan-item carry-forward ─────────────────────────────────────────────────
+
+export const PLAN_CARRY_ACTION_LABELS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED]: "—",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]: "Carry As Is",
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]: "Partial Carry",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]: "Close",
+}
+
+// What each plan-item action actually does. Every sentence below is derived
+// from a specific code path, not from its own label — a description that
+// flatters its label is worse than none, because the user acts on it.
+//
+// Source of truth: services/ppc/internal/application/planitem/carry_forward.go
+// and internal/domain/planitem/entity.go.
+//
+// `{targetMonth}` is substituted by planCarryActionDescription().
+export const PLAN_CARRY_ACTION_DESCRIPTIONS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED]: "",
+  // createCarriedItem (carry_forward.go) builds a NEW plan item with the source's
+  // product, demand link, machine group, preferred machine, shade and notes, in
+  // cmd.TargetMonth with MonthOverride: true. carryQty() sizes it at
+  // QtyUncovered() — qty_target minus non-void work-order coverage — never at
+  // qty_target. The source is deliberately not touched: it keeps its status,
+  // its month, and its work-order links (see the comment at the end of
+  // createCarriedItem explaining why, unlike a demand, it is not closed).
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]:
+    "Creates a new plan item in {targetMonth} for the quantity no work order has claimed yet, keeping the same product, demand, machine group and preferred machine. The original stays in its own month exactly as it is, with its work orders intact.",
+  // Same path, with carryQty() returning cmd.CarryQty after checking it against
+  // uncovered — over-asking is rejected (ErrCarryQtyExceedsUncovered), not
+  // clamped. Nothing writes off the remainder: unlike the demand's
+  // PARTIAL_CARRY, the source plan item is untouched, so the part not carried
+  // is still plannable where it is.
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]:
+    "Creates a new plan item in {targetMonth} for just the quantity you enter, which cannot exceed the unclaimed quantity. The original is left untouched, so whatever you do not carry stays plannable in its own month.",
+  // carryCancel() calls PlanItem.Close() → status CLOSED, and writes one
+  // production_plan_log row. CLOSED has no outbound transition
+  // (state_machine.go), so it cannot be reopened.
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]:
+    "Creates nothing. The plan item is closed where it is and recorded in its change log. A closed plan item cannot be reopened.",
+}
+
+/** Resolves a plan-item action's effect description against the target month. */
+export function planCarryActionDescription(action: number, targetMonthLabel: string): string {
+  return (PLAN_CARRY_ACTION_DESCRIPTIONS[action] ?? "").replaceAll(
+    "{targetMonth}",
+    targetMonthLabel
+  )
+}
+
+// Actions that create nothing in the target month, so the target month and
+// deadline inputs do not apply. carryCancel() takes only the source item.
+export const PLAN_CARRY_ACTIONS_WITHOUT_TARGET: readonly PlanCarryAction[] = [
+  PlanCarryAction.PLAN_CARRY_ACTION_CANCEL,
+]
+
+// Actions that cannot be undone. CLOSED is terminal in the plan-item state
+// machine — allowedTransitions[StatusClosed] is empty.
+export const PLAN_CARRY_ACTIONS_IRREVERSIBLE: readonly PlanCarryAction[] = [
+  PlanCarryAction.PLAN_CARRY_ACTION_CANCEL,
+]
+
+// Past-tense outcome shown once an action has been applied in this session.
+export const PLAN_CARRY_ACTION_OUTCOME_LABELS: Record<number, string> = {
+  [PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS]: "Carried",
+  [PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY]: "Partly carried",
+  [PlanCarryAction.PLAN_CARRY_ACTION_CANCEL]: "Closed",
 }
 
 export const GRADE_REQ_LABELS: Record<number, string> = {

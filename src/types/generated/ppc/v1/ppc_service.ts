@@ -232,8 +232,12 @@ import {
   GetGanttViewResponse,
   GetPlanItemRequest,
   GetPlanItemResponse,
+  ListPlanCarryForwardCandidatesRequest,
+  ListPlanCarryForwardCandidatesResponse,
   ListPlanItemsRequest,
   ListPlanItemsResponse,
+  ProcessPlanCarryForwardRequest,
+  ProcessPlanCarryForwardResponse,
   UpdatePlanItemRequest,
   UpdatePlanItemResponse,
 } from "./plan_item";
@@ -258,10 +262,14 @@ import {
   ListMergeCandidatesResponse,
   ListWOExecutionsRequest,
   ListWOExecutionsResponse,
+  ListWorkOrderCarryForwardCandidatesRequest,
+  ListWorkOrderCarryForwardCandidatesResponse,
   ListWorkOrdersRequest,
   ListWorkOrdersResponse,
   PopulateWORmFromRouteRequest,
   PopulateWORmFromRouteResponse,
+  ProcessWorkOrderCarryForwardRequest,
+  ProcessWorkOrderCarryForwardResponse,
   RejectWORequest,
   RejectWOResponse,
   ResolveWOParametersRequest,
@@ -992,6 +1000,46 @@ export const PPCServiceDefinition = {
       requestType: GetGanttViewRequest,
       requestStream: false,
       responseType: GetGanttViewResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ListPlanCarryForwardCandidates lists plan items eligible for carry-forward. */
+    listPlanCarryForwardCandidates: {
+      name: "ListPlanCarryForwardCandidates",
+      requestType: ListPlanCarryForwardCandidatesRequest,
+      requestStream: false,
+      responseType: ListPlanCarryForwardCandidatesResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ProcessPlanCarryForward executes a per-plan-item carry-forward action. */
+    processPlanCarryForward: {
+      name: "ProcessPlanCarryForward",
+      requestType: ProcessPlanCarryForwardRequest,
+      requestStream: false,
+      responseType: ProcessPlanCarryForwardResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ── Work Order Carry-forward (month start) ──────────────────────────────────
+     * ListWorkOrderCarryForwardCandidates lists WOs eligible to carry into a new
+     * month. Ineligible WOs are included with their reason, never silently filtered.
+     */
+    listWorkOrderCarryForwardCandidates: {
+      name: "ListWorkOrderCarryForwardCandidates",
+      requestType: ListWorkOrderCarryForwardCandidatesRequest,
+      requestStream: false,
+      responseType: ListWorkOrderCarryForwardCandidatesResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ProcessWorkOrderCarryForward carries one WO into a new month as a CONTINUATION. */
+    processWorkOrderCarryForward: {
+      name: "ProcessWorkOrderCarryForward",
+      requestType: ProcessWorkOrderCarryForwardRequest,
+      requestStream: false,
+      responseType: ProcessWorkOrderCarryForwardResponse,
       responseStream: false,
       options: {},
     },

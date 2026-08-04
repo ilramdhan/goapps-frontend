@@ -385,6 +385,64 @@ export function carryActionToJSON(object: CarryAction): string {
   }
 }
 
+/**
+ * PlanCarryAction is the per-plan-item decision in the start-new-month
+ * workflow. Deliberately NARROWER than CarryAction rather than a reuse of it:
+ * the plan-item lifecycle (DRAFT/CONFIRMED/IN_PROGRESS/COMPLETED/CLOSED) has no
+ * DEFERRED state, so CARRY_ACTION_DEFER has nothing to map onto, and SPLIT would
+ * need per-child machine groups and timelines that a demand split never carries.
+ * Stretching CarryAction to cover plan items would make two of its five values
+ * silently unimplementable.
+ */
+export enum PlanCarryAction {
+  /** PLAN_CARRY_ACTION_UNSPECIFIED - Default / none. */
+  PLAN_CARRY_ACTION_UNSPECIFIED = 0,
+  /** PLAN_CARRY_ACTION_CARRY_AS_IS - New plan item for the whole unplanned qty. */
+  PLAN_CARRY_ACTION_CARRY_AS_IS = 1,
+  /** PLAN_CARRY_ACTION_PARTIAL_CARRY - Carry part; the rest is not carried. */
+  PLAN_CARRY_ACTION_PARTIAL_CARRY = 2,
+  /** PLAN_CARRY_ACTION_CANCEL - Close the plan item without carrying it. */
+  PLAN_CARRY_ACTION_CANCEL = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function planCarryActionFromJSON(object: any): PlanCarryAction {
+  switch (object) {
+    case 0:
+    case "PLAN_CARRY_ACTION_UNSPECIFIED":
+      return PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED;
+    case 1:
+    case "PLAN_CARRY_ACTION_CARRY_AS_IS":
+      return PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS;
+    case 2:
+    case "PLAN_CARRY_ACTION_PARTIAL_CARRY":
+      return PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY;
+    case 3:
+    case "PLAN_CARRY_ACTION_CANCEL":
+      return PlanCarryAction.PLAN_CARRY_ACTION_CANCEL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PlanCarryAction.UNRECOGNIZED;
+  }
+}
+
+export function planCarryActionToJSON(object: PlanCarryAction): string {
+  switch (object) {
+    case PlanCarryAction.PLAN_CARRY_ACTION_UNSPECIFIED:
+      return "PLAN_CARRY_ACTION_UNSPECIFIED";
+    case PlanCarryAction.PLAN_CARRY_ACTION_CARRY_AS_IS:
+      return "PLAN_CARRY_ACTION_CARRY_AS_IS";
+    case PlanCarryAction.PLAN_CARRY_ACTION_PARTIAL_CARRY:
+      return "PLAN_CARRY_ACTION_PARTIAL_CARRY";
+    case PlanCarryAction.PLAN_CARRY_ACTION_CANCEL:
+      return "PLAN_CARRY_ACTION_CANCEL";
+    case PlanCarryAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** GradeReq expresses the grade requirement attached to a demand. */
 export enum GradeReq {
   /** GRADE_REQ_UNSPECIFIED - Default / no-filter. */
