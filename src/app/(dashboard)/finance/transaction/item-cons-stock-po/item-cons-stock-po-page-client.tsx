@@ -26,6 +26,8 @@ const defaultFilters: ListItemConsStockPOParams = {
   page: 1,
   pageSize: 20,
   search: "",
+  period: undefined,
+  itemCode: undefined,
 }
 
 function ItemConsStockPOPageContent() {
