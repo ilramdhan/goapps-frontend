@@ -30,9 +30,30 @@ const defaultFilters: ListItemConsStockPOParams = {
   itemCode: undefined,
 }
 
+// `period` and `itemCode` default to `undefined`, so the generic deserializer
+// can't infer a "string" type from them and falls back to JSON.parse — which
+// turns a numeric-looking value like "202607" into the number 202607 instead
+// of keeping it a string. That silently breaks the period <Select>, since its
+// SelectItem values are strings and no longer match. Force string handling
+// for these two keys explicitly.
+function deserializeStringFilter<T extends object>(
+  key: keyof T,
+  value: string | null
+): T[keyof T] {
+  return (value === null ? undefined : value) as T[keyof T]
+}
+
 function ItemConsStockPOPageContent() {
   const [filters, setFilters] = useUrlState<ListItemConsStockPOParams>({
     defaultValues: defaultFilters,
+    deserialize: (key, value, defaultValue) => {
+      if (key === "period" || key === "itemCode") {
+        return deserializeStringFilter(key, value)
+      }
+      return value === null
+        ? defaultValue
+        : (value as ListItemConsStockPOParams[typeof key])
+    },
   })
 
   const { data, isLoading, isError, error } = useItemConsStockPO(filters)
