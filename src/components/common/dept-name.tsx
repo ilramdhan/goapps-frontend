@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 interface Props {
   deptCode: string
   fallback?: string
+  className?: string
 }
 
 async function fetchDeptByCode(code: string): Promise<{ deptName?: string }> {
@@ -17,7 +18,7 @@ async function fetchDeptByCode(code: string): Promise<{ deptName?: string }> {
   return items[0] ?? {}
 }
 
-export function DeptName({ deptCode, fallback }: Props) {
+export function DeptName({ deptCode, fallback, className }: Props) {
   const { data } = useQuery({
     queryKey: ["iam", "dept", "display", deptCode],
     queryFn: () => fetchDeptByCode(deptCode),
@@ -26,7 +27,7 @@ export function DeptName({ deptCode, fallback }: Props) {
     gcTime: 30 * 60 * 1000,
   })
 
-  if (!deptCode) return <span>{fallback ?? "—"}</span>
+  if (!deptCode) return <span className={className}>{fallback ?? "—"}</span>
   const display = data?.deptName || deptCode
-  return <span title={deptCode}>{display}</span>
+  return <span className={className} title={deptCode}>{display}</span>
 }

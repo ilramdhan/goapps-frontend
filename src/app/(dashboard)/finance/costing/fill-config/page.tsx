@@ -2,6 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Command,
@@ -16,7 +34,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronsUpDown, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, ChevronsUpDown, Check, Loader2, ListChecks } from "lucide-react";
 import {
   useGlobalFillConfigs,
   useDeleteGlobalFillConfig,
@@ -25,6 +43,7 @@ import {
 import { useRouteByProduct, useRouteGraph } from "@/hooks/finance/use-cost-route";
 import { useCostProductMasters } from "@/hooks/finance/use-cost-product-master";
 import { FillConfigForm } from "@/components/finance/fill-assignment/FillConfigForm";
+import { FillConfigActorLabel } from "@/components/finance/fill-assignment/FillConfigActorLabel";
 import { type LevelAssignmentConfig } from "@/types/finance/fill-assignment";
 import { type CostProductMaster } from "@/types/finance/cost-product-master";
 import { cn } from "@/lib/utils";
@@ -56,15 +75,17 @@ function ProductPicker({ selected, onSelect }: ProductPickerProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full max-w-md justify-between"
+          className="w-full justify-between font-normal"
         >
-          {selected
-            ? `${selected.productCode} — ${selected.productName}`
-            : "Search product by code or name…"}
+          <span className="truncate">
+            {selected
+              ? `${selected.productCode} — ${selected.productName}`
+              : "Search product by code or name…"}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[480px] p-0">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search product by code or name…"
@@ -152,14 +173,16 @@ function ProductOverridesTab({ onEditOverride }: ProductOverridesTabProps) {
       {selectedProduct && (
         <>
           {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading routing levels…
+            <div className="space-y-2">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
             </div>
           ) : routeLevels.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No routing defined for this product yet. Configure the route first, then come back to set fill overrides.
-            </p>
+            <EmptyState
+              title="No routing defined"
+              description="Configure the route first, then come back to set fill overrides."
+            />
           ) : (
             <div className="space-y-2">
               <p className="text-sm font-medium">
@@ -170,19 +193,19 @@ function ProductOverridesTab({ onEditOverride }: ProductOverridesTabProps) {
                 </span>
               </p>
 
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="py-3 px-4 text-left font-medium">Level</th>
-                      <th className="py-3 px-4 text-left font-medium">Filler</th>
-                      <th className="py-3 px-4 text-left font-medium">Approver</th>
-                      <th className="py-3 px-4 text-left font-medium">SLA Fill</th>
-                      <th className="py-3 px-4 text-left font-medium">SLA Approve</th>
-                      <th className="py-3 px-4 text-left font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="rounded-lg border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Level</TableHead>
+                      <TableHead>Filler</TableHead>
+                      <TableHead>Approver</TableHead>
+                      <TableHead>SLA Fill</TableHead>
+                      <TableHead>SLA Approve</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {routeLevels.map((level) => {
                       const override = productOverrides.find(
                         (c) => c.routeLevel === level,
@@ -193,56 +216,70 @@ function ProductOverridesTab({ onEditOverride }: ProductOverridesTabProps) {
                       const hasOverride = !!override;
 
                       return (
-                        <tr key={level} className="border-b last:border-b-0">
-                          <td className="py-3 px-4 font-medium">Level {level}</td>
+                        <TableRow key={level}>
+                          <TableCell className="font-medium">Level {level}</TableCell>
 
-                          <td className="py-3 px-4">
+                          <TableCell>
                             {hasOverride ? (
                               <span className="text-xs font-medium text-primary">
-                                {override.fillerType}: {override.fillerValue}
+                                <FillConfigActorLabel
+                                  actorType={override.fillerType}
+                                  actorValue={override.fillerValue}
+                                />
                               </span>
                             ) : global ? (
                               <span className="text-xs text-muted-foreground italic">
-                                Global: {global.fillerType}: {global.fillerValue}
+                                <span className="opacity-60">Global: </span>
+                                <FillConfigActorLabel
+                                  actorType={global.fillerType}
+                                  actorValue={global.fillerValue}
+                                />
                               </span>
                             ) : (
                               <span className="text-xs text-muted-foreground italic">
                                 No global default
                               </span>
                             )}
-                          </td>
+                          </TableCell>
 
-                          <td className="py-3 px-4 text-xs">
+                          <TableCell className="text-xs">
                             {hasOverride ? (
                               override.approverType ? (
                                 <span className="text-primary font-medium">
-                                  {override.approverType}: {override.approverValue}
+                                  <FillConfigActorLabel
+                                    actorType={override.approverType}
+                                    actorValue={override.approverValue}
+                                  />
                                 </span>
                               ) : "—"
                             ) : global?.approverType ? (
                               <span className="text-muted-foreground italic">
-                                Global: {global.approverType}: {global.approverValue}
+                                <span className="opacity-60">Global: </span>
+                                <FillConfigActorLabel
+                                  actorType={global.approverType}
+                                  actorValue={global.approverValue}
+                                />
                               </span>
                             ) : "—"}
-                          </td>
+                          </TableCell>
 
-                          <td className="py-3 px-4 text-xs">
+                          <TableCell className="text-xs">
                             {hasOverride
                               ? `${override.slaFillHours}h`
                               : global
                                 ? <span className="text-muted-foreground italic">{global.slaFillHours}h (global)</span>
                                 : "—"}
-                          </td>
+                          </TableCell>
 
-                          <td className="py-3 px-4 text-xs">
+                          <TableCell className="text-xs">
                             {hasOverride
                               ? override.approverType ? `${override.slaApproveHours}h` : "—"
                               : global?.approverType
                                 ? <span className="text-muted-foreground italic">{global.slaApproveHours}h (global)</span>
                                 : "—"}
-                          </td>
+                          </TableCell>
 
-                          <td className="py-3 px-4">
+                          <TableCell>
                             <Button
                               size="sm"
                               variant={hasOverride ? "outline" : "secondary"}
@@ -256,12 +293,12 @@ function ProductOverridesTab({ onEditOverride }: ProductOverridesTabProps) {
                             >
                               {hasOverride ? "Edit Override" : "Set Override"}
                             </Button>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}
@@ -314,95 +351,121 @@ export default function FillConfigPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Fill Assignment Config</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure who fills and approves cost parameters per routing level.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Fill Assignment Config"
+        subtitle="Configure who fills and approves cost parameters per routing level."
+      />
 
-      <Tabs defaultValue="global">
-        <TabsList>
-          <TabsTrigger value="global">Global Defaults</TabsTrigger>
-          <TabsTrigger value="product">Product Overrides</TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Fill Assignment</CardTitle>
+          <CardDescription>
+            Global defaults apply to every product unless a product-level override is set.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="global">
+            <TabsList>
+              <TabsTrigger value="global">Global Defaults</TabsTrigger>
+              <TabsTrigger value="product">Product Overrides</TabsTrigger>
+            </TabsList>
 
-        {/* ---- Global tab ---- */}
-        <TabsContent value="global" className="mt-4">
-          <div className="flex justify-end mb-4">
-            <Button onClick={handleAddGlobal}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Level
-            </Button>
-          </div>
+            {/* ---- Global tab ---- */}
+            <TabsContent value="global" className="mt-4 space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={handleAddGlobal}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Level
+                </Button>
+              </div>
 
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : configs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No global configs yet. Add one above.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="py-3 px-4 text-left font-medium">Level</th>
-                    <th className="py-3 px-4 text-left font-medium">Filler</th>
-                    <th className="py-3 px-4 text-left font-medium">Approver</th>
-                    <th className="py-3 px-4 text-left font-medium">SLA Fill</th>
-                    <th className="py-3 px-4 text-left font-medium">SLA Approve</th>
-                    <th className="py-3 px-4 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {configs.map((c) => (
-                    <tr key={c.routeLevel} className="border-b last:border-b-0">
-                      <td className="py-3 px-4 font-medium">Level {c.routeLevel}</td>
-                      <td className="py-3 px-4">
-                        {c.fillerType}: {c.fillerValue}
-                      </td>
-                      <td className="py-3 px-4">
-                        {c.approverType
-                          ? `${c.approverType}: ${c.approverValue}`
-                          : "—"}
-                      </td>
-                      <td className="py-3 px-4">{c.slaFillHours}h</td>
-                      <td className="py-3 px-4">
-                        {c.approverType ? `${c.slaApproveHours}h` : "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditGlobal(c)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteConfig.mutate(c.routeLevel)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TabsContent>
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              ) : configs.length === 0 ? (
+                <EmptyState
+                  icon={ListChecks}
+                  title="No global configs yet"
+                  description="Add a level configuration to get started."
+                  action={
+                    <Button size="sm" onClick={handleAddGlobal}>
+                      <Plus className="mr-2 h-4 w-4" /> Add Level
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Level</TableHead>
+                        <TableHead>Filler</TableHead>
+                        <TableHead>Approver</TableHead>
+                        <TableHead>SLA Fill</TableHead>
+                        <TableHead>SLA Approve</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {configs.map((c) => (
+                        <TableRow key={c.routeLevel}>
+                          <TableCell className="font-medium">Level {c.routeLevel}</TableCell>
+                          <TableCell>
+                            <FillConfigActorLabel actorType={c.fillerType} actorValue={c.fillerValue} />
+                          </TableCell>
+                          <TableCell>
+                            {c.approverType ? (
+                              <FillConfigActorLabel actorType={c.approverType} actorValue={c.approverValue} />
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell>{c.slaFillHours}h</TableCell>
+                          <TableCell>
+                            {c.approverType ? `${c.slaApproveHours}h` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditGlobal(c)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => deleteConfig.mutate(c.routeLevel)}
+                                disabled={deleteConfig.isPending}
+                              >
+                                {deleteConfig.isPending ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
 
-        {/* ---- Product overrides tab ---- */}
-        <TabsContent value="product" className="mt-4">
-          <ProductOverridesTab onEditOverride={handleEditOverride} />
-        </TabsContent>
-      </Tabs>
+            {/* ---- Product overrides tab ---- */}
+            <TabsContent value="product" className="mt-4">
+              <ProductOverridesTab onEditOverride={handleEditOverride} />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <FillConfigForm
         key={
