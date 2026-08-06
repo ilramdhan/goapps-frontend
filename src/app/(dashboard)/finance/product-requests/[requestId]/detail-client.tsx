@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/empty-state"
+import { useBreadcrumbOverride } from "@/components/common/dynamic-breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   RequestDetailPanel,
@@ -34,6 +35,8 @@ export default function ProductRequestDetailClient({ requestId }: Props) {
     fillTasks.length > 0 &&
     fillTasks.every((t) => t.status === "FILL_TASK_STATUS_APPROVED")
   const [formOpen, setFormOpen] = useState(false)
+
+  useBreadcrumbOverride(request?.requestNo ?? null)
 
   function backToList() {
     router.push("/finance/product-requests")

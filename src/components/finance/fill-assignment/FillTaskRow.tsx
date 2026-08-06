@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 import { type FillTask } from "@/types/finance/fill-assignment";
 import { useRouteGraph } from "@/hooks/finance/use-cost-route";
 import { getProductsAtLevel } from "@/types/finance/cost-route";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { FillTaskStatusBadge } from "./FillTaskStatusBadge";
 import { FillTaskProgressBar } from "./FillTaskProgressBar";
 import { FillTaskIdentity } from "./FillTaskIdentity";
 import { FillApprovalReviewDrawer } from "./FillApprovalReviewDrawer";
+import { FillParamDrawer } from "./FillParamDrawer";
 
 interface FillTaskRowProps {
   task: FillTask;
@@ -35,6 +36,7 @@ export function FillTaskRow({
   onClaim,
   onReject,
 }: FillTaskRowProps) {
+  const [fillDrawerOpen, setFillDrawerOpen] = useState(false);
   const isActive = task.status === "FILL_TASK_STATUS_ACTIVE";
   const isFilling = task.status === "FILL_TASK_STATUS_FILLING";
   const isApprovalPending = task.status === "FILL_TASK_STATUS_APPROVAL_PENDING";
@@ -70,8 +72,8 @@ export function FillTaskRow({
     (isSuperAdmin || isUserApprover || isDeptApprover);
 
   return (
-    <tr className="border-b" data-testid={`fill-task-level-${task.routeLevel}`}>
-      <td className="py-3 px-4 text-sm font-medium">
+    <TableRow data-testid={`fill-task-level-${task.routeLevel}`}>
+      <TableCell className="font-medium">
         <div className="space-y-1">
           <div>Level {task.routeLevel}</div>
           {productsAtLevel.length > 0 && (
@@ -88,20 +90,20 @@ export function FillTaskRow({
             </div>
           )}
         </div>
-      </td>
-      <td className="py-3 px-4">
+      </TableCell>
+      <TableCell>
         <FillTaskStatusBadge status={task.status} />
-      </td>
-      <td className="py-3 px-4 text-sm text-muted-foreground">
+      </TableCell>
+      <TableCell className="text-muted-foreground">
         <FillTaskIdentity task={task} />
-      </td>
-      <td className="py-3 px-4 min-w-[160px]">
+      </TableCell>
+      <TableCell className="min-w-[160px]">
         <FillTaskProgressBar task={task} />
-      </td>
-      <td className="py-3 px-4 text-sm text-muted-foreground">
+      </TableCell>
+      <TableCell className="text-muted-foreground">
         {task.slaFillHours}h SLA
-      </td>
-      <td className="py-3 px-4">
+      </TableCell>
+      <TableCell>
         <div className="flex gap-2">
           {canClaim && onClaim && (
             <Button
@@ -113,10 +115,8 @@ export function FillTaskRow({
             </Button>
           )}
           {canSubmit && (
-            <Button size="sm" asChild>
-              <Link href={`/finance/product-requests/${task.requestId}/fill/${task.taskId}`}>
-                Fill Parameters
-              </Link>
+            <Button size="sm" onClick={() => setFillDrawerOpen(true)}>
+              Fill Parameters
             </Button>
           )}
           {canApproveReject && (
@@ -136,7 +136,7 @@ export function FillTaskRow({
             </>
           )}
         </div>
-      </td>
+      </TableCell>
       {canApproveReject && (
         <FillApprovalReviewDrawer
           requestId={task.requestId}
@@ -145,6 +145,14 @@ export function FillTaskRow({
           onOpenChange={setApprovalDrawerOpen}
         />
       )}
-    </tr>
+      {canSubmit && (
+        <FillParamDrawer
+          requestId={task.requestId}
+          taskId={task.taskId}
+          open={fillDrawerOpen}
+          onOpenChange={setFillDrawerOpen}
+        />
+      )}
+    </TableRow>
   );
 }

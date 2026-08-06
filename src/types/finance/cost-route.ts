@@ -183,9 +183,9 @@ export function normalizeRouteGraph(raw: Record<string, unknown>): RouteGraph {
 /**
  * Returns the route-graph sequences (products) sitting at a given route
  * level, or an empty array if the graph/level isn't available yet. Shared
- * by the fill-entry flow (FillParamEntryPage, FillParamDrawer) and the fill
- * tracking cards (FillTaskRow, FillTrackingCompact) so the "products at this
- * level" filter logic lives in exactly one place.
+ * by the fill-entry flow (FillParamDrawer) and the fill tracking cards
+ * (FillTaskRow, FillTrackingCompact) so the "products at this level" filter
+ * logic lives in exactly one place.
  */
 export function getProductsAtLevel(
   graph: RouteGraph | null | undefined,

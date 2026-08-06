@@ -30,6 +30,7 @@ function DrawerContent({ requestId, taskId, onClose }: { requestId: number; task
   const { data: tasks = [], isLoading: tasksLoading } = useFillTasks(requestId)
   const task = useMemo(() => tasks.find((t) => t.taskId === taskId), [tasks, taskId])
   const { data: graph, isLoading: graphLoading } = useRouteGraph(task?.routeHeadId)
+  const isLocked = graph?.head?.routingStatus === "LOCKED"
 
   const productsAtLevel = useMemo(
     () => getProductsAtLevel(graph, task?.routeLevel),
@@ -115,14 +116,16 @@ function DrawerContent({ requestId, taskId, onClose }: { requestId: number; task
           />
         )}
 
-        {!isLoading && productsAtLevel.map((seq) => (
-          <FillParamProductSection
-            key={seq.productSysId}
-            productSysId={seq.productSysId}
-            productCode={seq.productCode}
-            productName={seq.productName}
-            onSaved={() => markSaved(seq.productSysId)}
-          />
+        {!isLoading && productsAtLevel.map((seq, i) => (
+          <div key={seq.productSysId} className={i > 0 ? "border-t pt-5" : undefined}>
+            <FillParamProductSection
+              productSysId={seq.productSysId}
+              productCode={seq.productCode}
+              productName={seq.productName}
+              onSaved={() => markSaved(seq.productSysId)}
+              isLocked={isLocked}
+            />
+          </div>
         ))}
       </div>
 
