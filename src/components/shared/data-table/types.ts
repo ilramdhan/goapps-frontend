@@ -93,6 +93,13 @@ export interface DataTableProps<TData> {
   /** Stable id used to persist column-visibility preferences in localStorage.
    *  When set, a column-visibility dropdown appears above the table. */
   tableId?: string
+  /** Suppress DataTable's own internal Columns-button row (still keeps
+   *  `tableId` driving the localStorage-backed visibility state). Use this
+   *  when the caller renders its own `<ColumnVisibilityMenu>` elsewhere
+   *  (e.g. inline with a filters/active-filters row) via the exported
+   *  `useColumnVisibility` hook + `ColumnVisibilityMenu` component with the
+   *  same `tableId`/`columns`, so state stays in sync. Default false. */
+  hideColumnsButton?: boolean
   /** Pin the row-actions column to the right. Default false. */
   stickyActions?: boolean
   /** Active backend sort key. Pairs with `ColumnDef.sortKey`. */

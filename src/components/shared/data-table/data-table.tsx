@@ -55,6 +55,7 @@ export function DataTable<TData>({
   emptyDescription = "Try adjusting your search or filter criteria",
   skeletonRowCount = 5,
   tableId,
+  hideColumnsButton,
   stickyActions,
   sortBy,
   sortOrder,
@@ -62,6 +63,7 @@ export function DataTable<TData>({
   dense,
 }: DataTableProps<TData>) {
   const { visibility, toggle, setAll, reset } = useColumnVisibility(tableId, columns)
+  const showInternalColumnsButton = Boolean(tableId) && !hideColumnsButton
   const visibleColumns = useMemo(
     () => columns.filter((c) => visibility[c.id] !== false),
     [columns, visibility],
@@ -80,22 +82,10 @@ export function DataTable<TData>({
     return `row-${index}`
   }
 
-  if (isLoading) {
-    return (
-      <div className={dense ? "space-y-1" : "space-y-3"}>
-        {Array.from({ length: skeletonRowCount }).map((_, i) => (
-          <div key={`skeleton-${i}`} className="flex items-center gap-4">
-            <Skeleton className={cn("w-full", dense ? "h-7" : "h-12")} />
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (!data || data.length === 0) {
+  if (!isLoading && (!data || data.length === 0)) {
     return (
       <div>
-        {tableId && (
+        {showInternalColumnsButton && (
           <div className="mb-2 flex justify-end">
             <ColumnVisibilityMenu
               columns={columns}
@@ -118,7 +108,7 @@ export function DataTable<TData>({
 
   return (
     <div className="w-full min-w-0 max-w-full">
-      {tableId && (
+      {showInternalColumnsButton && (
         <div className="mb-2 flex justify-end">
           <ColumnVisibilityMenu
             columns={columns}
@@ -178,7 +168,20 @@ export function DataTable<TData>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((row, rowIndex) => {
+          {isLoading
+            ? Array.from({ length: skeletonRowCount }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`} className="bg-background hover:bg-background">
+                  <TableCell
+                    colSpan={visibleColumns.length + (hasActions ? 1 : 0)}
+                    className={dense ? "px-2 py-1" : undefined}
+                  >
+                    <Skeleton className={cn("w-full", dense ? "h-7" : "h-8")} />
+                  </TableCell>
+                </TableRow>
+              ))
+            : (!data || data.length === 0)
+              ? null
+              : data.map((row, rowIndex) => {
             const key = resolveKey(row, rowIndex)
             return (
               <TableRow key={key} className="group bg-background">
