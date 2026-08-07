@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, BarChart3, CheckCircle2, ShieldCheck } from "lucide-react"
 
+import { useBreadcrumbTrail } from "@/components/common/dynamic-breadcrumb"
 import { PageHeader } from "@/components/common/page-header"
 import { StatusBadge } from "@/components/common/status-badge"
 import { UserName } from "@/components/common/user-name"
@@ -23,7 +24,7 @@ import type { CalculationType } from "@/types/finance/cost-calc"
 
 import { CostBreakdownModal } from "./cost-breakdown-modal"
 import { CostHistoryTab } from "./cost-history-tab"
-import { formatDate, formatNumeric } from "./format"
+import { calcTypeLabel, formatDate, formatNumeric } from "./format"
 
 interface Props {
   productSysId: number
@@ -42,8 +43,23 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
   // GetCostResult gRPC may return empty productCode/productName — fall back to product master.
   const needsProductFallback = result != null && (!result.productCode || !result.productName)
   const { data: productMaster } = useCostProductMaster(needsProductFallback ? productSysId : undefined)
-  const productCode = result?.productCode || productMaster?.productCode || `#${productSysId}`
+  // Resolved human code, or null while the query is still settling. Never fall
+  // back to the sys id here — the breadcrumb must not expose raw ids.
+  const resolvedProductCode = result?.productCode || productMaster?.productCode || null
+  const productCode = resolvedProductCode ?? `#${productSysId}`
   const productName = result?.productName || productMaster?.productName || ""
+
+  // The auto-derived trail turns each route param into a clickable crumb that
+  // 404s, so drive the whole trail explicitly. The tail segment is omitted until
+  // the product code is known, rather than briefly rendering the sys id.
+  useBreadcrumbTrail([
+    { label: "Home", href: "/dashboard" },
+    { label: "Finance", href: "/finance/dashboard" },
+    { label: "Cost Results", href: "/finance/cost-results" },
+    ...(resolvedProductCode
+      ? [{ label: `${resolvedProductCode} · ${period} · ${calcTypeLabel(calcType)}` }]
+      : []),
+  ])
 
   function backToList() {
     router.push("/finance/cost-results")

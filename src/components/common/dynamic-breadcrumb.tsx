@@ -8,6 +8,7 @@ import {
     useCallback,
     useContext,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useState,
 } from "react"
@@ -35,6 +36,12 @@ export interface BreadcrumbItemType {
     href?: string
 }
 
+// useLayoutEffect warns when it runs during SSR. Client components still get
+// server-rendered, so fall back to useEffect on the server — the pre-paint
+// guarantee only matters in the browser anyway.
+const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect
+
 // ------------------------------------------------------------
 // Breadcrumb-tail override system
 // ------------------------------------------------------------
@@ -47,6 +54,8 @@ export interface BreadcrumbItemType {
 interface BreadcrumbOverrideContextValue {
     tailLabel: string | null
     setTailLabel: (label: string | null) => void
+    items: BreadcrumbItemType[] | null
+    setItems: (items: BreadcrumbItemType[] | null) => void
 }
 
 const BreadcrumbOverrideContext = createContext<BreadcrumbOverrideContextValue | null>(
@@ -55,12 +64,15 @@ const BreadcrumbOverrideContext = createContext<BreadcrumbOverrideContextValue |
 
 export function BreadcrumbOverrideProvider({ children }: { children: React.ReactNode }) {
     const [tailLabel, setTailLabel] = useState<string | null>(null)
+    const [items, setItems] = useState<BreadcrumbItemType[] | null>(null)
     const value = useMemo(
         () => ({
             tailLabel,
             setTailLabel,
+            items,
+            setItems,
         }),
-        [tailLabel]
+        [tailLabel, items]
     )
     return (
         <BreadcrumbOverrideContext.Provider value={value}>
@@ -82,7 +94,10 @@ export function useBreadcrumbOverride(label: string | null) {
         },
         [ctx]
     )
-    useEffect(() => {
+    // Layout effect for the same reason as useBreadcrumbTrail below: useEffect
+    // flushes after paint, so the raw trailing segment (a UUID or sys id) would
+    // be visible for one frame before the label lands.
+    useIsomorphicLayoutEffect(() => {
         if (!ctx) return
         ctx.setTailLabel(label)
         return () => {
@@ -92,6 +107,32 @@ export function useBreadcrumbOverride(label: string | null) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [label])
     return setTailLabel
+}
+
+/**
+ * Replace the ENTIRE breadcrumb trail until this component unmounts or `items`
+ * becomes null. Use when the auto-derived trail is wrong beyond its tail — e.g.
+ * multi-segment detail routes whose intermediate segments are route params that
+ * would 404 if clicked. Pass `null` while the label data is still loading so the
+ * raw path (ids/UUIDs) is never shown. No-op when the provider is missing.
+ */
+export function useBreadcrumbTrail(items: BreadcrumbItemType[] | null) {
+    const ctx = useContext(BreadcrumbOverrideContext)
+    // Identity-stable key so callers can pass an inline array literal without
+    // triggering an update loop.
+    const key = items ? JSON.stringify(items) : null
+    // Layout effect, not effect: useEffect flushes AFTER paint, so the detail
+    // page would paint one frame of the raw path — including the product sys id
+    // — before the override lands. useLayoutEffect runs before the browser
+    // paints, so the id is never visible.
+    useIsomorphicLayoutEffect(() => {
+        if (!ctx) return
+        ctx.setItems(key ? (JSON.parse(key) as BreadcrumbItemType[]) : null)
+        return () => {
+            ctx.setItems(null)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [key])
 }
 
 interface DynamicBreadcrumbProps {
@@ -164,7 +205,8 @@ export function DynamicBreadcrumb({ items, maxVisibleItems = 4 }: DynamicBreadcr
     const pathname = usePathname()
     const overrideCtx = useContext(BreadcrumbOverrideContext)
 
-    let breadcrumbs = items ?? generateBreadcrumbsFromPath(pathname)
+    let breadcrumbs =
+        items ?? overrideCtx?.items ?? generateBreadcrumbsFromPath(pathname)
     if (overrideCtx?.tailLabel && breadcrumbs.length > 0) {
         breadcrumbs = breadcrumbs.map((b, i) =>
             i === breadcrumbs.length - 1 ? { ...b, label: overrideCtx.tailLabel as string } : b
