@@ -592,6 +592,10 @@ export interface CostResult {
     | undefined;
   /** User who verified (resolved label). */
   verifiedBy: string;
+  /** Product type id (from cost_product_master.cpm_product_type_id). */
+  productTypeId: number;
+  /** Resolved product type code (never the raw id in the UI). */
+  productTypeCode: string;
 }
 
 /** CostBreakdown is the full drill-down for one CostResult. */
@@ -647,6 +651,11 @@ export interface CostRMDetail {
   ratio: string;
   /** Contribution = unit_cost × ratio. */
   contribution: string;
+  /**
+   * Route level this RM edge feeds (1 = FG; 2..N upstream). Already stored in
+   * cpc_rm_cost_detail JSON; previously omitted from the contract.
+   */
+  routeLevel: number;
 }
 
 /** FormulaEval traces one formula evaluation step. */
@@ -872,6 +881,22 @@ export interface ListCostResultsRequest {
   search: string;
   /** Result status filter (UNSPECIFIED = active only, i.e. exclude SUPERSEDED). */
   status: CostResultStatus;
+  /** Product type filter (empty = all types). */
+  productTypeIds: number[];
+  /**
+   * Sort field. Accepted: productCode, productName, period, calculationType,
+   * costPerUnit, totalCost, status, calculatedAt. Unknown/empty = default order
+   * (cpc_calculated_at DESC, cpc_cost_id DESC).
+   */
+  sortBy: string;
+  /**
+   * Sort direction; empty = asc when sort_by names a column (an empty sort_by
+   * still falls back to the default newest-first order). Lowercase only,
+   * matching every other finance list RPC — the repository compares with
+   * EqualFold, so the uppercase spellings were accepted-but-redundant surface
+   * area.
+   */
+  sortOrder: string;
 }
 
 /** ListCostResultsResponse returns a page of cost results across products. */
@@ -888,6 +913,20 @@ export interface ListCostResultsResponse {
     | undefined;
   /** The period actually used (resolved when request period was empty). */
   resolvedPeriod: string;
+}
+
+/** ListCostResultPeriodsRequest has no filter arguments. */
+export interface ListCostResultPeriodsRequest {
+}
+
+/** ListCostResultPeriodsResponse carries the distinct set of calculated periods. */
+export interface ListCostResultPeriodsResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Distinct periods ordered DESC (newest first), YYYYMM strings. */
+  periods: string[];
 }
 
 /** GetCostBreakdownRequest fetches the full drill-down for a cost. */
@@ -908,6 +947,233 @@ export interface GetCostBreakdownResponse {
     | undefined;
   /** Full breakdown: summary + by-level + rm details + formula trace. */
   breakdown: CostBreakdown | undefined;
+}
+
+/**
+ * RouteCostSheetStage is one route stage (one column of the product cost sheet).
+ * Stages are ordered by (route_level, route_seq) as stored in cost_route_seq.
+ */
+export interface RouteCostSheetStage {
+  /** Route level (1 = first stage; ascending downstream). */
+  routeLevel: number;
+  /** Sequence within the level. */
+  routeSeq: number;
+  /** Route stage name (e.g. "POY", "PTY"). */
+  routeName: string;
+  /** Item code of the stage product (used as the sheet/column label; never an id). */
+  itemCode: string;
+  /** Resolved product name of the stage product. */
+  productName: string;
+  /** Shade code (if applicable). */
+  shadeCode: string;
+  /** Shade name (if applicable). */
+  shadeName: string;
+  /** Stage product sys id (internal; not rendered in the sheet). */
+  productSysId: number;
+  /**
+   * False when no cost row exists for this stage in the requested period/type;
+   * the export renders an all-"-" column instead of failing.
+   */
+  hasCost: boolean;
+  /** Parameter snapshot for this stage (key = param_code, val = stringified value). */
+  paramSnapshot: { [key: string]: string };
+}
+
+export interface RouteCostSheetStage_ParamSnapshotEntry {
+  key: string;
+  value: string;
+}
+
+/**
+ * GetRouteCostSheetRequest fetches every route stage's cost snapshot for one
+ * product in a single round-trip, so an N-column sheet costs one call.
+ */
+export interface GetRouteCostSheetRequest {
+  /** Target product sys id; must be > 0. */
+  productSysId: number;
+  /** Period in YYYYMM format. */
+  period: string;
+  /** Calculation flavor; cannot be UNSPECIFIED. */
+  calculationType: CalculationType;
+}
+
+/** GetRouteCostSheetResponse returns the ordered route stages with snapshots. */
+export interface GetRouteCostSheetResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Stages ordered by (route_level, route_seq). */
+  stages: RouteCostSheetStage[];
+}
+
+/**
+ * RequestProductCostSheetExportRequest queues an async product-cost-sheet
+ * export job. Carries the same filter shape as ListCostResultsRequest, plus an
+ * optional explicit product selection that overrides the filter when non-empty.
+ */
+export interface RequestProductCostSheetExportRequest {
+  /** Period in YYYYMM. Required — MinIO artifacts are namespaced by period. */
+  period: string;
+  /** Calculation type filter (UNSPECIFIED = all types in the period). */
+  calculationType: CalculationType;
+  /** Product type filter (empty = all types). */
+  productTypeIds: number[];
+  /** Product code/name search (case-insensitive, optional). */
+  search: string;
+  /** Result status filter (UNSPECIFIED = active only). */
+  status: CostResultStatus;
+  /**
+   * Explicit product selection; when non-empty the filters above are ignored.
+   * Capped at the export handler's own maxExportProducts so an oversized
+   * request is rejected at the edge instead of silently truncated deep in the
+   * handler. Keep the two numbers in sync.
+   */
+  productSysIds: number[];
+}
+
+/** RequestProductCostSheetExportResponse acknowledges the queued job. */
+export interface RequestProductCostSheetExportResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Queued job summary (job_id, job_code, status). */
+  data: ProductCostSheetExportJobInfo | undefined;
+}
+
+/** ProductCostSheetExportJobInfo summarizes a freshly-queued export job. */
+export interface ProductCostSheetExportJobInfo {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "PCS_EX-202604-001"). */
+  jobCode: string;
+  /** Initial status, typically "QUEUED". */
+  status: string;
+  /**
+   * True when this job is a batch-tracking parent (jex_total_children > 0)
+   * fanned out into multiple child export jobs. When false, total_children/
+   * completed_children/failed_children are all 0 and irrelevant.
+   */
+  isBatch: boolean;
+  /** Total child jobs expected (only meaningful when is_batch = true). */
+  totalChildren: number;
+  /** Child jobs that finished SUCCESS so far. */
+  completedChildren: number;
+  /** Child jobs that finished FAILED so far. */
+  failedChildren: number;
+}
+
+/**
+ * GetProductCostSheetDownloadURLRequest identifies the export job whose
+ * artifact the caller wants to download.
+ */
+export interface GetProductCostSheetDownloadURLRequest {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+}
+
+/** GetProductCostSheetDownloadURLResponse carries a presigned download URL. */
+export interface GetProductCostSheetDownloadURLResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Presigned URL + suggested filename + expiry. */
+  data: ProductCostSheetDownloadInfo | undefined;
+}
+
+/** ProductCostSheetDownloadInfo carries the presigned URL for the UI. */
+export interface ProductCostSheetDownloadInfo {
+  /** Short-lived presigned URL the browser can redirect to. */
+  url: string;
+  /** Suggested filename (Content-Disposition). */
+  fileName: string;
+  /** ISO8601 expiry for the presigned URL. */
+  expiresAt: string;
+}
+
+/**
+ * ListCostSheetExportBatchChildrenRequest identifies the batch-tracking
+ * parent job whose child export jobs should be enumerated.
+ */
+export interface ListCostSheetExportBatchChildrenRequest {
+  /** job_execution.job_id of the parent (batch-tracking) job. */
+  parentJobId: string;
+}
+
+/**
+ * ListCostSheetExportBatchChildrenResponse lists every child job belonging
+ * to a batch fan-out, in creation order.
+ */
+export interface ListCostSheetExportBatchChildrenResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Child jobs ordered by creation time (ascending). */
+  children: CostSheetExportBatchChildInfo[];
+}
+
+/**
+ * CostSheetExportBatchChildInfo summarizes one child job within a batch
+ * fan-out, including its download URL once the artifact is ready.
+ */
+export interface CostSheetExportBatchChildInfo {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "PCS_EX-202604-001"). */
+  jobCode: string;
+  /** Current status (e.g. "QUEUED", "PROCESSING", "SUCCESS", "FAILED"). */
+  status: string;
+  /**
+   * Short-lived presigned download URL; empty until status is SUCCESS and
+   * the URL could be resolved. Never causes the batch listing to fail.
+   */
+  downloadUrl: string;
+  /** Suggested filename (Content-Disposition); empty when download_url is empty. */
+  fileName: string;
+}
+
+/**
+ * GetProductCostSheetExportJobStatusRequest identifies the export job (either
+ * a standalone job or a batch-tracking parent) whose live status/progress
+ * should be polled while it is still QUEUED or PROCESSING.
+ */
+export interface GetProductCostSheetExportJobStatusRequest {
+  /**
+   * job_execution.job_id (UUID). Works for both a standalone job and a batch
+   * parent job.
+   */
+  jobId: string;
+}
+
+/**
+ * GetProductCostSheetExportJobStatusResponse reports the job's current
+ * status and, for a batch parent, its live child-completion counters.
+ */
+export interface GetProductCostSheetExportJobStatusResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "PCS_EX-202604-001"). */
+  jobCode: string;
+  /** Current status (e.g. "QUEUED", "PROCESSING", "SUCCESS", "FAILED"). */
+  status: string;
+  /**
+   * True when this job is a batch-tracking parent (jex_total_children > 0).
+   * When false, total_children/completed_children/failed_children are all 0.
+   */
+  isBatch: boolean;
+  /** Total child jobs expected (only meaningful when is_batch = true). */
+  totalChildren: number;
+  /** Child jobs that finished SUCCESS so far. */
+  completedChildren: number;
+  /** Child jobs that finished FAILED so far. */
+  failedChildren: number;
 }
 
 /** ListCostHistoryRequest lists versioned cost history for a product. */
@@ -997,6 +1263,110 @@ export interface ProcessChunkInternalResponse {
   failedCount: number;
   /** Number of products that were BLOCKED (missing CAPP, missing RM cost, etc.). */
   blockedCount: number;
+}
+
+/**
+ * GetBatchChildDownloadUrlRequest identifies one child job within a batch
+ * fan-out whose artifact should be freshly presigned.
+ */
+export interface GetBatchChildDownloadUrlRequest {
+  /** job_execution.job_id of the parent (batch-tracking) job. */
+  parentJobId: string;
+  /** job_execution.job_id of the child job whose artifact is downloaded. */
+  childJobId: string;
+}
+
+/**
+ * GetBatchChildDownloadUrlResponse carries a freshly presigned download URL
+ * for one child job's artifact. Re-presigned on every call; short validity
+ * (~5 min) is fine since it is used immediately after fetch.
+ */
+export interface GetBatchChildDownloadUrlResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Short-lived presigned URL the browser can redirect to. */
+  downloadUrl: string;
+  /** Suggested filename (Content-Disposition). */
+  fileName: string;
+}
+
+/**
+ * DownloadExportBatchZipRequest identifies the batch-tracking parent job
+ * whose completed child artifacts should be bundled into a single zip.
+ */
+export interface DownloadExportBatchZipRequest {
+  /** job_execution.job_id of the parent (batch-tracking) job. */
+  parentJobId: string;
+}
+
+/**
+ * DownloadExportBatchZipResponse carries the zipped bytes of every completed
+ * child file in the batch as one unary response (small few-hundred-KB-to-
+ * few-MB payloads are fine here; no streaming precedent exists in this file).
+ */
+export interface DownloadExportBatchZipResponse {
+  /** Zip archive bytes containing every completed child export file. */
+  zipData: Uint8Array;
+  /** Suggested filename (Content-Disposition). */
+  fileName: string;
+}
+
+/**
+ * ListExportJobsRequest lists recent cost-sheet export job_execution rows
+ * (both batch-tracking parents and standalone single jobs), for a "recent
+ * exports" UI.
+ */
+export interface ListExportJobsRequest {
+  /** Pagination params. */
+  pagination:
+    | PaginationRequest
+    | undefined;
+  /** Optional period filter (YYYYMM). */
+  period: string;
+}
+
+/** ListExportJobsResponse returns a page of export job summaries. */
+export interface ListExportJobsResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Page of export job summaries, newest first. */
+  jobs: ExportJobSummary[];
+  /** Pagination metadata. */
+  pagination: PaginationResponse | undefined;
+}
+
+/**
+ * ExportJobSummary summarizes one export job row (parent/batch or standalone)
+ * for the recent-exports listing.
+ */
+export interface ExportJobSummary {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "PCS_EX-202604-001"). */
+  jobCode: string;
+  /** Period in YYYYMM format. */
+  period: string;
+  /** Current status (e.g. "QUEUED", "PROCESSING", "SUCCESS", "FAILED"). */
+  status: string;
+  /** Total child jobs expected (only meaningful when is_batch = true). */
+  totalChildren: number;
+  /** Child jobs that finished SUCCESS so far. */
+  completedChildren: number;
+  /** Child jobs that finished FAILED so far. */
+  failedChildren: number;
+  /** When the job was queued. */
+  queuedAt:
+    | Date
+    | undefined;
+  /**
+   * True when this job is a batch-tracking parent fanned out into multiple
+   * child export jobs; false for a standalone single job.
+   */
+  isBatch: boolean;
 }
 
 function createBaseCalJob(): CalJob {
@@ -2321,6 +2691,8 @@ function createBaseCostResult(): CostResult {
     calculatedBy: "",
     verifiedAt: undefined,
     verifiedBy: "",
+    productTypeId: 0,
+    productTypeCode: "",
   };
 }
 
@@ -2388,6 +2760,12 @@ export const CostResult: MessageFns<CostResult> = {
     }
     if (message.verifiedBy !== "") {
       writer.uint32(170).string(message.verifiedBy);
+    }
+    if (message.productTypeId !== 0) {
+      writer.uint32(176).int32(message.productTypeId);
+    }
+    if (message.productTypeCode !== "") {
+      writer.uint32(186).string(message.productTypeCode);
     }
     return writer;
   },
@@ -2567,6 +2945,22 @@ export const CostResult: MessageFns<CostResult> = {
           message.verifiedBy = reader.string();
           continue;
         }
+        case 22: {
+          if (tag !== 176) {
+            break;
+          }
+
+          message.productTypeId = reader.int32();
+          continue;
+        }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.productTypeCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2671,6 +3065,16 @@ export const CostResult: MessageFns<CostResult> = {
         : isSet(object.verified_by)
         ? globalThis.String(object.verified_by)
         : "",
+      productTypeId: isSet(object.productTypeId)
+        ? globalThis.Number(object.productTypeId)
+        : isSet(object.product_type_id)
+        ? globalThis.Number(object.product_type_id)
+        : 0,
+      productTypeCode: isSet(object.productTypeCode)
+        ? globalThis.String(object.productTypeCode)
+        : isSet(object.product_type_code)
+        ? globalThis.String(object.product_type_code)
+        : "",
     };
   },
 
@@ -2739,6 +3143,12 @@ export const CostResult: MessageFns<CostResult> = {
     if (message.verifiedBy !== "") {
       obj.verifiedBy = message.verifiedBy;
     }
+    if (message.productTypeId !== 0) {
+      obj.productTypeId = Math.round(message.productTypeId);
+    }
+    if (message.productTypeCode !== "") {
+      obj.productTypeCode = message.productTypeCode;
+    }
     return obj;
   },
 
@@ -2768,6 +3178,8 @@ export const CostResult: MessageFns<CostResult> = {
     message.calculatedBy = object.calculatedBy ?? "";
     message.verifiedAt = object.verifiedAt ?? undefined;
     message.verifiedBy = object.verifiedBy ?? "";
+    message.productTypeId = object.productTypeId ?? 0;
+    message.productTypeCode = object.productTypeCode ?? "";
     return message;
   },
 };
@@ -3176,7 +3588,16 @@ export const LevelBreakdown: MessageFns<LevelBreakdown> = {
 };
 
 function createBaseCostRMDetail(): CostRMDetail {
-  return { rmType: "", refCode: "", refLabel: "", shadeCode: "", unitCost: "", ratio: "", contribution: "" };
+  return {
+    rmType: "",
+    refCode: "",
+    refLabel: "",
+    shadeCode: "",
+    unitCost: "",
+    ratio: "",
+    contribution: "",
+    routeLevel: 0,
+  };
 }
 
 export const CostRMDetail: MessageFns<CostRMDetail> = {
@@ -3201,6 +3622,9 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     }
     if (message.contribution !== "") {
       writer.uint32(58).string(message.contribution);
+    }
+    if (message.routeLevel !== 0) {
+      writer.uint32(64).int32(message.routeLevel);
     }
     return writer;
   },
@@ -3268,6 +3692,14 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
           message.contribution = reader.string();
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.routeLevel = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3306,6 +3738,11 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
         : "",
       ratio: isSet(object.ratio) ? globalThis.String(object.ratio) : "",
       contribution: isSet(object.contribution) ? globalThis.String(object.contribution) : "",
+      routeLevel: isSet(object.routeLevel)
+        ? globalThis.Number(object.routeLevel)
+        : isSet(object.route_level)
+        ? globalThis.Number(object.route_level)
+        : 0,
     };
   },
 
@@ -3332,6 +3769,9 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     if (message.contribution !== "") {
       obj.contribution = message.contribution;
     }
+    if (message.routeLevel !== 0) {
+      obj.routeLevel = Math.round(message.routeLevel);
+    }
     return obj;
   },
 
@@ -3347,6 +3787,7 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     message.unitCost = object.unitCost ?? "";
     message.ratio = object.ratio ?? "";
     message.contribution = object.contribution ?? "";
+    message.routeLevel = object.routeLevel ?? 0;
     return message;
   },
 };
@@ -5204,7 +5645,16 @@ export const GetCostResultResponse: MessageFns<GetCostResultResponse> = {
 };
 
 function createBaseListCostResultsRequest(): ListCostResultsRequest {
-  return { pagination: undefined, period: "", calculationType: 0, search: "", status: 0 };
+  return {
+    pagination: undefined,
+    period: "",
+    calculationType: 0,
+    search: "",
+    status: 0,
+    productTypeIds: [],
+    sortBy: "",
+    sortOrder: "",
+  };
 }
 
 export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
@@ -5223,6 +5673,15 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     }
     if (message.status !== 0) {
       writer.uint32(40).int32(message.status);
+    }
+    for (const v of message.productTypeIds) {
+      writer.uint32(48).int32(v!);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(58).string(message.sortBy);
+    }
+    if (message.sortOrder !== "") {
+      writer.uint32(66).string(message.sortOrder);
     }
     return writer;
   },
@@ -5274,6 +5733,40 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
           message.status = reader.int32() as any;
           continue;
         }
+        case 6: {
+          if (tag === 48) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 50) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.sortOrder = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5294,6 +5787,21 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
         : 0,
       search: isSet(object.search) ? globalThis.String(object.search) : "",
       status: isSet(object.status) ? costResultStatusFromJSON(object.status) : 0,
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      sortBy: isSet(object.sortBy)
+        ? globalThis.String(object.sortBy)
+        : isSet(object.sort_by)
+        ? globalThis.String(object.sort_by)
+        : "",
+      sortOrder: isSet(object.sortOrder)
+        ? globalThis.String(object.sortOrder)
+        : isSet(object.sort_order)
+        ? globalThis.String(object.sort_order)
+        : "",
     };
   },
 
@@ -5314,6 +5822,15 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     if (message.status !== 0) {
       obj.status = costResultStatusToJSON(message.status);
     }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
+    if (message.sortBy !== "") {
+      obj.sortBy = message.sortBy;
+    }
+    if (message.sortOrder !== "") {
+      obj.sortOrder = message.sortOrder;
+    }
     return obj;
   },
 
@@ -5329,6 +5846,9 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     message.calculationType = object.calculationType ?? 0;
     message.search = object.search ?? "";
     message.status = object.status ?? 0;
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
+    message.sortBy = object.sortBy ?? "";
+    message.sortOrder = object.sortOrder ?? "";
     return message;
   },
 };
@@ -5445,6 +5965,127 @@ export const ListCostResultsResponse: MessageFns<ListCostResultsResponse> = {
       ? PaginationResponse.fromPartial(object.pagination)
       : undefined;
     message.resolvedPeriod = object.resolvedPeriod ?? "";
+    return message;
+  },
+};
+
+function createBaseListCostResultPeriodsRequest(): ListCostResultPeriodsRequest {
+  return {};
+}
+
+export const ListCostResultPeriodsRequest: MessageFns<ListCostResultPeriodsRequest> = {
+  encode(_: ListCostResultPeriodsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListCostResultPeriodsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListCostResultPeriodsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): ListCostResultPeriodsRequest {
+    return {};
+  },
+
+  toJSON(_: ListCostResultPeriodsRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListCostResultPeriodsRequest>): ListCostResultPeriodsRequest {
+    return ListCostResultPeriodsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<ListCostResultPeriodsRequest>): ListCostResultPeriodsRequest {
+    const message = createBaseListCostResultPeriodsRequest();
+    return message;
+  },
+};
+
+function createBaseListCostResultPeriodsResponse(): ListCostResultPeriodsResponse {
+  return { base: undefined, periods: [] };
+}
+
+export const ListCostResultPeriodsResponse: MessageFns<ListCostResultPeriodsResponse> = {
+  encode(message: ListCostResultPeriodsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.periods) {
+      writer.uint32(18).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListCostResultPeriodsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListCostResultPeriodsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.periods.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListCostResultPeriodsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      periods: globalThis.Array.isArray(object?.periods) ? object.periods.map((e: any) => globalThis.String(e)) : [],
+    };
+  },
+
+  toJSON(message: ListCostResultPeriodsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.periods?.length) {
+      obj.periods = message.periods;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListCostResultPeriodsResponse>): ListCostResultPeriodsResponse {
+    return ListCostResultPeriodsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListCostResultPeriodsResponse>): ListCostResultPeriodsResponse {
+    const message = createBaseListCostResultPeriodsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.periods = object.periods?.map((e) => e) || [];
     return message;
   },
 };
@@ -5625,6 +6266,1789 @@ export const GetCostBreakdownResponse: MessageFns<GetCostBreakdownResponse> = {
     message.breakdown = (object.breakdown !== undefined && object.breakdown !== null)
       ? CostBreakdown.fromPartial(object.breakdown)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseRouteCostSheetStage(): RouteCostSheetStage {
+  return {
+    routeLevel: 0,
+    routeSeq: 0,
+    routeName: "",
+    itemCode: "",
+    productName: "",
+    shadeCode: "",
+    shadeName: "",
+    productSysId: 0,
+    hasCost: false,
+    paramSnapshot: {},
+  };
+}
+
+export const RouteCostSheetStage: MessageFns<RouteCostSheetStage> = {
+  encode(message: RouteCostSheetStage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.routeLevel !== 0) {
+      writer.uint32(8).int32(message.routeLevel);
+    }
+    if (message.routeSeq !== 0) {
+      writer.uint32(16).int32(message.routeSeq);
+    }
+    if (message.routeName !== "") {
+      writer.uint32(26).string(message.routeName);
+    }
+    if (message.itemCode !== "") {
+      writer.uint32(34).string(message.itemCode);
+    }
+    if (message.productName !== "") {
+      writer.uint32(42).string(message.productName);
+    }
+    if (message.shadeCode !== "") {
+      writer.uint32(50).string(message.shadeCode);
+    }
+    if (message.shadeName !== "") {
+      writer.uint32(58).string(message.shadeName);
+    }
+    if (message.productSysId !== 0) {
+      writer.uint32(64).int64(message.productSysId);
+    }
+    if (message.hasCost !== false) {
+      writer.uint32(72).bool(message.hasCost);
+    }
+    globalThis.Object.entries(message.paramSnapshot).forEach(([key, value]: [string, string]) => {
+      RouteCostSheetStage_ParamSnapshotEntry.encode({ key: key as any, value }, writer.uint32(82).fork()).join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RouteCostSheetStage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRouteCostSheetStage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.routeLevel = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.routeSeq = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.routeName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.itemCode = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.productName = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.shadeCode = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.shadeName = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.hasCost = reader.bool();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          const entry10 = RouteCostSheetStage_ParamSnapshotEntry.decode(reader, reader.uint32());
+          if (entry10.value !== undefined) {
+            message.paramSnapshot[entry10.key] = entry10.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RouteCostSheetStage {
+    return {
+      routeLevel: isSet(object.routeLevel)
+        ? globalThis.Number(object.routeLevel)
+        : isSet(object.route_level)
+        ? globalThis.Number(object.route_level)
+        : 0,
+      routeSeq: isSet(object.routeSeq)
+        ? globalThis.Number(object.routeSeq)
+        : isSet(object.route_seq)
+        ? globalThis.Number(object.route_seq)
+        : 0,
+      routeName: isSet(object.routeName)
+        ? globalThis.String(object.routeName)
+        : isSet(object.route_name)
+        ? globalThis.String(object.route_name)
+        : "",
+      itemCode: isSet(object.itemCode)
+        ? globalThis.String(object.itemCode)
+        : isSet(object.item_code)
+        ? globalThis.String(object.item_code)
+        : "",
+      productName: isSet(object.productName)
+        ? globalThis.String(object.productName)
+        : isSet(object.product_name)
+        ? globalThis.String(object.product_name)
+        : "",
+      shadeCode: isSet(object.shadeCode)
+        ? globalThis.String(object.shadeCode)
+        : isSet(object.shade_code)
+        ? globalThis.String(object.shade_code)
+        : "",
+      shadeName: isSet(object.shadeName)
+        ? globalThis.String(object.shadeName)
+        : isSet(object.shade_name)
+        ? globalThis.String(object.shade_name)
+        : "",
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      hasCost: isSet(object.hasCost)
+        ? globalThis.Boolean(object.hasCost)
+        : isSet(object.has_cost)
+        ? globalThis.Boolean(object.has_cost)
+        : false,
+      paramSnapshot: isObject(object.paramSnapshot)
+        ? (globalThis.Object.entries(object.paramSnapshot) as [string, any][]).reduce(
+          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
+            acc[key] = globalThis.String(value);
+            return acc;
+          },
+          {},
+        )
+        : isObject(object.param_snapshot)
+        ? (globalThis.Object.entries(object.param_snapshot) as [string, any][]).reduce(
+          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
+            acc[key] = globalThis.String(value);
+            return acc;
+          },
+          {},
+        )
+        : {},
+    };
+  },
+
+  toJSON(message: RouteCostSheetStage): unknown {
+    const obj: any = {};
+    if (message.routeLevel !== 0) {
+      obj.routeLevel = Math.round(message.routeLevel);
+    }
+    if (message.routeSeq !== 0) {
+      obj.routeSeq = Math.round(message.routeSeq);
+    }
+    if (message.routeName !== "") {
+      obj.routeName = message.routeName;
+    }
+    if (message.itemCode !== "") {
+      obj.itemCode = message.itemCode;
+    }
+    if (message.productName !== "") {
+      obj.productName = message.productName;
+    }
+    if (message.shadeCode !== "") {
+      obj.shadeCode = message.shadeCode;
+    }
+    if (message.shadeName !== "") {
+      obj.shadeName = message.shadeName;
+    }
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.hasCost !== false) {
+      obj.hasCost = message.hasCost;
+    }
+    if (message.paramSnapshot) {
+      const entries = globalThis.Object.entries(message.paramSnapshot) as [string, string][];
+      if (entries.length > 0) {
+        obj.paramSnapshot = {};
+        entries.forEach(([k, v]) => {
+          obj.paramSnapshot[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RouteCostSheetStage>): RouteCostSheetStage {
+    return RouteCostSheetStage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RouteCostSheetStage>): RouteCostSheetStage {
+    const message = createBaseRouteCostSheetStage();
+    message.routeLevel = object.routeLevel ?? 0;
+    message.routeSeq = object.routeSeq ?? 0;
+    message.routeName = object.routeName ?? "";
+    message.itemCode = object.itemCode ?? "";
+    message.productName = object.productName ?? "";
+    message.shadeCode = object.shadeCode ?? "";
+    message.shadeName = object.shadeName ?? "";
+    message.productSysId = object.productSysId ?? 0;
+    message.hasCost = object.hasCost ?? false;
+    message.paramSnapshot = (globalThis.Object.entries(object.paramSnapshot ?? {}) as [string, string][]).reduce(
+      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.String(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseRouteCostSheetStage_ParamSnapshotEntry(): RouteCostSheetStage_ParamSnapshotEntry {
+  return { key: "", value: "" };
+}
+
+export const RouteCostSheetStage_ParamSnapshotEntry: MessageFns<RouteCostSheetStage_ParamSnapshotEntry> = {
+  encode(message: RouteCostSheetStage_ParamSnapshotEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RouteCostSheetStage_ParamSnapshotEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRouteCostSheetStage_ParamSnapshotEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RouteCostSheetStage_ParamSnapshotEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: RouteCostSheetStage_ParamSnapshotEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RouteCostSheetStage_ParamSnapshotEntry>): RouteCostSheetStage_ParamSnapshotEntry {
+    return RouteCostSheetStage_ParamSnapshotEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RouteCostSheetStage_ParamSnapshotEntry>): RouteCostSheetStage_ParamSnapshotEntry {
+    const message = createBaseRouteCostSheetStage_ParamSnapshotEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseGetRouteCostSheetRequest(): GetRouteCostSheetRequest {
+  return { productSysId: 0, period: "", calculationType: 0 };
+}
+
+export const GetRouteCostSheetRequest: MessageFns<GetRouteCostSheetRequest> = {
+  encode(message: GetRouteCostSheetRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.period !== "") {
+      writer.uint32(18).string(message.period);
+    }
+    if (message.calculationType !== 0) {
+      writer.uint32(24).int32(message.calculationType);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRouteCostSheetRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetRouteCostSheetRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.calculationType = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetRouteCostSheetRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      calculationType: isSet(object.calculationType)
+        ? calculationTypeFromJSON(object.calculationType)
+        : isSet(object.calculation_type)
+        ? calculationTypeFromJSON(object.calculation_type)
+        : 0,
+    };
+  },
+
+  toJSON(message: GetRouteCostSheetRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.calculationType !== 0) {
+      obj.calculationType = calculationTypeToJSON(message.calculationType);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRouteCostSheetRequest>): GetRouteCostSheetRequest {
+    return GetRouteCostSheetRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRouteCostSheetRequest>): GetRouteCostSheetRequest {
+    const message = createBaseGetRouteCostSheetRequest();
+    message.productSysId = object.productSysId ?? 0;
+    message.period = object.period ?? "";
+    message.calculationType = object.calculationType ?? 0;
+    return message;
+  },
+};
+
+function createBaseGetRouteCostSheetResponse(): GetRouteCostSheetResponse {
+  return { base: undefined, stages: [] };
+}
+
+export const GetRouteCostSheetResponse: MessageFns<GetRouteCostSheetResponse> = {
+  encode(message: GetRouteCostSheetResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.stages) {
+      RouteCostSheetStage.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRouteCostSheetResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetRouteCostSheetResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.stages.push(RouteCostSheetStage.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetRouteCostSheetResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      stages: globalThis.Array.isArray(object?.stages)
+        ? object.stages.map((e: any) => RouteCostSheetStage.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: GetRouteCostSheetResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.stages?.length) {
+      obj.stages = message.stages.map((e) => RouteCostSheetStage.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRouteCostSheetResponse>): GetRouteCostSheetResponse {
+    return GetRouteCostSheetResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRouteCostSheetResponse>): GetRouteCostSheetResponse {
+    const message = createBaseGetRouteCostSheetResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.stages = object.stages?.map((e) => RouteCostSheetStage.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseRequestProductCostSheetExportRequest(): RequestProductCostSheetExportRequest {
+  return { period: "", calculationType: 0, productTypeIds: [], search: "", status: 0, productSysIds: [] };
+}
+
+export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCostSheetExportRequest> = {
+  encode(message: RequestProductCostSheetExportRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.period !== "") {
+      writer.uint32(10).string(message.period);
+    }
+    if (message.calculationType !== 0) {
+      writer.uint32(16).int32(message.calculationType);
+    }
+    for (const v of message.productTypeIds) {
+      writer.uint32(24).int32(v!);
+    }
+    if (message.search !== "") {
+      writer.uint32(34).string(message.search);
+    }
+    if (message.status !== 0) {
+      writer.uint32(40).int32(message.status);
+    }
+    for (const v of message.productSysIds) {
+      writer.uint32(48).int64(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RequestProductCostSheetExportRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRequestProductCostSheetExportRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.calculationType = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag === 24) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag === 48) {
+            message.productSysIds.push(longToNumber(reader.int64()));
+
+            continue;
+          }
+
+          if (tag === 50) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productSysIds.push(longToNumber(reader.int64()));
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RequestProductCostSheetExportRequest {
+    return {
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      calculationType: isSet(object.calculationType)
+        ? calculationTypeFromJSON(object.calculationType)
+        : isSet(object.calculation_type)
+        ? calculationTypeFromJSON(object.calculation_type)
+        : 0,
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      status: isSet(object.status) ? costResultStatusFromJSON(object.status) : 0,
+      productSysIds: globalThis.Array.isArray(object?.productSysIds)
+        ? object.productSysIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_sys_ids)
+        ? object.product_sys_ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: RequestProductCostSheetExportRequest): unknown {
+    const obj: any = {};
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.calculationType !== 0) {
+      obj.calculationType = calculationTypeToJSON(message.calculationType);
+    }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.status !== 0) {
+      obj.status = costResultStatusToJSON(message.status);
+    }
+    if (message.productSysIds?.length) {
+      obj.productSysIds = message.productSysIds.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RequestProductCostSheetExportRequest>): RequestProductCostSheetExportRequest {
+    return RequestProductCostSheetExportRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RequestProductCostSheetExportRequest>): RequestProductCostSheetExportRequest {
+    const message = createBaseRequestProductCostSheetExportRequest();
+    message.period = object.period ?? "";
+    message.calculationType = object.calculationType ?? 0;
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
+    message.search = object.search ?? "";
+    message.status = object.status ?? 0;
+    message.productSysIds = object.productSysIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseRequestProductCostSheetExportResponse(): RequestProductCostSheetExportResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const RequestProductCostSheetExportResponse: MessageFns<RequestProductCostSheetExportResponse> = {
+  encode(message: RequestProductCostSheetExportResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      ProductCostSheetExportJobInfo.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RequestProductCostSheetExportResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRequestProductCostSheetExportResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = ProductCostSheetExportJobInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RequestProductCostSheetExportResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? ProductCostSheetExportJobInfo.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: RequestProductCostSheetExportResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = ProductCostSheetExportJobInfo.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RequestProductCostSheetExportResponse>): RequestProductCostSheetExportResponse {
+    return RequestProductCostSheetExportResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RequestProductCostSheetExportResponse>): RequestProductCostSheetExportResponse {
+    const message = createBaseRequestProductCostSheetExportResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? ProductCostSheetExportJobInfo.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseProductCostSheetExportJobInfo(): ProductCostSheetExportJobInfo {
+  return {
+    jobId: "",
+    jobCode: "",
+    status: "",
+    isBatch: false,
+    totalChildren: 0,
+    completedChildren: 0,
+    failedChildren: 0,
+  };
+}
+
+export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJobInfo> = {
+  encode(message: ProductCostSheetExportJobInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(18).string(message.jobCode);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    if (message.isBatch !== false) {
+      writer.uint32(32).bool(message.isBatch);
+    }
+    if (message.totalChildren !== 0) {
+      writer.uint32(40).int32(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      writer.uint32(48).int32(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      writer.uint32(56).int32(message.failedChildren);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProductCostSheetExportJobInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProductCostSheetExportJobInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isBatch = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.totalChildren = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.completedChildren = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.failedChildren = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProductCostSheetExportJobInfo {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      isBatch: isSet(object.isBatch)
+        ? globalThis.Boolean(object.isBatch)
+        : isSet(object.is_batch)
+        ? globalThis.Boolean(object.is_batch)
+        : false,
+      totalChildren: isSet(object.totalChildren)
+        ? globalThis.Number(object.totalChildren)
+        : isSet(object.total_children)
+        ? globalThis.Number(object.total_children)
+        : 0,
+      completedChildren: isSet(object.completedChildren)
+        ? globalThis.Number(object.completedChildren)
+        : isSet(object.completed_children)
+        ? globalThis.Number(object.completed_children)
+        : 0,
+      failedChildren: isSet(object.failedChildren)
+        ? globalThis.Number(object.failedChildren)
+        : isSet(object.failed_children)
+        ? globalThis.Number(object.failed_children)
+        : 0,
+    };
+  },
+
+  toJSON(message: ProductCostSheetExportJobInfo): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.isBatch !== false) {
+      obj.isBatch = message.isBatch;
+    }
+    if (message.totalChildren !== 0) {
+      obj.totalChildren = Math.round(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      obj.completedChildren = Math.round(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      obj.failedChildren = Math.round(message.failedChildren);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProductCostSheetExportJobInfo>): ProductCostSheetExportJobInfo {
+    return ProductCostSheetExportJobInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProductCostSheetExportJobInfo>): ProductCostSheetExportJobInfo {
+    const message = createBaseProductCostSheetExportJobInfo();
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.status = object.status ?? "";
+    message.isBatch = object.isBatch ?? false;
+    message.totalChildren = object.totalChildren ?? 0;
+    message.completedChildren = object.completedChildren ?? 0;
+    message.failedChildren = object.failedChildren ?? 0;
+    return message;
+  },
+};
+
+function createBaseGetProductCostSheetDownloadURLRequest(): GetProductCostSheetDownloadURLRequest {
+  return { jobId: "" };
+}
+
+export const GetProductCostSheetDownloadURLRequest: MessageFns<GetProductCostSheetDownloadURLRequest> = {
+  encode(message: GetProductCostSheetDownloadURLRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetProductCostSheetDownloadURLRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetProductCostSheetDownloadURLRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetProductCostSheetDownloadURLRequest {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetProductCostSheetDownloadURLRequest): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetProductCostSheetDownloadURLRequest>): GetProductCostSheetDownloadURLRequest {
+    return GetProductCostSheetDownloadURLRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetProductCostSheetDownloadURLRequest>): GetProductCostSheetDownloadURLRequest {
+    const message = createBaseGetProductCostSheetDownloadURLRequest();
+    message.jobId = object.jobId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetProductCostSheetDownloadURLResponse(): GetProductCostSheetDownloadURLResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const GetProductCostSheetDownloadURLResponse: MessageFns<GetProductCostSheetDownloadURLResponse> = {
+  encode(message: GetProductCostSheetDownloadURLResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      ProductCostSheetDownloadInfo.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetProductCostSheetDownloadURLResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetProductCostSheetDownloadURLResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = ProductCostSheetDownloadInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetProductCostSheetDownloadURLResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? ProductCostSheetDownloadInfo.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: GetProductCostSheetDownloadURLResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = ProductCostSheetDownloadInfo.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetProductCostSheetDownloadURLResponse>): GetProductCostSheetDownloadURLResponse {
+    return GetProductCostSheetDownloadURLResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetProductCostSheetDownloadURLResponse>): GetProductCostSheetDownloadURLResponse {
+    const message = createBaseGetProductCostSheetDownloadURLResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? ProductCostSheetDownloadInfo.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseProductCostSheetDownloadInfo(): ProductCostSheetDownloadInfo {
+  return { url: "", fileName: "", expiresAt: "" };
+}
+
+export const ProductCostSheetDownloadInfo: MessageFns<ProductCostSheetDownloadInfo> = {
+  encode(message: ProductCostSheetDownloadInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.url !== "") {
+      writer.uint32(10).string(message.url);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(18).string(message.fileName);
+    }
+    if (message.expiresAt !== "") {
+      writer.uint32(26).string(message.expiresAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProductCostSheetDownloadInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProductCostSheetDownloadInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.expiresAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProductCostSheetDownloadInfo {
+    return {
+      url: isSet(object.url) ? globalThis.String(object.url) : "",
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+      expiresAt: isSet(object.expiresAt)
+        ? globalThis.String(object.expiresAt)
+        : isSet(object.expires_at)
+        ? globalThis.String(object.expires_at)
+        : "",
+    };
+  },
+
+  toJSON(message: ProductCostSheetDownloadInfo): unknown {
+    const obj: any = {};
+    if (message.url !== "") {
+      obj.url = message.url;
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    if (message.expiresAt !== "") {
+      obj.expiresAt = message.expiresAt;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProductCostSheetDownloadInfo>): ProductCostSheetDownloadInfo {
+    return ProductCostSheetDownloadInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProductCostSheetDownloadInfo>): ProductCostSheetDownloadInfo {
+    const message = createBaseProductCostSheetDownloadInfo();
+    message.url = object.url ?? "";
+    message.fileName = object.fileName ?? "";
+    message.expiresAt = object.expiresAt ?? "";
+    return message;
+  },
+};
+
+function createBaseListCostSheetExportBatchChildrenRequest(): ListCostSheetExportBatchChildrenRequest {
+  return { parentJobId: "" };
+}
+
+export const ListCostSheetExportBatchChildrenRequest: MessageFns<ListCostSheetExportBatchChildrenRequest> = {
+  encode(message: ListCostSheetExportBatchChildrenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.parentJobId !== "") {
+      writer.uint32(10).string(message.parentJobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListCostSheetExportBatchChildrenRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListCostSheetExportBatchChildrenRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.parentJobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListCostSheetExportBatchChildrenRequest {
+    return {
+      parentJobId: isSet(object.parentJobId)
+        ? globalThis.String(object.parentJobId)
+        : isSet(object.parent_job_id)
+        ? globalThis.String(object.parent_job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ListCostSheetExportBatchChildrenRequest): unknown {
+    const obj: any = {};
+    if (message.parentJobId !== "") {
+      obj.parentJobId = message.parentJobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListCostSheetExportBatchChildrenRequest>): ListCostSheetExportBatchChildrenRequest {
+    return ListCostSheetExportBatchChildrenRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListCostSheetExportBatchChildrenRequest>): ListCostSheetExportBatchChildrenRequest {
+    const message = createBaseListCostSheetExportBatchChildrenRequest();
+    message.parentJobId = object.parentJobId ?? "";
+    return message;
+  },
+};
+
+function createBaseListCostSheetExportBatchChildrenResponse(): ListCostSheetExportBatchChildrenResponse {
+  return { base: undefined, children: [] };
+}
+
+export const ListCostSheetExportBatchChildrenResponse: MessageFns<ListCostSheetExportBatchChildrenResponse> = {
+  encode(message: ListCostSheetExportBatchChildrenResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.children) {
+      CostSheetExportBatchChildInfo.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListCostSheetExportBatchChildrenResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListCostSheetExportBatchChildrenResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.children.push(CostSheetExportBatchChildInfo.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListCostSheetExportBatchChildrenResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      children: globalThis.Array.isArray(object?.children)
+        ? object.children.map((e: any) => CostSheetExportBatchChildInfo.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListCostSheetExportBatchChildrenResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.children?.length) {
+      obj.children = message.children.map((e) => CostSheetExportBatchChildInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListCostSheetExportBatchChildrenResponse>): ListCostSheetExportBatchChildrenResponse {
+    return ListCostSheetExportBatchChildrenResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListCostSheetExportBatchChildrenResponse>): ListCostSheetExportBatchChildrenResponse {
+    const message = createBaseListCostSheetExportBatchChildrenResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.children = object.children?.map((e) => CostSheetExportBatchChildInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseCostSheetExportBatchChildInfo(): CostSheetExportBatchChildInfo {
+  return { jobId: "", jobCode: "", status: "", downloadUrl: "", fileName: "" };
+}
+
+export const CostSheetExportBatchChildInfo: MessageFns<CostSheetExportBatchChildInfo> = {
+  encode(message: CostSheetExportBatchChildInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(18).string(message.jobCode);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    if (message.downloadUrl !== "") {
+      writer.uint32(34).string(message.downloadUrl);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(42).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CostSheetExportBatchChildInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCostSheetExportBatchChildInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.downloadUrl = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CostSheetExportBatchChildInfo {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      downloadUrl: isSet(object.downloadUrl)
+        ? globalThis.String(object.downloadUrl)
+        : isSet(object.download_url)
+        ? globalThis.String(object.download_url)
+        : "",
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: CostSheetExportBatchChildInfo): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.downloadUrl !== "") {
+      obj.downloadUrl = message.downloadUrl;
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CostSheetExportBatchChildInfo>): CostSheetExportBatchChildInfo {
+    return CostSheetExportBatchChildInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CostSheetExportBatchChildInfo>): CostSheetExportBatchChildInfo {
+    const message = createBaseCostSheetExportBatchChildInfo();
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.status = object.status ?? "";
+    message.downloadUrl = object.downloadUrl ?? "";
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseGetProductCostSheetExportJobStatusRequest(): GetProductCostSheetExportJobStatusRequest {
+  return { jobId: "" };
+}
+
+export const GetProductCostSheetExportJobStatusRequest: MessageFns<GetProductCostSheetExportJobStatusRequest> = {
+  encode(message: GetProductCostSheetExportJobStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetProductCostSheetExportJobStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetProductCostSheetExportJobStatusRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetProductCostSheetExportJobStatusRequest {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetProductCostSheetExportJobStatusRequest): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetProductCostSheetExportJobStatusRequest>): GetProductCostSheetExportJobStatusRequest {
+    return GetProductCostSheetExportJobStatusRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<GetProductCostSheetExportJobStatusRequest>,
+  ): GetProductCostSheetExportJobStatusRequest {
+    const message = createBaseGetProductCostSheetExportJobStatusRequest();
+    message.jobId = object.jobId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetProductCostSheetExportJobStatusResponse(): GetProductCostSheetExportJobStatusResponse {
+  return {
+    base: undefined,
+    jobId: "",
+    jobCode: "",
+    status: "",
+    isBatch: false,
+    totalChildren: 0,
+    completedChildren: 0,
+    failedChildren: 0,
+  };
+}
+
+export const GetProductCostSheetExportJobStatusResponse: MessageFns<GetProductCostSheetExportJobStatusResponse> = {
+  encode(message: GetProductCostSheetExportJobStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.jobId !== "") {
+      writer.uint32(18).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(26).string(message.jobCode);
+    }
+    if (message.status !== "") {
+      writer.uint32(34).string(message.status);
+    }
+    if (message.isBatch !== false) {
+      writer.uint32(40).bool(message.isBatch);
+    }
+    if (message.totalChildren !== 0) {
+      writer.uint32(48).int32(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      writer.uint32(56).int32(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      writer.uint32(64).int32(message.failedChildren);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetProductCostSheetExportJobStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetProductCostSheetExportJobStatusResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isBatch = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.totalChildren = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.completedChildren = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.failedChildren = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetProductCostSheetExportJobStatusResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      isBatch: isSet(object.isBatch)
+        ? globalThis.Boolean(object.isBatch)
+        : isSet(object.is_batch)
+        ? globalThis.Boolean(object.is_batch)
+        : false,
+      totalChildren: isSet(object.totalChildren)
+        ? globalThis.Number(object.totalChildren)
+        : isSet(object.total_children)
+        ? globalThis.Number(object.total_children)
+        : 0,
+      completedChildren: isSet(object.completedChildren)
+        ? globalThis.Number(object.completedChildren)
+        : isSet(object.completed_children)
+        ? globalThis.Number(object.completed_children)
+        : 0,
+      failedChildren: isSet(object.failedChildren)
+        ? globalThis.Number(object.failedChildren)
+        : isSet(object.failed_children)
+        ? globalThis.Number(object.failed_children)
+        : 0,
+    };
+  },
+
+  toJSON(message: GetProductCostSheetExportJobStatusResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.isBatch !== false) {
+      obj.isBatch = message.isBatch;
+    }
+    if (message.totalChildren !== 0) {
+      obj.totalChildren = Math.round(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      obj.completedChildren = Math.round(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      obj.failedChildren = Math.round(message.failedChildren);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetProductCostSheetExportJobStatusResponse>): GetProductCostSheetExportJobStatusResponse {
+    return GetProductCostSheetExportJobStatusResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<GetProductCostSheetExportJobStatusResponse>,
+  ): GetProductCostSheetExportJobStatusResponse {
+    const message = createBaseGetProductCostSheetExportJobStatusResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.status = object.status ?? "";
+    message.isBatch = object.isBatch ?? false;
+    message.totalChildren = object.totalChildren ?? 0;
+    message.completedChildren = object.completedChildren ?? 0;
+    message.failedChildren = object.failedChildren ?? 0;
     return message;
   },
 };
@@ -6403,6 +8827,740 @@ export const ProcessChunkInternalResponse: MessageFns<ProcessChunkInternalRespon
   },
 };
 
+function createBaseGetBatchChildDownloadUrlRequest(): GetBatchChildDownloadUrlRequest {
+  return { parentJobId: "", childJobId: "" };
+}
+
+export const GetBatchChildDownloadUrlRequest: MessageFns<GetBatchChildDownloadUrlRequest> = {
+  encode(message: GetBatchChildDownloadUrlRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.parentJobId !== "") {
+      writer.uint32(10).string(message.parentJobId);
+    }
+    if (message.childJobId !== "") {
+      writer.uint32(18).string(message.childJobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBatchChildDownloadUrlRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetBatchChildDownloadUrlRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.parentJobId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.childJobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetBatchChildDownloadUrlRequest {
+    return {
+      parentJobId: isSet(object.parentJobId)
+        ? globalThis.String(object.parentJobId)
+        : isSet(object.parent_job_id)
+        ? globalThis.String(object.parent_job_id)
+        : "",
+      childJobId: isSet(object.childJobId)
+        ? globalThis.String(object.childJobId)
+        : isSet(object.child_job_id)
+        ? globalThis.String(object.child_job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetBatchChildDownloadUrlRequest): unknown {
+    const obj: any = {};
+    if (message.parentJobId !== "") {
+      obj.parentJobId = message.parentJobId;
+    }
+    if (message.childJobId !== "") {
+      obj.childJobId = message.childJobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetBatchChildDownloadUrlRequest>): GetBatchChildDownloadUrlRequest {
+    return GetBatchChildDownloadUrlRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetBatchChildDownloadUrlRequest>): GetBatchChildDownloadUrlRequest {
+    const message = createBaseGetBatchChildDownloadUrlRequest();
+    message.parentJobId = object.parentJobId ?? "";
+    message.childJobId = object.childJobId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetBatchChildDownloadUrlResponse(): GetBatchChildDownloadUrlResponse {
+  return { base: undefined, downloadUrl: "", fileName: "" };
+}
+
+export const GetBatchChildDownloadUrlResponse: MessageFns<GetBatchChildDownloadUrlResponse> = {
+  encode(message: GetBatchChildDownloadUrlResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.downloadUrl !== "") {
+      writer.uint32(18).string(message.downloadUrl);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(26).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBatchChildDownloadUrlResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetBatchChildDownloadUrlResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.downloadUrl = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetBatchChildDownloadUrlResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      downloadUrl: isSet(object.downloadUrl)
+        ? globalThis.String(object.downloadUrl)
+        : isSet(object.download_url)
+        ? globalThis.String(object.download_url)
+        : "",
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: GetBatchChildDownloadUrlResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.downloadUrl !== "") {
+      obj.downloadUrl = message.downloadUrl;
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetBatchChildDownloadUrlResponse>): GetBatchChildDownloadUrlResponse {
+    return GetBatchChildDownloadUrlResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetBatchChildDownloadUrlResponse>): GetBatchChildDownloadUrlResponse {
+    const message = createBaseGetBatchChildDownloadUrlResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.downloadUrl = object.downloadUrl ?? "";
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadExportBatchZipRequest(): DownloadExportBatchZipRequest {
+  return { parentJobId: "" };
+}
+
+export const DownloadExportBatchZipRequest: MessageFns<DownloadExportBatchZipRequest> = {
+  encode(message: DownloadExportBatchZipRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.parentJobId !== "") {
+      writer.uint32(10).string(message.parentJobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DownloadExportBatchZipRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadExportBatchZipRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.parentJobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadExportBatchZipRequest {
+    return {
+      parentJobId: isSet(object.parentJobId)
+        ? globalThis.String(object.parentJobId)
+        : isSet(object.parent_job_id)
+        ? globalThis.String(object.parent_job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: DownloadExportBatchZipRequest): unknown {
+    const obj: any = {};
+    if (message.parentJobId !== "") {
+      obj.parentJobId = message.parentJobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DownloadExportBatchZipRequest>): DownloadExportBatchZipRequest {
+    return DownloadExportBatchZipRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DownloadExportBatchZipRequest>): DownloadExportBatchZipRequest {
+    const message = createBaseDownloadExportBatchZipRequest();
+    message.parentJobId = object.parentJobId ?? "";
+    return message;
+  },
+};
+
+function createBaseDownloadExportBatchZipResponse(): DownloadExportBatchZipResponse {
+  return { zipData: new Uint8Array(0), fileName: "" };
+}
+
+export const DownloadExportBatchZipResponse: MessageFns<DownloadExportBatchZipResponse> = {
+  encode(message: DownloadExportBatchZipResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.zipData.length !== 0) {
+      writer.uint32(10).bytes(message.zipData);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(18).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DownloadExportBatchZipResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDownloadExportBatchZipResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.zipData = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DownloadExportBatchZipResponse {
+    return {
+      zipData: isSet(object.zipData)
+        ? bytesFromBase64(object.zipData)
+        : isSet(object.zip_data)
+        ? bytesFromBase64(object.zip_data)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: DownloadExportBatchZipResponse): unknown {
+    const obj: any = {};
+    if (message.zipData.length !== 0) {
+      obj.zipData = base64FromBytes(message.zipData);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DownloadExportBatchZipResponse>): DownloadExportBatchZipResponse {
+    return DownloadExportBatchZipResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DownloadExportBatchZipResponse>): DownloadExportBatchZipResponse {
+    const message = createBaseDownloadExportBatchZipResponse();
+    message.zipData = object.zipData ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseListExportJobsRequest(): ListExportJobsRequest {
+  return { pagination: undefined, period: "" };
+}
+
+export const ListExportJobsRequest: MessageFns<ListExportJobsRequest> = {
+  encode(message: ListExportJobsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.pagination !== undefined) {
+      PaginationRequest.encode(message.pagination, writer.uint32(10).fork()).join();
+    }
+    if (message.period !== "") {
+      writer.uint32(18).string(message.period);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListExportJobsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListExportJobsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.pagination = PaginationRequest.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListExportJobsRequest {
+    return {
+      pagination: isSet(object.pagination) ? PaginationRequest.fromJSON(object.pagination) : undefined,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+    };
+  },
+
+  toJSON(message: ListExportJobsRequest): unknown {
+    const obj: any = {};
+    if (message.pagination !== undefined) {
+      obj.pagination = PaginationRequest.toJSON(message.pagination);
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListExportJobsRequest>): ListExportJobsRequest {
+    return ListExportJobsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListExportJobsRequest>): ListExportJobsRequest {
+    const message = createBaseListExportJobsRequest();
+    message.pagination = (object.pagination !== undefined && object.pagination !== null)
+      ? PaginationRequest.fromPartial(object.pagination)
+      : undefined;
+    message.period = object.period ?? "";
+    return message;
+  },
+};
+
+function createBaseListExportJobsResponse(): ListExportJobsResponse {
+  return { base: undefined, jobs: [], pagination: undefined };
+}
+
+export const ListExportJobsResponse: MessageFns<ListExportJobsResponse> = {
+  encode(message: ListExportJobsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.jobs) {
+      ExportJobSummary.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.pagination !== undefined) {
+      PaginationResponse.encode(message.pagination, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListExportJobsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListExportJobsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobs.push(ExportJobSummary.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pagination = PaginationResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListExportJobsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      jobs: globalThis.Array.isArray(object?.jobs) ? object.jobs.map((e: any) => ExportJobSummary.fromJSON(e)) : [],
+      pagination: isSet(object.pagination) ? PaginationResponse.fromJSON(object.pagination) : undefined,
+    };
+  },
+
+  toJSON(message: ListExportJobsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.jobs?.length) {
+      obj.jobs = message.jobs.map((e) => ExportJobSummary.toJSON(e));
+    }
+    if (message.pagination !== undefined) {
+      obj.pagination = PaginationResponse.toJSON(message.pagination);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListExportJobsResponse>): ListExportJobsResponse {
+    return ListExportJobsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListExportJobsResponse>): ListExportJobsResponse {
+    const message = createBaseListExportJobsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.jobs = object.jobs?.map((e) => ExportJobSummary.fromPartial(e)) || [];
+    message.pagination = (object.pagination !== undefined && object.pagination !== null)
+      ? PaginationResponse.fromPartial(object.pagination)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseExportJobSummary(): ExportJobSummary {
+  return {
+    jobId: "",
+    jobCode: "",
+    period: "",
+    status: "",
+    totalChildren: 0,
+    completedChildren: 0,
+    failedChildren: 0,
+    queuedAt: undefined,
+    isBatch: false,
+  };
+}
+
+export const ExportJobSummary: MessageFns<ExportJobSummary> = {
+  encode(message: ExportJobSummary, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(18).string(message.jobCode);
+    }
+    if (message.period !== "") {
+      writer.uint32(26).string(message.period);
+    }
+    if (message.status !== "") {
+      writer.uint32(34).string(message.status);
+    }
+    if (message.totalChildren !== 0) {
+      writer.uint32(40).int32(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      writer.uint32(48).int32(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      writer.uint32(56).int32(message.failedChildren);
+    }
+    if (message.queuedAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.queuedAt), writer.uint32(66).fork()).join();
+    }
+    if (message.isBatch !== false) {
+      writer.uint32(72).bool(message.isBatch);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportJobSummary {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportJobSummary();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.totalChildren = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.completedChildren = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.failedChildren = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.queuedAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.isBatch = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportJobSummary {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      totalChildren: isSet(object.totalChildren)
+        ? globalThis.Number(object.totalChildren)
+        : isSet(object.total_children)
+        ? globalThis.Number(object.total_children)
+        : 0,
+      completedChildren: isSet(object.completedChildren)
+        ? globalThis.Number(object.completedChildren)
+        : isSet(object.completed_children)
+        ? globalThis.Number(object.completed_children)
+        : 0,
+      failedChildren: isSet(object.failedChildren)
+        ? globalThis.Number(object.failedChildren)
+        : isSet(object.failed_children)
+        ? globalThis.Number(object.failed_children)
+        : 0,
+      queuedAt: isSet(object.queuedAt)
+        ? fromJsonTimestamp(object.queuedAt)
+        : isSet(object.queued_at)
+        ? fromJsonTimestamp(object.queued_at)
+        : undefined,
+      isBatch: isSet(object.isBatch)
+        ? globalThis.Boolean(object.isBatch)
+        : isSet(object.is_batch)
+        ? globalThis.Boolean(object.is_batch)
+        : false,
+    };
+  },
+
+  toJSON(message: ExportJobSummary): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.totalChildren !== 0) {
+      obj.totalChildren = Math.round(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      obj.completedChildren = Math.round(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      obj.failedChildren = Math.round(message.failedChildren);
+    }
+    if (message.queuedAt !== undefined) {
+      obj.queuedAt = message.queuedAt.toISOString();
+    }
+    if (message.isBatch !== false) {
+      obj.isBatch = message.isBatch;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportJobSummary>): ExportJobSummary {
+    return ExportJobSummary.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportJobSummary>): ExportJobSummary {
+    const message = createBaseExportJobSummary();
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.period = object.period ?? "";
+    message.status = object.status ?? "";
+    message.totalChildren = object.totalChildren ?? 0;
+    message.completedChildren = object.completedChildren ?? 0;
+    message.failedChildren = object.failedChildren ?? 0;
+    message.queuedAt = object.queuedAt ?? undefined;
+    message.isBatch = object.isBatch ?? false;
+    return message;
+  },
+};
+
 /** CostCalcService runs the cost calculation engine and exposes results. */
 export type CostCalcServiceDefinition = typeof CostCalcServiceDefinition;
 export const CostCalcServiceDefinition = {
@@ -6507,6 +9665,18 @@ export const CostCalcServiceDefinition = {
       options: {},
     },
     /**
+     * ListCostResultPeriods returns distinct periods with cost results (newest first).
+     * Required permission: finance.cost.result.view.
+     */
+    listCostResultPeriods: {
+      name: "ListCostResultPeriods",
+      requestType: ListCostResultPeriodsRequest,
+      requestStream: false,
+      responseType: ListCostResultPeriodsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
      * GetCostBreakdown returns by-level + rm-details + formula-trace for a cost.
      * Required permission: finance.cost.result.view.
      */
@@ -6559,7 +9729,59 @@ export const CostCalcServiceDefinition = {
      * Invoked by finance-cost-worker after consuming a chunk message from RMQ.
      * NOT exposed via REST gateway; intended for service-to-service traffic only.
      * Required permission: finance.cost.caljob.trigger.
+     * GetRouteCostSheet returns every route stage's param snapshot for one
+     * product in one round-trip (backs the product cost sheet export).
      */
+    getRouteCostSheet: {
+      name: "GetRouteCostSheet",
+      requestType: GetRouteCostSheetRequest,
+      requestStream: false,
+      responseType: GetRouteCostSheetResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** RequestProductCostSheetExport queues an async A4 xlsx export job. */
+    requestProductCostSheetExport: {
+      name: "RequestProductCostSheetExport",
+      requestType: RequestProductCostSheetExportRequest,
+      requestStream: false,
+      responseType: RequestProductCostSheetExportResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetProductCostSheetDownloadURL presigns the finished export artifact. */
+    getProductCostSheetDownloadURL: {
+      name: "GetProductCostSheetDownloadURL",
+      requestType: GetProductCostSheetDownloadURLRequest,
+      requestStream: false,
+      responseType: GetProductCostSheetDownloadURLResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ListCostSheetExportBatchChildren enumerates a batch-tracking parent
+     * job's child export jobs, each with its download URL once ready.
+     */
+    listCostSheetExportBatchChildren: {
+      name: "ListCostSheetExportBatchChildren",
+      requestType: ListCostSheetExportBatchChildrenRequest,
+      requestStream: false,
+      responseType: ListCostSheetExportBatchChildrenResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * GetProductCostSheetExportJobStatus polls a standalone or batch-parent
+     * export job's live status/progress while it is still in flight.
+     */
+    getProductCostSheetExportJobStatus: {
+      name: "GetProductCostSheetExportJobStatus",
+      requestType: GetProductCostSheetExportJobStatusRequest,
+      requestStream: false,
+      responseType: GetProductCostSheetExportJobStatusResponse,
+      responseStream: false,
+      options: {},
+    },
     processChunkInternal: {
       name: "ProcessChunkInternal",
       requestType: ProcessChunkInternalRequest,
@@ -6568,8 +9790,69 @@ export const CostCalcServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * GetBatchChildDownloadUrl freshly presigns one child job's artifact
+     * within a batch fan-out.
+     */
+    getBatchChildDownloadUrl: {
+      name: "GetBatchChildDownloadUrl",
+      requestType: GetBatchChildDownloadUrlRequest,
+      requestStream: false,
+      responseType: GetBatchChildDownloadUrlResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * DownloadExportBatchZip streams a zip of every completed child file in a
+     * batch as one download.
+     */
+    downloadExportBatchZip: {
+      name: "DownloadExportBatchZip",
+      requestType: DownloadExportBatchZipRequest,
+      requestStream: false,
+      responseType: DownloadExportBatchZipResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ListExportJobs lists recent cost-sheet export jobs (batch parents and
+     * standalone jobs) for a "recent exports" UI.
+     */
+    listExportJobs: {
+      name: "ListExportJobs",
+      requestType: ListExportJobsRequest,
+      requestStream: false,
+      responseType: ListExportJobsResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
+
+function bytesFromBase64(b64: string): Uint8Array {
+  if ((globalThis as any).Buffer) {
+    return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+  } else {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+      arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+  }
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  if ((globalThis as any).Buffer) {
+    return globalThis.Buffer.from(arr).toString("base64");
+  } else {
+    const bin: string[] = [];
+    arr.forEach((byte) => {
+      bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+  }
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
