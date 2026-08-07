@@ -122,8 +122,11 @@ export function useUrlState<T extends object>(
 
   // Use ref to access current state in callback without adding it to dependencies
   // This prevents setState from changing reference on every state change.
-  // Sync the ref during render (not in an effect) so that setState always reads
-  // the latest state, even when called from other effects in the same cycle.
+  // The ref is synced in a passive effect, so it lags by one commit: a setState
+  // called from another effect in the same cycle still reads the previous state.
+  // In practice every caller either passes a whole new object or derives from
+  // `state` directly, so the lag is not observable — but do not rely on the ref
+  // being fresh inside effects that run before this one.
   const stateRef = useRef(state)
   useEffect(() => {
     stateRef.current = state

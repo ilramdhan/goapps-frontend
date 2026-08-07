@@ -179,6 +179,19 @@ export function FormulaFormDialog({
     sortOrder: "asc",
   })
 
+  // MASTER_LOOKUP params are legitimate formula inputs (e.g. F_YARN_VB1_LOSS
+  // consumes CHANGE_OVER_QLTY_LOSS and VOLUME_BUCKET_1_QTY). Omitting this
+  // category made those ids unresolvable, so they rendered as raw UUIDs and
+  // could not be checklisted.
+  const { data: masterLookupParamData } = useParameters({
+    page: 1,
+    pageSize: 200,
+    activeFilter: ActiveFilter.ACTIVE_FILTER_ACTIVE,
+    paramCategory: ParamCategory.PARAM_CATEGORY_MASTER_LOOKUP,
+    sortBy: "code",
+    sortOrder: "asc",
+  })
+
   // Result param pool = CALCULATED + INPUT. INPUT params can also be formula outputs
   // (e.g. AX_WT is INPUT category but is the result of F_YARN_AX_WT_FROM_MKT).
   // This matches Oracle's design where FROM_MARKETING formulas write to INPUT params.
@@ -188,15 +201,17 @@ export function FormulaFormDialog({
   ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [calculatedParamData, inputParamData])
 
   const calculatedParams = useMemo(() => calculatedParamData?.data || [], [calculatedParamData])
-  // Input picker = INPUT + RATE + CALCULATED. A CALCULATED param IS a valid
+  // Input picker = INPUT + RATE + CALCULATED + MASTER_LOOKUP. A CALCULATED param IS a valid
   // input to a *downstream* formula (formula chaining) — this is what enables
   // multi-level calc engines (e.g. COST_CONVERSION uses COST_ELEC + COST_LABOR_FULL).
+  // MASTER_LOOKUP params are selector/auto-fill values that formulas also read.
   // We exclude the formula's own resultParamId at filter time to prevent self-loops.
   const inputPool = useMemo(() => [
     ...(inputParamData?.data || []),
     ...(rateParamData?.data || []),
     ...(calculatedParamData?.data || []),
-  ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [inputParamData, rateParamData, calculatedParamData])
+    ...(masterLookupParamData?.data || []),
+  ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [inputParamData, rateParamData, calculatedParamData, masterLookupParamData])
 
   const form = useForm<FormulaFormValues>({
     resolver: zodResolver(formulaFormSchema) as never,
@@ -226,6 +241,19 @@ export function FormulaFormDialog({
       p.paramCode?.toLowerCase().includes(s) || p.paramName?.toLowerCase().includes(s)
     )
   }, [inputPool, inputParamSearch, watchedResultParamId])
+
+  // Fallback label resolver for a selected param id. The picker pool is the
+  // primary source; the formula's own inputParams carry paramCode/paramName
+  // resolved by the backend join, so they cover any id outside the pool.
+  // Never fall through to the bare UUID — show a readable placeholder instead.
+  const resolveParamLabel = (paramId: string): string => {
+    const fromPool = inputPool.find((p) => p.paramId === paramId)
+    if (fromPool?.paramCode) return fromPool.paramCode
+    const joined = (fullFormula || formula)?.inputParams?.find((p) => p.paramId === paramId)
+    if (joined?.paramCode) return joined.paramCode
+    if (joined?.paramName) return joined.paramName
+    return "Unknown parameter"
+  }
 
   // Populate form when dialog opens or fullFormula loads
   useEffect(() => {
@@ -469,10 +497,9 @@ export function FormulaFormDialog({
                       {selectedInputIds.length > 0 && (
                         <div className="flex flex-wrap gap-1 pb-2">
                           {selectedInputIds.map((id) => {
-                            const p = inputPool.find((param) => param.paramId === id)
                             return (
                               <Badge key={id} variant="secondary" className="text-xs">
-                                {p?.paramCode || id}
+                                {resolveParamLabel(id)}
                                 <button
                                   type="button"
                                   onClick={() => toggleInputParam(id)}
@@ -525,7 +552,7 @@ export function FormulaFormDialog({
                         </ScrollArea>
                       </div>
                       <FormDescription>
-                        Input, Rate, and Calculated parameters are all available — pick the ones referenced in the expression above.
+                        Input, Rate, Calculated, and Master Lookup parameters are all available — pick the ones referenced in the expression above.
                         Calculated params enable formula chaining (e.g. COST_CONVERSION uses COST_LABOR_FULL which is itself produced by another formula).
                       </FormDescription>
                       <FormMessage />

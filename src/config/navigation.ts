@@ -111,6 +111,7 @@ export const breadcrumbConfig: Record<string, BreadcrumbConfig> = {
   "/finance/master/parameters": { title: "Parameters" },
   "/finance/transaction": { title: "Transaction", href: undefined }, // No page, category only
   "/finance/transaction/costing-process": { title: "Costing Process" },
+  "/finance/cost-results": { title: "Cost Results" },
 
   // Executive Dashboard (BI)
   "/finance/bi": { title: "Executive Dashboard", href: "/finance/bi" },

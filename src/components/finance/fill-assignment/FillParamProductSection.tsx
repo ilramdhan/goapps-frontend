@@ -3,12 +3,10 @@
 import { useCallback, useMemo, useState } from "react"
 import { Check, Loader2 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   useProductRequiredParams,
   useUpsertProductParamValuesBatch,
@@ -97,14 +95,10 @@ export function FillParamProductSection({ productSysId, productCode, productName
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-16 animate-pulse rounded bg-muted" />
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        <p className="text-sm font-semibold">{title}</p>
+        <div className="h-16 animate-pulse rounded bg-muted" />
+      </div>
     )
   }
 
@@ -117,47 +111,46 @@ export function FillParamProductSection({ productSysId, productCode, productName
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-base">{title}</CardTitle>
-        {productName && productCode && (
-          <span className="text-xs text-muted-foreground">{productName}</span>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {params.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No parameters defined for this product.</p>
-        ) : (
-          groupedParams.map(({ group, entries }) => (
-            <div key={group || "__ungrouped"} className="space-y-4">
-              {group && (
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{group}</p>
-              )}
-              {entries.map((param) => (
-                <ParamInput
-                  key={param.paramId}
-                  param={param}
-                  value={getEffectiveValue(param)}
-                  onChange={(v) => handleChange(param.paramId, v)}
-                />
-              ))}
-            </div>
-          ))
-        )}
-        {params.length > 0 && (
-          <div className="flex justify-end pt-2 border-t">
-            <Button size="sm" onClick={onSave} disabled={upsertM.isPending}>
-              {upsertM.isPending ? (
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="mr-2 h-3.5 w-3.5" />
-              )}
-              Save
-            </Button>
+    <div className="space-y-4">
+      <div className="space-y-0.5">
+        <p className="text-sm font-semibold leading-tight">{title}</p>
+        <p className="text-xs text-muted-foreground">
+          {productName ? `${productName} · ` : ""}
+          {params.length} parameter{params.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+      {params.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No parameters defined for this product.</p>
+      ) : (
+        groupedParams.map(({ group, entries }) => (
+          <div key={group || "__ungrouped"} className="space-y-4">
+            {group && (
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{group}</p>
+            )}
+            {entries.map((param) => (
+              <ParamInput
+                key={param.paramId}
+                param={param}
+                value={getEffectiveValue(param)}
+                onChange={(v) => handleChange(param.paramId, v)}
+              />
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        ))
+      )}
+      {params.length > 0 && (
+        <div className="flex justify-end pt-2 border-t">
+          <Button size="sm" onClick={onSave} disabled={upsertM.isPending}>
+            {upsertM.isPending ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="mr-2 h-3.5 w-3.5" />
+            )}
+            Save
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -169,48 +162,44 @@ interface ParamInputProps {
 
 function ParamInput({ param, value, onChange }: ParamInputProps) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Label className="text-sm font-medium">{param.paramName || param.paramCode}</Label>
-          {param.uomCode && (
-            <Badge variant="outline" className="text-[10px] px-1.5">
-              {param.uomCode}
-            </Badge>
-          )}
-          {param.isRequiredForCosting && (
-            <Badge variant="secondary" className="text-[10px] px-1.5">
-              Required
-            </Badge>
-          )}
-        </div>
-        {param.dataType === "BOOLEAN" ? (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={value.valueFlag ?? false}
-              onCheckedChange={(checked) => onChange({ valueFlag: checked === true })}
-            />
-            <span className="text-xs text-muted-foreground">Yes / No</span>
-          </div>
-        ) : param.dataType === "NUMBER" ? (
-          <Input
-            type="number"
-            value={value.valueNumeric ?? ""}
-            onChange={(e) => onChange({ valueNumeric: e.target.value })}
-            className="h-8 text-sm max-w-xs"
-            placeholder="0"
-          />
-        ) : (
-          <Input
-            value={value.valueText ?? ""}
-            onChange={(e) => onChange({ valueText: e.target.value })}
-            className="h-8 text-sm"
-            placeholder="Enter value…"
-          />
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <Label className="text-xs font-medium">
+          {param.paramCode}
+          {param.isRequiredForCosting && <span className="text-destructive ml-0.5">*</span>}
+        </Label>
+        {param.uomCode && (
+          <span className="text-[10px] text-muted-foreground">{param.uomCode}</span>
         )}
       </div>
-      {param.hasValue && (
-        <span className="text-xs text-muted-foreground pt-7 flex-shrink-0">✓ filled</span>
+      <p className="text-[10px] text-muted-foreground">{param.paramName}</p>
+      {param.dataType === "NUMBER" && (
+        <Input
+          type="number"
+          value={value.valueNumeric ?? ""}
+          onChange={(e) => onChange({ valueNumeric: e.target.value })}
+          className="h-8 text-sm font-mono"
+          placeholder="Enter value"
+        />
+      )}
+      {param.dataType === "TEXT" && (
+        <Input
+          value={value.valueText ?? ""}
+          onChange={(e) => onChange({ valueText: e.target.value })}
+          className="h-8 text-sm"
+          placeholder="Enter value"
+        />
+      )}
+      {param.dataType === "BOOLEAN" && (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={value.valueFlag ?? false}
+            onCheckedChange={(checked) => onChange({ valueFlag: checked })}
+          />
+          <span className="text-xs text-muted-foreground">
+            {(value.valueFlag ?? false) ? "True" : "False"}
+          </span>
+        </div>
       )}
     </div>
   )

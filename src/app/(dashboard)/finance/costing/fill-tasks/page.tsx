@@ -13,6 +13,16 @@ import { FillTrackingTable } from "@/components/finance/fill-assignment/FillTrac
 import { FillBlockerAlert } from "@/components/finance/fill-assignment/FillBlockerAlert";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -56,15 +66,17 @@ function RequestPicker({ selectedId, onSelect }: RequestPickerProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full max-w-md justify-between"
+          className="w-full justify-between font-normal"
         >
-          {selectedItem
-            ? `${selectedItem.requestNo} — ${selectedItem.title}`
-            : "Select request…"}
+          <span className="truncate">
+            {selectedItem
+              ? `${selectedItem.requestNo} — ${selectedItem.title}`
+              : "Select request…"}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[480px] p-0">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search by request no or title…"
@@ -149,23 +161,22 @@ function FillTasksContent({ requestId, onRequestSelect }: FillTasksContentProps)
       </div>
 
       {!requestId ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
-          <ClipboardList className="h-12 w-12 text-muted-foreground/40" />
-          <div>
-            <p className="text-base font-medium text-muted-foreground">
-              No request selected
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Search for a product request above to view its fill tasks.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="No request selected"
+          description="Search for a product request above to view its fill tasks."
+        />
       ) : isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading fill tasks…</p>
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
       ) : tasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No fill tasks found for this request.
-        </p>
+        <EmptyState
+          title="No fill tasks found"
+          description="This request has no fill tasks yet."
+        />
       ) : (
         <>
           {myBlockerTask && <FillBlockerAlert task={myBlockerTask} />}
@@ -226,20 +237,32 @@ function FillTasksPageContent() {
 
 export default function FillTasksPage() {
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Fill Tasks</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Parameter fill tasks and approvals for costing requests.
-        </p>
-      </div>
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        }
-      >
-        <FillTasksPageContent />
-      </Suspense>
+    <div className="space-y-6">
+      <PageHeader
+        title="Fill Tasks"
+        subtitle="Parameter fill tasks and approvals for costing requests."
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Fill Tracking</CardTitle>
+          <CardDescription>
+            Select a request to view and manage its parameter fill tasks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Suspense
+            fallback={
+              <div className="space-y-2">
+                <Skeleton className="h-9 w-full max-w-md" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            }
+          >
+            <FillTasksPageContent />
+          </Suspense>
+        </CardContent>
+      </Card>
     </div>
   );
 }

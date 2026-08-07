@@ -1,6 +1,7 @@
 export { FillTaskStatusBadge } from "./FillTaskStatusBadge";
 export { FillTaskProgressBar } from "./FillTaskProgressBar";
 export { FillTaskIdentity } from "./FillTaskIdentity";
+export { FillConfigActorLabel } from "./FillConfigActorLabel";
 export { FillTaskRow } from "./FillTaskRow";
 export { FillTrackingTable } from "./FillTrackingTable";
 export { FillBlockerAlert } from "./FillBlockerAlert";
@@ -9,7 +10,6 @@ export { FillTrackingTab } from "./FillTrackingTab";
 export { FillTrackingCompact } from "./FillTrackingCompact";
 export { FillProgressMini } from "./FillProgressMini";
 export { FillConfigForm } from "./FillConfigForm";
-export { FillParamEntryPage } from "./FillParamEntryPage";
 export { FillParamDrawer } from "./FillParamDrawer";
 export { FillParamProductSection } from "./FillParamProductSection";
 export { FillApprovalReviewDrawer } from "./FillApprovalReviewDrawer";

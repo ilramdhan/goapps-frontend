@@ -1,6 +1,13 @@
 "use client";
 
 import { type FillTask } from "@/types/finance/fill-assignment";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { FillTaskRow } from "./FillTaskRow";
 
 interface FillTrackingTableProps {
@@ -34,19 +41,19 @@ export function FillTrackingTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr>
-            <th className="py-3 px-4 text-left font-medium">Level</th>
-            <th className="py-3 px-4 text-left font-medium">Status</th>
-            <th className="py-3 px-4 text-left font-medium">Filler</th>
-            <th className="py-3 px-4 text-left font-medium">Progress</th>
-            <th className="py-3 px-4 text-left font-medium">SLA</th>
-            <th className="py-3 px-4 text-left font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="rounded-lg border overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Level</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Filler</TableHead>
+            <TableHead>Progress</TableHead>
+            <TableHead>SLA</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {tasks.map((task) => (
             <FillTaskRow
               key={task.taskId}
@@ -58,8 +65,8 @@ export function FillTrackingTable({
               onReject={onReject}
             />
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

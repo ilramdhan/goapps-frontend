@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  ScrollableDialogContent,
+  ScrollableDialogHeader,
+  ScrollableDialogBody,
+  ScrollableDialogFooter,
+} from "@/components/common/scrollable-dialog";
 import {
   Command,
   CommandEmpty,
@@ -72,7 +72,7 @@ function UserCombobox({ value, onValueChange, users, isLoading, disabled }: User
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput placeholder="Search by name or username…" />
           <CommandList>
@@ -177,8 +177,8 @@ export function FillConfigForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <ScrollableDialogContent className="sm:max-w-[560px]">
+        <ScrollableDialogHeader>
           <DialogTitle>
             {existing ? "Edit" : "Add"} Level Config
             {effectiveTier !== "GLOBAL" && (
@@ -187,9 +187,10 @@ export function FillConfigForm({
               </span>
             )}
           </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        </ScrollableDialogHeader>
+        <form onSubmit={handleSubmit} className="contents">
+        <ScrollableDialogBody className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Route Level</Label>
               <Input
@@ -304,16 +305,17 @@ export function FillConfigForm({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={upsert.isPending}>
-              {upsert.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
+        </ScrollableDialogBody>
+        <ScrollableDialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={upsert.isPending}>
+            {upsert.isPending ? "Saving..." : "Save"}
+          </Button>
+        </ScrollableDialogFooter>
         </form>
-      </DialogContent>
+      </ScrollableDialogContent>
     </Dialog>
   );
 }

@@ -4,6 +4,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCostCalcClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
 import { toCalcType, toCostResultStatus } from "@/lib/grpc/cost-calc-enums"
 
+// parseIdList turns the CSV productTypeIds query param into positive ints,
+// dropping anything malformed so a bad URL narrows nothing instead of erroring.
+function parseIdList(raw: string | null): number[] {
+  if (!raw) return []
+  return raw
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams
@@ -19,6 +29,9 @@ export async function GET(request: NextRequest) {
         calculationType: toCalcType(sp.get("calculationType")),
         status: toCostResultStatus(sp.get("status")),
         search: sp.get("search") || "",
+        productTypeIds: parseIdList(sp.get("productTypeIds")),
+        sortBy: sp.get("sortBy") || "",
+        sortOrder: sp.get("sortOrder") || "",
       },
       metadata,
     )

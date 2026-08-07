@@ -1,5 +1,17 @@
 // Shared formatting helpers for cost-results UI.
 
+// Friendly calculation-type labels — shared by the list table, the detail page
+// and its breadcrumb so the wording never drifts between them.
+export const CALC_TYPE_LABELS: Record<string, string> = {
+  ACTUAL: "Actual (Valuation Rate)",
+  FORECAST: "Forecast (Marketing Rate)",
+  SELLING: "Selling (Simulation Rate)",
+}
+
+export function calcTypeLabel(calcType: string): string {
+  return CALC_TYPE_LABELS[calcType] ?? calcType
+}
+
 export function formatNumeric(s: string | number | null | undefined): string {
   if (s == null || s === "") return "—"
   const n = typeof s === "number" ? s : Number(s)

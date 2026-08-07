@@ -9,6 +9,14 @@ import {
   ExternalLinkPayload,
 } from "@/types/iam/notification"
 
+// Download endpoints registered per notification source_type. The value is the
+// BFF route prefix; the notification's source_id (the export job id) is appended
+// as the path segment, e.g. /api/v1/finance/exports/{job_id}/download.
+const DOWNLOAD_ROUTE_BY_SOURCE_TYPE: Record<string, string> = {
+  "finance.rm_cost_export": "/api/v1/finance/exports",
+  "finance.product_cost_sheet_export": "/api/v1/finance/cost-results/exports",
+}
+
 // executeNotificationAction performs the click-action for a notification.
 // Returns true when an action ran (so the caller can mark-as-read), false
 // when nothing was actionable (e.g. NONE or CUSTOM with no handler).
@@ -21,13 +29,13 @@ export function executeNotificationAction(
       const p = parseActionPayload<DownloadPayload>(notif)
       if (!p?.file_path && !notif.sourceId) return false
       // Generic download endpoint: callers register one per source_type.
-      // Finance RM cost export is handled by /api/v1/finance/exports/{job_id}/download.
-      if (notif.sourceType === "finance.rm_cost_export" && notif.sourceId) {
+      const prefix = DOWNLOAD_ROUTE_BY_SOURCE_TYPE[notif.sourceType]
+      if (prefix && notif.sourceId) {
         // Open in a new tab so the active page (notifications dropdown / list)
         // stays in place; the new tab redirects to MinIO and the browser saves
         // the file. The tab usually self-closes after the download trigger.
         window.open(
-          `/api/v1/finance/exports/${encodeURIComponent(notif.sourceId)}/download`,
+          `${prefix}/${encodeURIComponent(notif.sourceId)}/download`,
           "_blank",
           "noopener,noreferrer",
         )
