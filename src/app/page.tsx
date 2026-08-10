@@ -15,39 +15,22 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { ThemeToggle } from "@/components/layout/header/theme-toggle"
-import {
-    ArrowRight,
-    LayoutDashboard,
-    LogIn,
-    Server,
-    Shield,
-    BarChart3,
-    Users,
-    Layers,
-    Zap,
-    type LucideIcon,
-} from "lucide-react"
+import { ArrowRight, LayoutDashboard, LogIn } from "lucide-react"
+import { DynamicIcon } from "lucide-react/dynamic"
 import { usePublicLanding, getSettingValue, getSectionsByType } from "@/hooks/use-public-landing"
 import { CMSSectionType } from "@/types/generated/iam/v1/cms"
+import { pascalToIconName } from "@/types/iam/menu"
 
-// Fallback icon map for CMS sections
-const iconMap: Record<string, LucideIcon> = {
-    Server,
-    Shield,
-    BarChart3,
-    Users,
-    Layers,
-    Zap,
-}
+const DEFAULT_FEATURE_ICON = "Zap"
 
 // Fallback data when CMS is not available
 const fallbackFeatures = [
-    { icon: Server, title: "Microservice Architecture", description: "Built on Go gRPC microservices with clean architecture and domain-driven design for reliability and scalability." },
-    { icon: Shield, title: "Enterprise Security", description: "Role-based access control, two-factor authentication, JWT tokens, and comprehensive audit logging." },
-    { icon: BarChart3, title: "Real-time Monitoring", description: "Prometheus metrics, Grafana dashboards, and distributed tracing with Jaeger for full observability." },
-    { icon: Users, title: "Multi-department", description: "Finance, HR, IT, CI, and Export-Import modules with granular permissions per department and role." },
-    { icon: Layers, title: "Kubernetes Native", description: "Deployed on K3s with ArgoCD GitOps, auto-scaling, automated backups, and zero-downtime deployments." },
-    { icon: Zap, title: "Modern Frontend", description: "Next.js 16 with React 19, TailwindCSS 4, and shadcn/ui for a fast, accessible, and responsive interface." },
+    { iconName: "Server", title: "Microservice Architecture", description: "Built on Go gRPC microservices with clean architecture and domain-driven design for reliability and scalability." },
+    { iconName: "Shield", title: "Enterprise Security", description: "Role-based access control, two-factor authentication, JWT tokens, and comprehensive audit logging." },
+    { iconName: "BarChart3", title: "Real-time Monitoring", description: "Prometheus metrics, Grafana dashboards, and distributed tracing with Jaeger for full observability." },
+    { iconName: "Users", title: "Multi-department", description: "Finance, HR, IT, CI, and Export-Import modules with granular permissions per department and role." },
+    { iconName: "Layers", title: "Kubernetes Native", description: "Deployed on K3s with ArgoCD GitOps, auto-scaling, automated backups, and zero-downtime deployments." },
+    { iconName: "Zap", title: "Modern Frontend", description: "Next.js 16 with React 19, TailwindCSS 4, and shadcn/ui for a fast, accessible, and responsive interface." },
 ]
 
 const fallbackFaqs = [
@@ -87,7 +70,7 @@ export default function HomePage() {
     const cmsFeatures = getSectionsByType(sections, CMSSectionType.CMS_SECTION_TYPE_FEATURE)
     const features = cmsFeatures.length > 0
         ? cmsFeatures.map((f) => ({
-            icon: iconMap[f.iconName] || Zap,
+            iconName: f.iconName || DEFAULT_FEATURE_ICON,
             title: f.title,
             subtitle: f.subtitle,
             description: f.content,
@@ -240,7 +223,10 @@ export default function HomePage() {
                                         </div>
                                     ) : (
                                         <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                                            <feature.icon className="h-5 w-5 text-primary" />
+                                            <DynamicIcon
+                                                name={pascalToIconName(feature.iconName) ?? "zap"}
+                                                className="h-5 w-5 text-primary"
+                                            />
                                         </div>
                                     )}
                                     <h3 className="mb-2 font-semibold">{feature.title}</h3>
