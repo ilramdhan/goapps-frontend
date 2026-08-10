@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { IconPicker } from "@/components/common/icon-picker"
 
 import { useCreateMenu, useUpdateMenu } from "@/hooks/iam/use-menu"
 import { type NormalizedMenuWithChildren, MenuLevel } from "@/types/iam/menu"
@@ -313,7 +314,7 @@ function CreateFormFields({ form }: { form: UseFormReturn<CreateFormValues> }) {
                         <FormItem>
                             <FormLabel>Icon Name</FormLabel>
                             <FormControl>
-                                <Input placeholder="DollarSign" {...field} />
+                                <IconPicker value={field.value} onChange={field.onChange} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -397,7 +398,7 @@ function UpdateFormFields({ form }: { form: UseFormReturn<UpdateFormValues> }) {
                         <FormItem>
                             <FormLabel>Icon Name</FormLabel>
                             <FormControl>
-                                <Input placeholder="DollarSign" {...field} />
+                                <IconPicker value={field.value} onChange={field.onChange} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

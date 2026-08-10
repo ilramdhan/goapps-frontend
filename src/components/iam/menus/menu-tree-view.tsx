@@ -10,11 +10,12 @@ import {
     Plus,
     EyeOff,
 } from "lucide-react"
+import { DynamicIcon } from "lucide-react/dynamic"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { NormalizedMenuWithChildren } from "@/types/iam/menu"
-import { MenuLevel } from "@/types/iam/menu"
+import { MenuLevel, pascalToIconName } from "@/types/iam/menu"
 
 interface MenuTreeViewProps {
     menus: NormalizedMenuWithChildren[]
@@ -115,9 +116,17 @@ function MenuTreeNode({
                     )}
                 </button>
 
-                {/* Icon name */}
-                <span className="w-5 shrink-0 text-center text-xs text-muted-foreground font-mono">
-                    {menu.iconName ? menu.iconName.substring(0, 2) : "–"}
+                {/* Icon preview */}
+                <span className="flex w-5 shrink-0 items-center justify-center text-muted-foreground">
+                    {menu.iconName && pascalToIconName(menu.iconName) ? (
+                        <DynamicIcon
+                            name={pascalToIconName(menu.iconName)!}
+                            className="h-4 w-4"
+                            fallback={() => null}
+                        />
+                    ) : (
+                        <span className="text-xs font-mono">–</span>
+                    )}
                 </span>
 
                 {/* Menu title + url */}

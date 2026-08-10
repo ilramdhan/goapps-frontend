@@ -28,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { IconPicker } from "@/components/common/icon-picker"
 import {
   Select,
   SelectContent,
@@ -315,7 +316,7 @@ export function CMSSectionFormDialog({
                   <FormItem>
                     <FormLabel>Icon Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Shield" {...field} value={field.value || ""} disabled={isPending} />
+                      <IconPicker value={field.value} onChange={field.onChange} disabled={isPending} />
                     </FormControl>
                     <FormDescription>Lucide icon name</FormDescription>
                     <FormMessage />

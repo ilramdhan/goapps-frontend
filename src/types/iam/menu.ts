@@ -154,34 +154,49 @@ export function normalizeMenuTree(raw: RawMenuWithChildren[]): NormalizedMenuWit
 }
 
 // =============================================================================
-// Icon resolver — maps DB icon name string → Lucide component
-// Only import icons actually stored in the DB seed to keep bundle lean.
+// Icon resolver — maps DB icon name string (PascalCase) → Lucide component
+// Uses lucide-react's dynamic import map so ALL ~1900 icons are supported,
+// not just a hand-picked whitelist.
 // =============================================================================
 
-// Lazy-loaded icon map keyed by the iconName string stored in mst_menu
-const ICON_MAP: Record<string, () => Promise<LucideIcon>> = {
-    LayoutDashboard:  () => import("lucide-react").then((m) => m.LayoutDashboard),
-    DollarSign:       () => import("lucide-react").then((m) => m.DollarSign),
-    Database:         () => import("lucide-react").then((m) => m.Database),
-    Receipt:          () => import("lucide-react").then((m) => m.Receipt),
-    MonitorDot:       () => import("lucide-react").then((m) => m.MonitorDot),
-    Users:            () => import("lucide-react").then((m) => m.Users),
-    Ship:             () => import("lucide-react").then((m) => m.Ship),
-    TrendingUp:       () => import("lucide-react").then((m) => m.TrendingUp),
-    Settings:         () => import("lucide-react").then((m) => m.Settings),
-    Shield:           () => import("lucide-react").then((m) => m.Shield),
-    Menu:             () => import("lucide-react").then((m) => m.Menu),
-    Home:             () => import("lucide-react").then((m) => m.Home),
-    Building2:        () => import("lucide-react").then((m) => m.Building2),
-    FileText:         () => import("lucide-react").then((m) => m.FileText),
-    BarChart3:        () => import("lucide-react").then((m) => m.BarChart3),
-    Globe:            () => import("lucide-react").then((m) => m.Globe),
-    FlaskConical:     () => import("lucide-react").then((m) => m.FlaskConical),
-    TestTube:         () => import("lucide-react").then((m) => m.TestTube),
-    Send:             () => import("lucide-react").then((m) => m.Send),
-    Sparkles:         () => import("lucide-react").then((m) => m.Sparkles),
-    SlidersHorizontal: () => import("lucide-react").then((m) => m.SlidersHorizontal),
+import { dynamicIconImports, type IconName } from "lucide-react/dynamic"
+
+/**
+ * Map every dynamicIconImports kebab-case key (e.g. "clipboard-list",
+ * "bar-chart-3", "x-circle", "grid-2x2") to its DB-stored PascalCase name
+ * (e.g. "ClipboardList", "BarChart3", "XCircle", "Grid2x2").
+ *
+ * Built kebab -> Pascal (not the reverse) because that direction is exact —
+ * a regex-based Pascal -> kebab converter can't round-trip acronym runs
+ * ("XCircle" has no case-boundary hyphen: "xcircle") or digit-only groups
+ * ("Grid2x2" -> "grid2x2", not "grid-2x-2"), and multiple kebab names can
+ * collapse onto the same guessed Pascal name (e.g. "arrow-down-0-1" and
+ * "arrow-down-01" both naively become "ArrowDown01").
+ */
+const kebabToPascal = (kebab: string): string =>
+    kebab
+        .split("-")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("")
+
+const PASCAL_TO_ICON_NAME: Record<string, IconName> = {}
+for (const kebab of Object.keys(dynamicIconImports) as IconName[]) {
+    const pascal = kebabToPascal(kebab)
+    if (!(pascal in PASCAL_TO_ICON_NAME)) {
+        PASCAL_TO_ICON_NAME[pascal] = kebab
+    }
 }
+
+/**
+ * Resolve a DB-stored (PascalCase) icon name to a valid dynamicIconImports
+ * key, or undefined if it doesn't match any known Lucide icon.
+ */
+export function pascalToIconName(name: string): IconName | undefined {
+    return PASCAL_TO_ICON_NAME[name]
+}
+
+/** All valid icon names, in PascalCase, for use in search/picker UIs. */
+export const pascalCaseIconNames: string[] = Object.keys(PASCAL_TO_ICON_NAME)
 
 // Synchronous icon cache populated after first async resolution
 const _iconCache: Record<string, LucideIcon> = {}
@@ -210,9 +225,11 @@ export async function preloadMenuIcons(items: NormalizedMenuWithChildren[]): Pro
 
     await Promise.all(
         Array.from(names).map(async (name) => {
-            if (!_iconCache[name] && ICON_MAP[name]) {
-                _iconCache[name] = await ICON_MAP[name]()
-            }
+            if (_iconCache[name]) return
+            const iconName = pascalToIconName(name)
+            if (!iconName) return
+            const mod = await dynamicIconImports[iconName]()
+            _iconCache[name] = mod.default
         })
     )
 }

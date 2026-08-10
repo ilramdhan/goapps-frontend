@@ -8,6 +8,7 @@ export { KpiGrid, type KpiGridProps } from "./kpi-grid"
 export { EmptyState, type EmptyStateProps } from "./empty-state"
 export { StatusBadge, type StatusBadgeProps } from "./status-badge"
 export { MentionableTextarea, MentionContent } from "./mentionable-textarea"
+export { IconPicker } from "./icon-picker"
 
 // Touch / tablet primitives
 export {
