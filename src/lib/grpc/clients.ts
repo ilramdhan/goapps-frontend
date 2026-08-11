@@ -27,6 +27,7 @@ import {
 } from "@/types/generated/finance/v1/bi"
 import { UOMCategoryServiceDefinition } from "@/types/generated/finance/v1/uom_category"
 import { RMCategoryServiceDefinition } from "@/types/generated/finance/v1/rm_category"
+import { SpinFixedCostServiceDefinition } from "@/types/generated/finance/v1/spin_fixed_cost"
 import { ParameterServiceDefinition } from "@/types/generated/finance/v1/parameter"
 import { FormulaServiceDefinition } from "@/types/generated/finance/v1/formula"
 import {
@@ -240,6 +241,12 @@ export function getUomCategoryClient() {
 export function getRmCategoryClient() {
   return getOrCreate("rmCategory", () =>
     createServiceClient(RMCategoryServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getSpinFixedCostClient() {
+  return getOrCreate("spinFixedCost", () =>
+    createServiceClient(SpinFixedCostServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

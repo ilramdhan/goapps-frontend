@@ -1,6 +1,7 @@
 export * from "./use-uom"
 export * from "./use-uom-category"
 export * from "./use-rm-category"
+export * from "./use-spin-fixed-cost"
 export * from "./use-parameter"
 export * from "./use-formula"
 export * from "./use-oracle-sync"
