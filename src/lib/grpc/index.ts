@@ -22,6 +22,7 @@ export {
   getBiUploadClient,
   getUomCategoryClient,
   getRmCategoryClient,
+  getSpinFixedCostClient,
   getParameterClient,
   getFormulaClient,
   getCmsPageClient,

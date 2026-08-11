@@ -124,6 +124,13 @@ export const PERMISSIONS = {
     uomcategoryUpdate: "finance.master.uomcategory.update",
     uomcategoryView: "finance.master.uomcategory.view",
   },
+  // Spin Fixed Cost (FINANCE_SPIN_FIXED_COST)
+  SpinFixedCost: {
+    spinfixedcostCreate: "finance.master.spinfixedcost.create",
+    spinfixedcostDelete: "finance.master.spinfixedcost.delete",
+    spinfixedcostUpdate: "finance.master.spinfixedcost.update",
+    spinfixedcostView: "finance.master.spinfixedcost.view",
+  },
   // RM Category (FINANCE_RM_CATEGORY)
   RmCategory: {
     rmcategoryCreate: "finance.master.rmcategory.create",
