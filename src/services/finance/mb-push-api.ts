@@ -16,6 +16,8 @@ interface BFFEnvelope<T> {
 export interface PreviewPushToHeadResult {
   pushable: PushableMbHead[]
   skipped: SkippedMbHead[]
+  /** Pushable heads whose already-pushed cost went stale after a later MB Batch run. */
+  needsRepushCount: number
 }
 
 export async function previewPushToHead(period: string): Promise<PreviewPushToHeadResult> {
@@ -25,13 +27,18 @@ export async function previewPushToHead(period: string): Promise<PreviewPushToHe
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ period }),
   })
-  const json = (await res.json()) as BFFEnvelope<{ pushable?: PushableMbHead[]; skipped?: SkippedMbHead[] }>
+  const json = (await res.json()) as BFFEnvelope<{
+    pushable?: PushableMbHead[]
+    skipped?: SkippedMbHead[]
+    needsRepushCount?: number
+  }>
   if (json.base?.isSuccess === false) {
     throw new Error(json.base.message || "Failed to preview push-to-head")
   }
   return {
     pushable: json.data?.pushable ?? [],
     skipped: json.data?.skipped ?? [],
+    needsRepushCount: Number(json.data?.needsRepushCount ?? 0),
   }
 }
 

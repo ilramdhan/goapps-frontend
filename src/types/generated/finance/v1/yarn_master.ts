@@ -2985,6 +2985,13 @@ export interface PushableMbHead {
   hasSelling: boolean;
   /** Whether a FORECAST cost value is available to push. */
   hasForecast: boolean;
+  /**
+   * Whether this head was already pushed for the period but its pushed cost has since gone
+   * stale — the source cst_product_cost row is SUPERSEDED (or unlinked) and a newer
+   * non-superseded row exists. Informational only: such a head is still pushable, and
+   * re-pushing is exactly the remedy.
+   */
+  needsRepush: boolean;
 }
 
 /** SkippedMbHead describes an MB Head excluded from the push, with the reason why. */
@@ -3009,6 +3016,11 @@ export interface PreviewPushToHeadResponse {
   pushable: PushableMbHead[];
   /** MB Heads excluded from push, with reasons. */
   skipped: SkippedMbHead[];
+  /**
+   * Count of pushable heads flagged needs_repush — heads whose already-pushed cost went stale
+   * after a later MB Batch run. Surfaced as its own bucket so operators can act on it.
+   */
+  needsRepushCount: number;
 }
 
 /** ExecutePushToHeadRequest is the request for executing a push-to-head batch for a period. */
@@ -28241,7 +28253,7 @@ export const PreviewPushToHeadRequest: MessageFns<PreviewPushToHeadRequest> = {
 };
 
 function createBasePushableMbHead(): PushableMbHead {
-  return { mbhId: "", code: "", name: "", hasActual: false, hasSelling: false, hasForecast: false };
+  return { mbhId: "", code: "", name: "", hasActual: false, hasSelling: false, hasForecast: false, needsRepush: false };
 }
 
 export const PushableMbHead: MessageFns<PushableMbHead> = {
@@ -28263,6 +28275,9 @@ export const PushableMbHead: MessageFns<PushableMbHead> = {
     }
     if (message.hasForecast !== false) {
       writer.uint32(48).bool(message.hasForecast);
+    }
+    if (message.needsRepush !== false) {
+      writer.uint32(56).bool(message.needsRepush);
     }
     return writer;
   },
@@ -28322,6 +28337,14 @@ export const PushableMbHead: MessageFns<PushableMbHead> = {
           message.hasForecast = reader.bool();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.needsRepush = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -28355,6 +28378,11 @@ export const PushableMbHead: MessageFns<PushableMbHead> = {
         : isSet(object.has_forecast)
         ? globalThis.Boolean(object.has_forecast)
         : false,
+      needsRepush: isSet(object.needsRepush)
+        ? globalThis.Boolean(object.needsRepush)
+        : isSet(object.needs_repush)
+        ? globalThis.Boolean(object.needs_repush)
+        : false,
     };
   },
 
@@ -28378,6 +28406,9 @@ export const PushableMbHead: MessageFns<PushableMbHead> = {
     if (message.hasForecast !== false) {
       obj.hasForecast = message.hasForecast;
     }
+    if (message.needsRepush !== false) {
+      obj.needsRepush = message.needsRepush;
+    }
     return obj;
   },
 
@@ -28392,6 +28423,7 @@ export const PushableMbHead: MessageFns<PushableMbHead> = {
     message.hasActual = object.hasActual ?? false;
     message.hasSelling = object.hasSelling ?? false;
     message.hasForecast = object.hasForecast ?? false;
+    message.needsRepush = object.needsRepush ?? false;
     return message;
   },
 };
@@ -28509,7 +28541,7 @@ export const SkippedMbHead: MessageFns<SkippedMbHead> = {
 };
 
 function createBasePreviewPushToHeadResponse(): PreviewPushToHeadResponse {
-  return { base: undefined, pushable: [], skipped: [] };
+  return { base: undefined, pushable: [], skipped: [], needsRepushCount: 0 };
 }
 
 export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = {
@@ -28522,6 +28554,9 @@ export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = 
     }
     for (const v of message.skipped) {
       SkippedMbHead.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.needsRepushCount !== 0) {
+      writer.uint32(32).int32(message.needsRepushCount);
     }
     return writer;
   },
@@ -28557,6 +28592,14 @@ export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = 
           message.skipped.push(SkippedMbHead.decode(reader, reader.uint32()));
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.needsRepushCount = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -28575,6 +28618,11 @@ export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = 
       skipped: globalThis.Array.isArray(object?.skipped)
         ? object.skipped.map((e: any) => SkippedMbHead.fromJSON(e))
         : [],
+      needsRepushCount: isSet(object.needsRepushCount)
+        ? globalThis.Number(object.needsRepushCount)
+        : isSet(object.needs_repush_count)
+        ? globalThis.Number(object.needs_repush_count)
+        : 0,
     };
   },
 
@@ -28589,6 +28637,9 @@ export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = 
     if (message.skipped?.length) {
       obj.skipped = message.skipped.map((e) => SkippedMbHead.toJSON(e));
     }
+    if (message.needsRepushCount !== 0) {
+      obj.needsRepushCount = Math.round(message.needsRepushCount);
+    }
     return obj;
   },
 
@@ -28602,6 +28653,7 @@ export const PreviewPushToHeadResponse: MessageFns<PreviewPushToHeadResponse> = 
       : undefined;
     message.pushable = object.pushable?.map((e) => PushableMbHead.fromPartial(e)) || [];
     message.skipped = object.skipped?.map((e) => SkippedMbHead.fromPartial(e)) || [];
+    message.needsRepushCount = object.needsRepushCount ?? 0;
     return message;
   },
 };
