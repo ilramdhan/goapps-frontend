@@ -142,10 +142,13 @@ export function NewJobDialog({ open, onOpenChange }: Props) {
           {scope === "FILTERED" && (
             <div className="space-y-1">
               <Label>Product type</Label>
+              {/* MB is computed by MB Batch (MB Push to Head), never by a calc job — the
+                  backend rejects it, so it is not offered here either. */}
               <ProductTypeCombobox
                 value={productTypeId}
                 onChange={(typeId) => setProductTypeId(typeId)}
                 placeholder="Pick a product type…"
+                excludeTypeCodes={["MB"]}
               />
               {filteredNeedsType && (
                 <p className="text-xs text-destructive">Required for FILTERED scope</p>

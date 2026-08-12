@@ -23,6 +23,8 @@ interface ProductTypeComboboxProps {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /** Type codes to hide, e.g. ["MB"] where the caller cannot accept that type. Case-insensitive. */
+  excludeTypeCodes?: string[]
 }
 
 export function ProductTypeCombobox({
@@ -31,11 +33,20 @@ export function ProductTypeCombobox({
   placeholder = "Select product type…",
   disabled,
   className,
+  excludeTypeCodes,
 }: ProductTypeComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const { data, isLoading } = useCostProductTypes({ search, activeFilter: "active", pageSize: 50 })
-  const selected = useMemo(() => data?.items.find((t) => t.typeId === value), [data, value])
+  const excluded = useMemo(
+    () => new Set((excludeTypeCodes ?? []).map((c) => c.toUpperCase())),
+    [excludeTypeCodes]
+  )
+  const items = useMemo(
+    () => (data?.items ?? []).filter((t) => !excluded.has(t.typeCode.toUpperCase())),
+    [data, excluded]
+  )
+  const selected = useMemo(() => items.find((t) => t.typeId === value), [items, value])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -69,7 +80,7 @@ export function ProductTypeCombobox({
             )}
             <CommandEmpty>No product type matches.</CommandEmpty>
             <CommandGroup>
-              {(data?.items ?? []).map((t) => (
+              {items.map((t) => (
                 <CommandItem
                   key={t.typeId}
                   value={`${t.typeCode} ${t.typeName}`}

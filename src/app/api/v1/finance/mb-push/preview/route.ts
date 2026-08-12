@@ -13,7 +13,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             base: response.base,
-            data: { pushable: response.pushable, skipped: response.skipped },
+            data: {
+                pushable: response.pushable,
+                skipped: response.skipped,
+                needsRepushCount: response.needsRepushCount,
+            },
         })
     } catch (error) {
         if (isGrpcError(error)) return handleGrpcError(error)
