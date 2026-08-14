@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Beaker } from "lucide-react"
+import { ArrowLeft, Beaker, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { useBreadcrumbOverride } from "@/components/common/dynamic-breadcrumb"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/common/empty-state"
 import { useMBHead } from "@/hooks/finance/use-mb-head"
+import { MBHeadFormDialog } from "@/components/finance/mb-head"
 import {
   MbCompositionTab,
   MbParametersTab,
@@ -25,6 +27,7 @@ interface Props {
 export default function MbRecipeDetailClient({ mbhId }: Props) {
   const { data, isLoading } = useMBHead(mbhId)
   const mbHead = data?.data
+  const [editOpen, setEditOpen] = useState(false)
 
   useBreadcrumbOverride(mbHead ? mbHead.devCode || mbHead.mbhMbCosting || null : null)
 
@@ -64,8 +67,16 @@ export default function MbRecipeDetailClient({ mbhId }: Props) {
           title={`${mbHead.devCode || mbHead.mbhMbCosting} — ${mbHead.shadeName || mbHead.shadeCode || ""}`}
           subtitle={`Version ${mbHead.currentVersion}`}
         />
-        <MbRecipeActionBar mbHead={mbHead} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          <MbRecipeActionBar mbHead={mbHead} />
+        </div>
       </div>
+
+      <MBHeadFormDialog open={editOpen} onOpenChange={setEditOpen} mbHead={mbHead} />
 
       <Card>
         <CardHeader className="py-3">
