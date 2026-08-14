@@ -1411,7 +1411,39 @@ export interface MBHead {
   /** Frozen param snapshot at VALIDATED — number of process; stores option code, e.g. "D". */
   paramNoOfProcess: string;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). Optional. */
-  machineId?: string | undefined;
+  machineId?:
+    | string
+    | undefined;
+  /** VS number. Unique among live records. */
+  mbhVsNumber: string;
+  /** Number of process option code (references mst_mb_param_option where mbpo_mbp_code = 'NO_OF_PROCESS'), e.g. "S"/"D"/"T". */
+  mbhNoOfProcess: string;
+  /** Additional shade codes beyond the header shade (at most 2). Label-only metadata, no costing impact. */
+  shades: MBHeadShade[];
+}
+
+/** MBHeadShade is an additional shade code carried by an MB Head beyond the header shade. */
+export interface MBHeadShade {
+  /** UUID primary key. */
+  mbhsId: string;
+  /** Display sequence number within the head (2 or 3; the header shade is #1). */
+  mbhsSeqNo: number;
+  /** Shade code. */
+  mbhsShadeCode: string;
+  /** Shade name. */
+  mbhsShadeName: string;
+  /** Audit metadata. */
+  audit: AuditInfo | undefined;
+}
+
+/** MBHeadShadeInput is a desired additional shade supplied on MB Head create/update. */
+export interface MBHeadShadeInput {
+  /** Display sequence number within the head (2 or 3; the header shade is #1). */
+  mbhsSeqNo: number;
+  /** Shade code (max 20 chars). */
+  mbhsShadeCode: string;
+  /** Shade name (max 100 chars). */
+  mbhsShadeName: string;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1422,18 +1454,12 @@ export interface CreateMBHeadRequest {
   mbhOracleSysId?:
     | string
     | undefined;
-  /** Management display name (max 100 chars). */
-  mbhMgtName?:
-    | string
-    | undefined;
-  /** Optional yarn denier. */
-  mbhDenier?:
-    | number
-    | undefined;
-  /** Optional number of filaments. */
-  mbhFilament?:
-    | number
-    | undefined;
+  /** Management display name / MB Name (1-100 chars). Required. */
+  mbhMgtName: string;
+  /** POY denier (> 0). Required. */
+  mbhDenier: number;
+  /** POY filament count (> 0). Required. */
+  mbhFilament: number;
   /** Optional dozing percentage. */
   mbhDozing?:
     | number
@@ -1446,42 +1472,38 @@ export interface CreateMBHeadRequest {
   mbhStatus?:
     | string
     | undefined;
-  /** Optional Oracle CMBH_LDR_PRSN (≥ 0). */
-  mbhLdrPrsn?:
-    | number
-    | undefined;
-  /** Optional Oracle CMBH_FINAL_PRODUCT (max 200 chars). */
-  mbhFinalProduct?:
-    | string
-    | undefined;
+  /** LDR percentage (0-100). Required. */
+  mbhLdrPrsn: number;
+  /** Final product description (1-200 chars). Required. */
+  mbhFinalProduct: string;
   /** Optional Oracle CMBH_CODE (max 100 chars). */
   mbhCode?:
     | string
     | undefined;
   /** Whether this MB is a bought-out item (no internal spinning cost). Immutable after creation. */
   mbhIsBoughtout: boolean;
-  /** Development code (max 50 chars). */
-  mbhDevCode?:
-    | string
-    | undefined;
-  /** Shade code (max 20 chars). */
-  mbhShadeCode?:
-    | string
-    | undefined;
-  /** Shade name (max 100 chars). */
-  mbhShadeName?:
-    | string
-    | undefined;
-  /** Cross-section descriptor (max 20 chars). */
-  mbhCrossSection?:
-    | string
-    | undefined;
+  /** Development number (1-50 chars). Required. Unique among live records. */
+  mbhDevCode: string;
+  /** Shade code (1-20 chars). Required. */
+  mbhShadeCode: string;
+  /** Shade name (1-100 chars). Required. */
+  mbhShadeName: string;
+  /** Cross-section descriptor (1-20 chars). Required. */
+  mbhCrossSection: string;
   /** Lusture code, references MbLusture.code (max 10 chars). */
   mbhLustureCode?:
     | string
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
-  mbhMachineId?: string | undefined;
+  mbhMachineId?:
+    | string
+    | undefined;
+  /** VS number (1-50 chars). Required. Unique among live records. */
+  mbhVsNumber: string;
+  /** Number of process option code, e.g. "S"/"D"/"T" (1-10 chars). Required. */
+  mbhNoOfProcess: string;
+  /** Additional shades beyond the header shade (at most 2). */
+  shades: MBHeadShadeInput[];
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1518,18 +1540,12 @@ export interface UpdateMBHeadRequest {
   mbhMbCosting?:
     | string
     | undefined;
-  /** Updated management display name (max 100 chars). */
-  mbhMgtName?:
-    | string
-    | undefined;
-  /** Updated yarn denier. */
-  mbhDenier?:
-    | number
-    | undefined;
-  /** Updated number of filaments. */
-  mbhFilament?:
-    | number
-    | undefined;
+  /** Updated management display name / MB Name (1-100 chars). Required. */
+  mbhMgtName: string;
+  /** Updated POY denier (> 0). Required. */
+  mbhDenier: number;
+  /** Updated POY filament count (> 0). Required. */
+  mbhFilament: number;
   /** Updated dozing percentage. */
   mbhDozing?:
     | number
@@ -1546,40 +1562,36 @@ export interface UpdateMBHeadRequest {
   mbhStatus?:
     | string
     | undefined;
-  /** Optional Oracle CMBH_LDR_PRSN (≥ 0). */
-  mbhLdrPrsn?:
-    | number
-    | undefined;
-  /** Optional Oracle CMBH_FINAL_PRODUCT (max 200 chars). */
-  mbhFinalProduct?:
-    | string
-    | undefined;
+  /** Updated LDR percentage (0-100). Required. */
+  mbhLdrPrsn: number;
+  /** Updated final product description (1-200 chars). Required. */
+  mbhFinalProduct: string;
   /** Optional Oracle CMBH_CODE (max 100 chars). */
   mbhCode?:
     | string
     | undefined;
-  /** Development code (max 50 chars). */
-  mbhDevCode?:
-    | string
-    | undefined;
-  /** Shade code (max 20 chars). */
-  mbhShadeCode?:
-    | string
-    | undefined;
-  /** Shade name (max 100 chars). */
-  mbhShadeName?:
-    | string
-    | undefined;
-  /** Cross-section descriptor (max 20 chars). */
-  mbhCrossSection?:
-    | string
-    | undefined;
+  /** Updated development number (1-50 chars). Required. Unique among live records. */
+  mbhDevCode: string;
+  /** Updated shade code (1-20 chars). Required. */
+  mbhShadeCode: string;
+  /** Updated shade name (1-100 chars). Required. */
+  mbhShadeName: string;
+  /** Updated cross-section descriptor (1-20 chars). Required. */
+  mbhCrossSection: string;
   /** Lusture code, references MbLusture.code (max 10 chars). */
   mbhLustureCode?:
     | string
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
-  mbhMachineId?: string | undefined;
+  mbhMachineId?:
+    | string
+    | undefined;
+  /** Updated VS number (1-50 chars). Required. Unique among live records. */
+  mbhVsNumber: string;
+  /** Updated number of process option code, e.g. "S"/"D"/"T" (1-10 chars). Required. */
+  mbhNoOfProcess: string;
+  /** Full desired list of additional shades beyond the header shade (at most 2). Replace-on-save. */
+  shades: MBHeadShadeInput[];
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -1658,6 +1670,8 @@ export interface ImportMBHeadsRequest {
   fileName: string;
   /** How to handle duplicate mb_costing values. */
   duplicateAction: string;
+  /** When true, validate every row and return counts and errors without writing anything. */
+  dryRun: boolean;
 }
 
 /** ImportMBHeadsResponse is the response for importing MB Head records. */
@@ -1674,6 +1688,8 @@ export interface ImportMBHeadsResponse {
   failedCount: number;
   /** Per-row import errors. */
   errors: ImportError[];
+  /** Number of existing records updated. */
+  updatedCount: number;
 }
 
 /** DownloadMBHeadTemplateRequest is the request for downloading the import template. */
@@ -13076,6 +13092,9 @@ function createBaseMBHead(): MBHead {
     paramThroughputPerHour: "",
     paramNoOfProcess: "",
     machineId: undefined,
+    mbhVsNumber: "",
+    mbhNoOfProcess: "",
+    shades: [],
   };
 }
 
@@ -13188,6 +13207,15 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.machineId !== undefined) {
       writer.uint32(290).string(message.machineId);
+    }
+    if (message.mbhVsNumber !== "") {
+      writer.uint32(298).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== "") {
+      writer.uint32(306).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.shades) {
+      MBHeadShade.encode(v!, writer.uint32(314).fork()).join();
     }
     return writer;
   },
@@ -13487,6 +13515,30 @@ export const MBHead: MessageFns<MBHead> = {
           message.machineId = reader.string();
           continue;
         }
+        case 37: {
+          if (tag !== 298) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 38: {
+          if (tag !== 306) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 39: {
+          if (tag !== 314) {
+            break;
+          }
+
+          message.shades.push(MBHeadShade.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13674,6 +13726,19 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.machine_id)
         ? globalThis.String(object.machine_id)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : "",
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : "",
+      shades: globalThis.Array.isArray(object?.shades)
+        ? object.shades.map((e: any) => MBHeadShade.fromJSON(e))
+        : [],
     };
   },
 
@@ -13787,6 +13852,15 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.machineId !== undefined) {
       obj.machineId = message.machineId;
     }
+    if (message.mbhVsNumber !== "") {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== "") {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.shades?.length) {
+      obj.shades = message.shades.map((e) => MBHeadShade.toJSON(e));
+    }
     return obj;
   },
 
@@ -13833,6 +13907,255 @@ export const MBHead: MessageFns<MBHead> = {
     message.paramThroughputPerHour = object.paramThroughputPerHour ?? "";
     message.paramNoOfProcess = object.paramNoOfProcess ?? "";
     message.machineId = object.machineId ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? "";
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? "";
+    message.shades = object.shades?.map((e) => MBHeadShade.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMBHeadShade(): MBHeadShade {
+  return { mbhsId: "", mbhsSeqNo: 0, mbhsShadeCode: "", mbhsShadeName: "", audit: undefined };
+}
+
+export const MBHeadShade: MessageFns<MBHeadShade> = {
+  encode(message: MBHeadShade, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhsId !== "") {
+      writer.uint32(10).string(message.mbhsId);
+    }
+    if (message.mbhsSeqNo !== 0) {
+      writer.uint32(16).int32(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      writer.uint32(26).string(message.mbhsShadeCode);
+    }
+    if (message.mbhsShadeName !== "") {
+      writer.uint32(34).string(message.mbhsShadeName);
+    }
+    if (message.audit !== undefined) {
+      AuditInfo.encode(message.audit, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBHeadShade {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBHeadShade();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.mbhsSeqNo = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbhsShadeCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.mbhsShadeName = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.audit = AuditInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBHeadShade {
+    return {
+      mbhsId: isSet(object.mbhsId)
+        ? globalThis.String(object.mbhsId)
+        : isSet(object.mbhs_id)
+        ? globalThis.String(object.mbhs_id)
+        : "",
+      mbhsSeqNo: isSet(object.mbhsSeqNo)
+        ? globalThis.Number(object.mbhsSeqNo)
+        : isSet(object.mbhs_seq_no)
+        ? globalThis.Number(object.mbhs_seq_no)
+        : 0,
+      mbhsShadeCode: isSet(object.mbhsShadeCode)
+        ? globalThis.String(object.mbhsShadeCode)
+        : isSet(object.mbhs_shade_code)
+        ? globalThis.String(object.mbhs_shade_code)
+        : "",
+      mbhsShadeName: isSet(object.mbhsShadeName)
+        ? globalThis.String(object.mbhsShadeName)
+        : isSet(object.mbhs_shade_name)
+        ? globalThis.String(object.mbhs_shade_name)
+        : "",
+      audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
+    };
+  },
+
+  toJSON(message: MBHeadShade): unknown {
+    const obj: any = {};
+    if (message.mbhsId !== "") {
+      obj.mbhsId = message.mbhsId;
+    }
+    if (message.mbhsSeqNo !== 0) {
+      obj.mbhsSeqNo = Math.round(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      obj.mbhsShadeCode = message.mbhsShadeCode;
+    }
+    if (message.mbhsShadeName !== "") {
+      obj.mbhsShadeName = message.mbhsShadeName;
+    }
+    if (message.audit !== undefined) {
+      obj.audit = AuditInfo.toJSON(message.audit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBHeadShade>): MBHeadShade {
+    return MBHeadShade.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBHeadShade>): MBHeadShade {
+    const message = createBaseMBHeadShade();
+    message.mbhsId = object.mbhsId ?? "";
+    message.mbhsSeqNo = object.mbhsSeqNo ?? 0;
+    message.mbhsShadeCode = object.mbhsShadeCode ?? "";
+    message.mbhsShadeName = object.mbhsShadeName ?? "";
+    message.audit = (object.audit !== undefined && object.audit !== null)
+      ? AuditInfo.fromPartial(object.audit)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseMBHeadShadeInput(): MBHeadShadeInput {
+  return { mbhsSeqNo: 0, mbhsShadeCode: "", mbhsShadeName: "" };
+}
+
+export const MBHeadShadeInput: MessageFns<MBHeadShadeInput> = {
+  encode(message: MBHeadShadeInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhsSeqNo !== 0) {
+      writer.uint32(8).int32(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      writer.uint32(18).string(message.mbhsShadeCode);
+    }
+    if (message.mbhsShadeName !== "") {
+      writer.uint32(26).string(message.mbhsShadeName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBHeadShadeInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBHeadShadeInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.mbhsSeqNo = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbhsShadeCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbhsShadeName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBHeadShadeInput {
+    return {
+      mbhsSeqNo: isSet(object.mbhsSeqNo)
+        ? globalThis.Number(object.mbhsSeqNo)
+        : isSet(object.mbhs_seq_no)
+        ? globalThis.Number(object.mbhs_seq_no)
+        : 0,
+      mbhsShadeCode: isSet(object.mbhsShadeCode)
+        ? globalThis.String(object.mbhsShadeCode)
+        : isSet(object.mbhs_shade_code)
+        ? globalThis.String(object.mbhs_shade_code)
+        : "",
+      mbhsShadeName: isSet(object.mbhsShadeName)
+        ? globalThis.String(object.mbhsShadeName)
+        : isSet(object.mbhs_shade_name)
+        ? globalThis.String(object.mbhs_shade_name)
+        : "",
+    };
+  },
+
+  toJSON(message: MBHeadShadeInput): unknown {
+    const obj: any = {};
+    if (message.mbhsSeqNo !== 0) {
+      obj.mbhsSeqNo = Math.round(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      obj.mbhsShadeCode = message.mbhsShadeCode;
+    }
+    if (message.mbhsShadeName !== "") {
+      obj.mbhsShadeName = message.mbhsShadeName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBHeadShadeInput>): MBHeadShadeInput {
+    return MBHeadShadeInput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBHeadShadeInput>): MBHeadShadeInput {
+    const message = createBaseMBHeadShadeInput();
+    message.mbhsSeqNo = object.mbhsSeqNo ?? 0;
+    message.mbhsShadeCode = object.mbhsShadeCode ?? "";
+    message.mbhsShadeName = object.mbhsShadeName ?? "";
     return message;
   },
 };
@@ -13841,22 +14164,25 @@ function createBaseCreateMBHeadRequest(): CreateMBHeadRequest {
   return {
     mbhMbCosting: "",
     mbhOracleSysId: undefined,
-    mbhMgtName: undefined,
-    mbhDenier: undefined,
-    mbhFilament: undefined,
+    mbhMgtName: "",
+    mbhDenier: 0,
+    mbhFilament: 0,
     mbhDozing: undefined,
     mbhCheckStatus: undefined,
     mbhStatus: undefined,
-    mbhLdrPrsn: undefined,
-    mbhFinalProduct: undefined,
+    mbhLdrPrsn: 0,
+    mbhFinalProduct: "",
     mbhCode: undefined,
     mbhIsBoughtout: false,
-    mbhDevCode: undefined,
-    mbhShadeCode: undefined,
-    mbhShadeName: undefined,
-    mbhCrossSection: undefined,
+    mbhDevCode: "",
+    mbhShadeCode: "",
+    mbhShadeName: "",
+    mbhCrossSection: "",
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
+    mbhVsNumber: "",
+    mbhNoOfProcess: "",
+    shades: [],
   };
 }
 
@@ -13868,13 +14194,13 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhOracleSysId !== undefined) {
       writer.uint32(18).string(message.mbhOracleSysId);
     }
-    if (message.mbhMgtName !== undefined) {
+    if (message.mbhMgtName !== "") {
       writer.uint32(26).string(message.mbhMgtName);
     }
-    if (message.mbhDenier !== undefined) {
+    if (message.mbhDenier !== 0) {
       writer.uint32(33).double(message.mbhDenier);
     }
-    if (message.mbhFilament !== undefined) {
+    if (message.mbhFilament !== 0) {
       writer.uint32(40).int32(message.mbhFilament);
     }
     if (message.mbhDozing !== undefined) {
@@ -13886,10 +14212,10 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhStatus !== undefined) {
       writer.uint32(66).string(message.mbhStatus);
     }
-    if (message.mbhLdrPrsn !== undefined) {
+    if (message.mbhLdrPrsn !== 0) {
       writer.uint32(73).double(message.mbhLdrPrsn);
     }
-    if (message.mbhFinalProduct !== undefined) {
+    if (message.mbhFinalProduct !== "") {
       writer.uint32(82).string(message.mbhFinalProduct);
     }
     if (message.mbhCode !== undefined) {
@@ -13898,16 +14224,16 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhIsBoughtout !== false) {
       writer.uint32(96).bool(message.mbhIsBoughtout);
     }
-    if (message.mbhDevCode !== undefined) {
+    if (message.mbhDevCode !== "") {
       writer.uint32(106).string(message.mbhDevCode);
     }
-    if (message.mbhShadeCode !== undefined) {
+    if (message.mbhShadeCode !== "") {
       writer.uint32(114).string(message.mbhShadeCode);
     }
-    if (message.mbhShadeName !== undefined) {
+    if (message.mbhShadeName !== "") {
       writer.uint32(122).string(message.mbhShadeName);
     }
-    if (message.mbhCrossSection !== undefined) {
+    if (message.mbhCrossSection !== "") {
       writer.uint32(130).string(message.mbhCrossSection);
     }
     if (message.mbhLustureCode !== undefined) {
@@ -13915,6 +14241,15 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       writer.uint32(146).string(message.mbhMachineId);
+    }
+    if (message.mbhVsNumber !== "") {
+      writer.uint32(154).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== "") {
+      writer.uint32(162).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.shades) {
+      MBHeadShadeInput.encode(v!, writer.uint32(170).fork()).join();
     }
     return writer;
   },
@@ -14070,6 +14405,30 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
           message.mbhMachineId = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.shades.push(MBHeadShadeInput.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14095,17 +14454,17 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         ? globalThis.String(object.mbhMgtName)
         : isSet(object.mbh_mgt_name)
         ? globalThis.String(object.mbh_mgt_name)
-        : undefined,
+        : "",
       mbhDenier: isSet(object.mbhDenier)
         ? globalThis.Number(object.mbhDenier)
         : isSet(object.mbh_denier)
         ? globalThis.Number(object.mbh_denier)
-        : undefined,
+        : 0,
       mbhFilament: isSet(object.mbhFilament)
         ? globalThis.Number(object.mbhFilament)
         : isSet(object.mbh_filament)
         ? globalThis.Number(object.mbh_filament)
-        : undefined,
+        : 0,
       mbhDozing: isSet(object.mbhDozing)
         ? globalThis.Number(object.mbhDozing)
         : isSet(object.mbh_dozing)
@@ -14125,12 +14484,12 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         ? globalThis.Number(object.mbhLdrPrsn)
         : isSet(object.mbh_ldr_prsn)
         ? globalThis.Number(object.mbh_ldr_prsn)
-        : undefined,
+        : 0,
       mbhFinalProduct: isSet(object.mbhFinalProduct)
         ? globalThis.String(object.mbhFinalProduct)
         : isSet(object.mbh_final_product)
         ? globalThis.String(object.mbh_final_product)
-        : undefined,
+        : "",
       mbhCode: isSet(object.mbhCode)
         ? globalThis.String(object.mbhCode)
         : isSet(object.mbh_code)
@@ -14145,22 +14504,22 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         ? globalThis.String(object.mbhDevCode)
         : isSet(object.mbh_dev_code)
         ? globalThis.String(object.mbh_dev_code)
-        : undefined,
+        : "",
       mbhShadeCode: isSet(object.mbhShadeCode)
         ? globalThis.String(object.mbhShadeCode)
         : isSet(object.mbh_shade_code)
         ? globalThis.String(object.mbh_shade_code)
-        : undefined,
+        : "",
       mbhShadeName: isSet(object.mbhShadeName)
         ? globalThis.String(object.mbhShadeName)
         : isSet(object.mbh_shade_name)
         ? globalThis.String(object.mbh_shade_name)
-        : undefined,
+        : "",
       mbhCrossSection: isSet(object.mbhCrossSection)
         ? globalThis.String(object.mbhCrossSection)
         : isSet(object.mbh_cross_section)
         ? globalThis.String(object.mbh_cross_section)
-        : undefined,
+        : "",
       mbhLustureCode: isSet(object.mbhLustureCode)
         ? globalThis.String(object.mbhLustureCode)
         : isSet(object.mbh_lusture_code)
@@ -14171,6 +14530,19 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         : isSet(object.mbh_machine_id)
         ? globalThis.String(object.mbh_machine_id)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : "",
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : "",
+      shades: globalThis.Array.isArray(object?.shades)
+        ? object.shades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : [],
     };
   },
 
@@ -14182,13 +14554,13 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhOracleSysId !== undefined) {
       obj.mbhOracleSysId = message.mbhOracleSysId;
     }
-    if (message.mbhMgtName !== undefined) {
+    if (message.mbhMgtName !== "") {
       obj.mbhMgtName = message.mbhMgtName;
     }
-    if (message.mbhDenier !== undefined) {
+    if (message.mbhDenier !== 0) {
       obj.mbhDenier = message.mbhDenier;
     }
-    if (message.mbhFilament !== undefined) {
+    if (message.mbhFilament !== 0) {
       obj.mbhFilament = Math.round(message.mbhFilament);
     }
     if (message.mbhDozing !== undefined) {
@@ -14200,10 +14572,10 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhStatus !== undefined) {
       obj.mbhStatus = message.mbhStatus;
     }
-    if (message.mbhLdrPrsn !== undefined) {
+    if (message.mbhLdrPrsn !== 0) {
       obj.mbhLdrPrsn = message.mbhLdrPrsn;
     }
-    if (message.mbhFinalProduct !== undefined) {
+    if (message.mbhFinalProduct !== "") {
       obj.mbhFinalProduct = message.mbhFinalProduct;
     }
     if (message.mbhCode !== undefined) {
@@ -14212,16 +14584,16 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhIsBoughtout !== false) {
       obj.mbhIsBoughtout = message.mbhIsBoughtout;
     }
-    if (message.mbhDevCode !== undefined) {
+    if (message.mbhDevCode !== "") {
       obj.mbhDevCode = message.mbhDevCode;
     }
-    if (message.mbhShadeCode !== undefined) {
+    if (message.mbhShadeCode !== "") {
       obj.mbhShadeCode = message.mbhShadeCode;
     }
-    if (message.mbhShadeName !== undefined) {
+    if (message.mbhShadeName !== "") {
       obj.mbhShadeName = message.mbhShadeName;
     }
-    if (message.mbhCrossSection !== undefined) {
+    if (message.mbhCrossSection !== "") {
       obj.mbhCrossSection = message.mbhCrossSection;
     }
     if (message.mbhLustureCode !== undefined) {
@@ -14229,6 +14601,15 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       obj.mbhMachineId = message.mbhMachineId;
+    }
+    if (message.mbhVsNumber !== "") {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== "") {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.shades?.length) {
+      obj.shades = message.shades.map((e) => MBHeadShadeInput.toJSON(e));
     }
     return obj;
   },
@@ -14240,22 +14621,25 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     const message = createBaseCreateMBHeadRequest();
     message.mbhMbCosting = object.mbhMbCosting ?? "";
     message.mbhOracleSysId = object.mbhOracleSysId ?? undefined;
-    message.mbhMgtName = object.mbhMgtName ?? undefined;
-    message.mbhDenier = object.mbhDenier ?? undefined;
-    message.mbhFilament = object.mbhFilament ?? undefined;
+    message.mbhMgtName = object.mbhMgtName ?? "";
+    message.mbhDenier = object.mbhDenier ?? 0;
+    message.mbhFilament = object.mbhFilament ?? 0;
     message.mbhDozing = object.mbhDozing ?? undefined;
     message.mbhCheckStatus = object.mbhCheckStatus ?? undefined;
     message.mbhStatus = object.mbhStatus ?? undefined;
-    message.mbhLdrPrsn = object.mbhLdrPrsn ?? undefined;
-    message.mbhFinalProduct = object.mbhFinalProduct ?? undefined;
+    message.mbhLdrPrsn = object.mbhLdrPrsn ?? 0;
+    message.mbhFinalProduct = object.mbhFinalProduct ?? "";
     message.mbhCode = object.mbhCode ?? undefined;
     message.mbhIsBoughtout = object.mbhIsBoughtout ?? false;
-    message.mbhDevCode = object.mbhDevCode ?? undefined;
-    message.mbhShadeCode = object.mbhShadeCode ?? undefined;
-    message.mbhShadeName = object.mbhShadeName ?? undefined;
-    message.mbhCrossSection = object.mbhCrossSection ?? undefined;
+    message.mbhDevCode = object.mbhDevCode ?? "";
+    message.mbhShadeCode = object.mbhShadeCode ?? "";
+    message.mbhShadeName = object.mbhShadeName ?? "";
+    message.mbhCrossSection = object.mbhCrossSection ?? "";
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? "";
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? "";
+    message.shades = object.shades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
     return message;
   },
 };
@@ -14484,22 +14868,25 @@ function createBaseUpdateMBHeadRequest(): UpdateMBHeadRequest {
   return {
     mbhId: "",
     mbhMbCosting: undefined,
-    mbhMgtName: undefined,
-    mbhDenier: undefined,
-    mbhFilament: undefined,
+    mbhMgtName: "",
+    mbhDenier: 0,
+    mbhFilament: 0,
     mbhDozing: undefined,
     mbhIsActive: undefined,
     mbhCheckStatus: undefined,
     mbhStatus: undefined,
-    mbhLdrPrsn: undefined,
-    mbhFinalProduct: undefined,
+    mbhLdrPrsn: 0,
+    mbhFinalProduct: "",
     mbhCode: undefined,
-    mbhDevCode: undefined,
-    mbhShadeCode: undefined,
-    mbhShadeName: undefined,
-    mbhCrossSection: undefined,
+    mbhDevCode: "",
+    mbhShadeCode: "",
+    mbhShadeName: "",
+    mbhCrossSection: "",
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
+    mbhVsNumber: "",
+    mbhNoOfProcess: "",
+    shades: [],
   };
 }
 
@@ -14511,13 +14898,13 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhMbCosting !== undefined) {
       writer.uint32(18).string(message.mbhMbCosting);
     }
-    if (message.mbhMgtName !== undefined) {
+    if (message.mbhMgtName !== "") {
       writer.uint32(26).string(message.mbhMgtName);
     }
-    if (message.mbhDenier !== undefined) {
+    if (message.mbhDenier !== 0) {
       writer.uint32(33).double(message.mbhDenier);
     }
-    if (message.mbhFilament !== undefined) {
+    if (message.mbhFilament !== 0) {
       writer.uint32(40).int32(message.mbhFilament);
     }
     if (message.mbhDozing !== undefined) {
@@ -14532,25 +14919,25 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhStatus !== undefined) {
       writer.uint32(74).string(message.mbhStatus);
     }
-    if (message.mbhLdrPrsn !== undefined) {
+    if (message.mbhLdrPrsn !== 0) {
       writer.uint32(81).double(message.mbhLdrPrsn);
     }
-    if (message.mbhFinalProduct !== undefined) {
+    if (message.mbhFinalProduct !== "") {
       writer.uint32(90).string(message.mbhFinalProduct);
     }
     if (message.mbhCode !== undefined) {
       writer.uint32(98).string(message.mbhCode);
     }
-    if (message.mbhDevCode !== undefined) {
+    if (message.mbhDevCode !== "") {
       writer.uint32(106).string(message.mbhDevCode);
     }
-    if (message.mbhShadeCode !== undefined) {
+    if (message.mbhShadeCode !== "") {
       writer.uint32(114).string(message.mbhShadeCode);
     }
-    if (message.mbhShadeName !== undefined) {
+    if (message.mbhShadeName !== "") {
       writer.uint32(122).string(message.mbhShadeName);
     }
-    if (message.mbhCrossSection !== undefined) {
+    if (message.mbhCrossSection !== "") {
       writer.uint32(130).string(message.mbhCrossSection);
     }
     if (message.mbhLustureCode !== undefined) {
@@ -14558,6 +14945,15 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       writer.uint32(146).string(message.mbhMachineId);
+    }
+    if (message.mbhVsNumber !== "") {
+      writer.uint32(154).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== "") {
+      writer.uint32(162).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.shades) {
+      MBHeadShadeInput.encode(v!, writer.uint32(170).fork()).join();
     }
     return writer;
   },
@@ -14713,6 +15109,30 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
           message.mbhMachineId = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.shades.push(MBHeadShadeInput.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14738,17 +15158,17 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         ? globalThis.String(object.mbhMgtName)
         : isSet(object.mbh_mgt_name)
         ? globalThis.String(object.mbh_mgt_name)
-        : undefined,
+        : "",
       mbhDenier: isSet(object.mbhDenier)
         ? globalThis.Number(object.mbhDenier)
         : isSet(object.mbh_denier)
         ? globalThis.Number(object.mbh_denier)
-        : undefined,
+        : 0,
       mbhFilament: isSet(object.mbhFilament)
         ? globalThis.Number(object.mbhFilament)
         : isSet(object.mbh_filament)
         ? globalThis.Number(object.mbh_filament)
-        : undefined,
+        : 0,
       mbhDozing: isSet(object.mbhDozing)
         ? globalThis.Number(object.mbhDozing)
         : isSet(object.mbh_dozing)
@@ -14773,12 +15193,12 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         ? globalThis.Number(object.mbhLdrPrsn)
         : isSet(object.mbh_ldr_prsn)
         ? globalThis.Number(object.mbh_ldr_prsn)
-        : undefined,
+        : 0,
       mbhFinalProduct: isSet(object.mbhFinalProduct)
         ? globalThis.String(object.mbhFinalProduct)
         : isSet(object.mbh_final_product)
         ? globalThis.String(object.mbh_final_product)
-        : undefined,
+        : "",
       mbhCode: isSet(object.mbhCode)
         ? globalThis.String(object.mbhCode)
         : isSet(object.mbh_code)
@@ -14788,22 +15208,22 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         ? globalThis.String(object.mbhDevCode)
         : isSet(object.mbh_dev_code)
         ? globalThis.String(object.mbh_dev_code)
-        : undefined,
+        : "",
       mbhShadeCode: isSet(object.mbhShadeCode)
         ? globalThis.String(object.mbhShadeCode)
         : isSet(object.mbh_shade_code)
         ? globalThis.String(object.mbh_shade_code)
-        : undefined,
+        : "",
       mbhShadeName: isSet(object.mbhShadeName)
         ? globalThis.String(object.mbhShadeName)
         : isSet(object.mbh_shade_name)
         ? globalThis.String(object.mbh_shade_name)
-        : undefined,
+        : "",
       mbhCrossSection: isSet(object.mbhCrossSection)
         ? globalThis.String(object.mbhCrossSection)
         : isSet(object.mbh_cross_section)
         ? globalThis.String(object.mbh_cross_section)
-        : undefined,
+        : "",
       mbhLustureCode: isSet(object.mbhLustureCode)
         ? globalThis.String(object.mbhLustureCode)
         : isSet(object.mbh_lusture_code)
@@ -14814,6 +15234,19 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         : isSet(object.mbh_machine_id)
         ? globalThis.String(object.mbh_machine_id)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : "",
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : "",
+      shades: globalThis.Array.isArray(object?.shades)
+        ? object.shades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : [],
     };
   },
 
@@ -14825,13 +15258,13 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhMbCosting !== undefined) {
       obj.mbhMbCosting = message.mbhMbCosting;
     }
-    if (message.mbhMgtName !== undefined) {
+    if (message.mbhMgtName !== "") {
       obj.mbhMgtName = message.mbhMgtName;
     }
-    if (message.mbhDenier !== undefined) {
+    if (message.mbhDenier !== 0) {
       obj.mbhDenier = message.mbhDenier;
     }
-    if (message.mbhFilament !== undefined) {
+    if (message.mbhFilament !== 0) {
       obj.mbhFilament = Math.round(message.mbhFilament);
     }
     if (message.mbhDozing !== undefined) {
@@ -14846,25 +15279,25 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhStatus !== undefined) {
       obj.mbhStatus = message.mbhStatus;
     }
-    if (message.mbhLdrPrsn !== undefined) {
+    if (message.mbhLdrPrsn !== 0) {
       obj.mbhLdrPrsn = message.mbhLdrPrsn;
     }
-    if (message.mbhFinalProduct !== undefined) {
+    if (message.mbhFinalProduct !== "") {
       obj.mbhFinalProduct = message.mbhFinalProduct;
     }
     if (message.mbhCode !== undefined) {
       obj.mbhCode = message.mbhCode;
     }
-    if (message.mbhDevCode !== undefined) {
+    if (message.mbhDevCode !== "") {
       obj.mbhDevCode = message.mbhDevCode;
     }
-    if (message.mbhShadeCode !== undefined) {
+    if (message.mbhShadeCode !== "") {
       obj.mbhShadeCode = message.mbhShadeCode;
     }
-    if (message.mbhShadeName !== undefined) {
+    if (message.mbhShadeName !== "") {
       obj.mbhShadeName = message.mbhShadeName;
     }
-    if (message.mbhCrossSection !== undefined) {
+    if (message.mbhCrossSection !== "") {
       obj.mbhCrossSection = message.mbhCrossSection;
     }
     if (message.mbhLustureCode !== undefined) {
@@ -14872,6 +15305,15 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       obj.mbhMachineId = message.mbhMachineId;
+    }
+    if (message.mbhVsNumber !== "") {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== "") {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.shades?.length) {
+      obj.shades = message.shades.map((e) => MBHeadShadeInput.toJSON(e));
     }
     return obj;
   },
@@ -14883,22 +15325,25 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     const message = createBaseUpdateMBHeadRequest();
     message.mbhId = object.mbhId ?? "";
     message.mbhMbCosting = object.mbhMbCosting ?? undefined;
-    message.mbhMgtName = object.mbhMgtName ?? undefined;
-    message.mbhDenier = object.mbhDenier ?? undefined;
-    message.mbhFilament = object.mbhFilament ?? undefined;
+    message.mbhMgtName = object.mbhMgtName ?? "";
+    message.mbhDenier = object.mbhDenier ?? 0;
+    message.mbhFilament = object.mbhFilament ?? 0;
     message.mbhDozing = object.mbhDozing ?? undefined;
     message.mbhIsActive = object.mbhIsActive ?? undefined;
     message.mbhCheckStatus = object.mbhCheckStatus ?? undefined;
     message.mbhStatus = object.mbhStatus ?? undefined;
-    message.mbhLdrPrsn = object.mbhLdrPrsn ?? undefined;
-    message.mbhFinalProduct = object.mbhFinalProduct ?? undefined;
+    message.mbhLdrPrsn = object.mbhLdrPrsn ?? 0;
+    message.mbhFinalProduct = object.mbhFinalProduct ?? "";
     message.mbhCode = object.mbhCode ?? undefined;
-    message.mbhDevCode = object.mbhDevCode ?? undefined;
-    message.mbhShadeCode = object.mbhShadeCode ?? undefined;
-    message.mbhShadeName = object.mbhShadeName ?? undefined;
-    message.mbhCrossSection = object.mbhCrossSection ?? undefined;
+    message.mbhDevCode = object.mbhDevCode ?? "";
+    message.mbhShadeCode = object.mbhShadeCode ?? "";
+    message.mbhShadeName = object.mbhShadeName ?? "";
+    message.mbhCrossSection = object.mbhCrossSection ?? "";
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? "";
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? "";
+    message.shades = object.shades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
     return message;
   },
 };
@@ -15524,7 +15969,7 @@ export const ExportMBHeadsResponse: MessageFns<ExportMBHeadsResponse> = {
 };
 
 function createBaseImportMBHeadsRequest(): ImportMBHeadsRequest {
-  return { fileContent: new Uint8Array(0), fileName: "", duplicateAction: "" };
+  return { fileContent: new Uint8Array(0), fileName: "", duplicateAction: "", dryRun: false };
 }
 
 export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
@@ -15537,6 +15982,9 @@ export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
     }
     if (message.duplicateAction !== "") {
       writer.uint32(26).string(message.duplicateAction);
+    }
+    if (message.dryRun !== false) {
+      writer.uint32(32).bool(message.dryRun);
     }
     return writer;
   },
@@ -15572,6 +16020,14 @@ export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
           message.duplicateAction = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.dryRun = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15598,6 +16054,11 @@ export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
         : isSet(object.duplicate_action)
         ? globalThis.String(object.duplicate_action)
         : "",
+      dryRun: isSet(object.dryRun)
+        ? globalThis.Boolean(object.dryRun)
+        : isSet(object.dry_run)
+        ? globalThis.Boolean(object.dry_run)
+        : false,
     };
   },
 
@@ -15612,6 +16073,9 @@ export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
     if (message.duplicateAction !== "") {
       obj.duplicateAction = message.duplicateAction;
     }
+    if (message.dryRun !== false) {
+      obj.dryRun = message.dryRun;
+    }
     return obj;
   },
 
@@ -15623,12 +16087,13 @@ export const ImportMBHeadsRequest: MessageFns<ImportMBHeadsRequest> = {
     message.fileContent = object.fileContent ?? new Uint8Array(0);
     message.fileName = object.fileName ?? "";
     message.duplicateAction = object.duplicateAction ?? "";
+    message.dryRun = object.dryRun ?? false;
     return message;
   },
 };
 
 function createBaseImportMBHeadsResponse(): ImportMBHeadsResponse {
-  return { base: undefined, successCount: 0, skippedCount: 0, failedCount: 0, errors: [] };
+  return { base: undefined, successCount: 0, skippedCount: 0, failedCount: 0, errors: [], updatedCount: 0 };
 }
 
 export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
@@ -15647,6 +16112,9 @@ export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
     }
     for (const v of message.errors) {
       ImportError.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.updatedCount !== 0) {
+      writer.uint32(48).int32(message.updatedCount);
     }
     return writer;
   },
@@ -15698,6 +16166,14 @@ export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
           message.errors.push(ImportError.decode(reader, reader.uint32()));
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.updatedCount = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15726,6 +16202,11 @@ export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
         ? globalThis.Number(object.failed_count)
         : 0,
       errors: globalThis.Array.isArray(object?.errors) ? object.errors.map((e: any) => ImportError.fromJSON(e)) : [],
+      updatedCount: isSet(object.updatedCount)
+        ? globalThis.Number(object.updatedCount)
+        : isSet(object.updated_count)
+        ? globalThis.Number(object.updated_count)
+        : 0,
     };
   },
 
@@ -15746,6 +16227,9 @@ export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
     if (message.errors?.length) {
       obj.errors = message.errors.map((e) => ImportError.toJSON(e));
     }
+    if (message.updatedCount !== 0) {
+      obj.updatedCount = Math.round(message.updatedCount);
+    }
     return obj;
   },
 
@@ -15761,6 +16245,7 @@ export const ImportMBHeadsResponse: MessageFns<ImportMBHeadsResponse> = {
     message.skippedCount = object.skippedCount ?? 0;
     message.failedCount = object.failedCount ?? 0;
     message.errors = object.errors?.map((e) => ImportError.fromPartial(e)) || [];
+    message.updatedCount = object.updatedCount ?? 0;
     return message;
   },
 };
