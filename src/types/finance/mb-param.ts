@@ -86,6 +86,9 @@ export const ACTIVE_FILTER_OPTIONS = [
 // UI Option Lists
 // ============================================================================
 
+/** `mst_mb_param.code` of the picklist backing the MB Head "No of Process" dropdown. */
+export const MB_PARAM_CODE_NO_OF_PROCESS = "NO_OF_PROCESS"
+
 export const MB_PARAM_TYPE_OPTIONS = [
   { value: "SCALAR", label: "Scalar" },
   { value: "PICKLIST", label: "Picklist" },

@@ -16,12 +16,14 @@ export async function POST(request: NextRequest) {
             fileContent: fileContentBytes,
             fileName: body.fileName,
             duplicateAction: body.duplicateAction,
+            dryRun: body.dryRun === true,
         }, metadata)
 
         return NextResponse.json({
             base: response.base,
             successCount: response.successCount,
             skippedCount: response.skippedCount,
+            updatedCount: response.updatedCount,
             failedCount: response.failedCount,
             errors: response.errors,
         })
@@ -38,6 +40,7 @@ export async function POST(request: NextRequest) {
                 },
                 successCount: 0,
                 skippedCount: 0,
+                updatedCount: 0,
                 failedCount: 0,
                 errors: [],
             },

@@ -43,6 +43,40 @@ export function useMbParams(params: ListMbParamsParams = {}) {
   })
 }
 
+/** A single picklist option reduced to what a `<Select>` needs. */
+export interface MbParamOptionChoice {
+  /** Option code stored on the entity, e.g. "S" / "D" / "T". */
+  code: string
+  /** Human label — option description when present, otherwise the code itself. */
+  name: string
+  /** Numeric value the option maps to, e.g. "1.000000". */
+  numericValue: string
+}
+
+/**
+ * Picklist options for one MB parameter, sourced live from `mst_mb_param_option`.
+ * Nothing is hardcoded — adding an option in the master surfaces it here with no code change.
+ *
+ * Reuses `useMbParams` (which eager-loads `options`) so it shares the existing
+ * `["finance","mb-param","list",…]` cache entry instead of opening a second request path.
+ *
+ * Inactive options are filtered out, matching the backend's active-only membership check.
+ */
+export function useMbParamOptions(paramCode: string) {
+  const { data, isLoading, isError } = useMbParams({ pageSize: 100 })
+
+  const param = data?.items.find((p) => p.code === paramCode)
+  const options: MbParamOptionChoice[] = (param?.options ?? [])
+    .filter((o) => o.isActive)
+    .map((o) => ({
+      code: o.code,
+      name: o.description || o.code,
+      numericValue: o.numericValue,
+    }))
+
+  return { options, unit: param?.unit ?? "", isLoading, isError }
+}
+
 export function useCreateMbParam() {
   const queryClient = useQueryClient()
   return useMutation({

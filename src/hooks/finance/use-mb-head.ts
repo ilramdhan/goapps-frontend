@@ -121,6 +121,8 @@ interface ImportData {
   fileContent: Uint8Array
   fileName: string
   duplicateAction: string
+  /** When true the backend validates every row and writes nothing. */
+  dryRun?: boolean
 }
 
 export function useImportMBHeads() {
@@ -132,15 +134,25 @@ export function useImportMBHeads() {
         fileContent: Array.from(data.fileContent),
         fileName: data.fileName,
         duplicateAction: data.duplicateAction,
+        dryRun: data.dryRun === true,
       })
       return ImportMBHeadsResponseParser.fromJSON(rawResponse)
     },
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
+      const { successCount, updatedCount, skippedCount, failedCount } = response
+
+      // Dry run writes nothing — no cache invalidation, and the dialog renders the preview itself.
+      if (variables.dryRun) {
+        if (!response.base?.isSuccess && failedCount === 0) {
+          toast.error(response.base?.message || "Failed to validate the file")
+        }
+        return
+      }
+
       queryClient.invalidateQueries({ queryKey: mbHeadKeys.lists() })
       if (response.base?.isSuccess) {
-        const { successCount, skippedCount, failedCount } = response
         toast.success(
-          `Import completed: ${successCount} created, ${skippedCount} skipped, ${failedCount} failed`
+          `Import completed: ${successCount} created, ${updatedCount} updated, ${skippedCount} skipped, ${failedCount} failed`
         )
       } else {
         toast.error(response.base?.message || "Failed to import MB Heads")
