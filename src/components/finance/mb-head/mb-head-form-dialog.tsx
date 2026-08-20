@@ -36,10 +36,13 @@ const formSchema = z.object({
   mbhMgtName: z.string().max(100).optional(),
   mbhDenier: z.coerce.number().positive().optional().or(z.literal("")),
   mbhFilament: z.coerce.number().int().positive().optional().or(z.literal("")),
+  // D30: mbhDozing is a retired, contaminated legacy column — kept in the schema so the
+  // value round-trips untouched, but deliberately NOT rendered in the form. Do not "fix" this.
   mbhDozing: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
   mbhCheckStatus: z.string().max(50).optional(),
   mbhStatus: z.string().max(100).optional(),
   mbhLdrPrsn: z.coerce.number().min(0).optional().nullable(),
+  mbhRunLdrPct: z.coerce.number().min(0).optional().nullable(),
   mbhFinalProduct: z.string().max(200).optional(),
   mbhCode: z.string().max(100).optional(),
   mbhIsBoughtout: z.boolean(),
@@ -71,7 +74,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
     defaultValues: {
       mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "",
       mbhDenier: "", mbhFilament: "", mbhDozing: "",
-      mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
+      mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
       mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
       mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
       mbhIsActive: true,
@@ -92,6 +95,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               mbhCheckStatus: mbHead.mbhCheckStatus || "",
               mbhStatus: mbHead.mbhStatus || "",
               mbhLdrPrsn: mbHead.mbhLdrPrsn ?? null,
+              mbhRunLdrPct: mbHead.mbhRunLdrPct ?? null,
               mbhFinalProduct: mbHead.mbhFinalProduct || "",
               mbhCode: mbHead.mbhCode || "",
               mbhIsBoughtout: mbHead.isBoughtout ?? false,
@@ -105,7 +109,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
             }
           : {
               mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
-              mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhFinalProduct: "", mbhCode: "",
+              mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
               mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
               mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
               mbhIsActive: true,
@@ -130,6 +134,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
             mbhCheckStatus: values.mbhCheckStatus || undefined,
             mbhStatus: values.mbhStatus || undefined,
             mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
+            mbhRunLdrPct: values.mbhRunLdrPct ?? undefined,
             mbhFinalProduct: values.mbhFinalProduct || undefined,
             mbhCode: values.mbhCode || undefined,
             mbhDevCode: values.mbhDevCode || undefined,
@@ -152,6 +157,7 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
           mbhCheckStatus: values.mbhCheckStatus || undefined,
           mbhStatus: values.mbhStatus || undefined,
           mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
+          mbhRunLdrPct: values.mbhRunLdrPct ?? undefined,
           mbhFinalProduct: values.mbhFinalProduct || undefined,
           mbhCode: values.mbhCode || undefined,
           mbhIsBoughtout: values.mbhIsBoughtout,
@@ -255,19 +261,13 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="mbhDozing"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Dozing %</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" min="0" max="100" placeholder="Optional" disabled={isPending} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/*
+              D30: the "Dozing %" field (mbhDozing) is intentionally NOT rendered.
+              The legacy column mixes two different scales (LDR ~3.55 and oil dozing rate
+              ~0.03) and has been retired. Its data is preserved in the DB and still
+              round-trips through this form's state — it is only hidden from the UI.
+              Use "LDR Aktual (%)" (mbhRunLdrPct) instead. Do not re-add this input.
+            */}
 
             {/* Oracle Data */}
             <div className="border-t pt-4 mt-2">
@@ -317,11 +317,27 @@ export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHe
                   name="mbhLdrPrsn"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>LDR Prsn <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormLabel>LDR Rencana (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                       <FormControl>
                         <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                           onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                       </FormControl>
+                      <FormDescription>LDR awal saat produk baru, sebelum masuk mesin spinning.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mbhRunLdrPct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>LDR Aktual (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.000001" min="0" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
+                      </FormControl>
+                      <FormDescription>LDR yang benar-benar dipakai saat produksi; nilai inilah yang dipakai perhitungan cost.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

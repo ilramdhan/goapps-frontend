@@ -1412,6 +1412,10 @@ export interface MBHead {
   paramNoOfProcess: string;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). Optional. */
   machineId?: string | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
+  mbhRunLdrPct?:
+    | number
+    | undefined;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1482,6 +1486,10 @@ export interface CreateMBHeadRequest {
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
   mbhMachineId?: string | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
+  mbhRunLdrPct?:
+    | number
+    | undefined;
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1580,6 +1588,10 @@ export interface UpdateMBHeadRequest {
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
   mbhMachineId?: string | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
+  mbhRunLdrPct?:
+    | number
+    | undefined;
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -1822,6 +1834,10 @@ export interface MBSpin {
   mbsFinalProduct?:
     | string
     | undefined;
+  /** Optional Oracle CMBS_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
+  mbsRunLdrPct?:
+    | number
+    | undefined;
   /** Audit metadata. */
   audit: AuditInfo | undefined;
 }
@@ -1869,7 +1885,11 @@ export interface CreateMBSpinRequest {
     | number
     | undefined;
   /** Optional Oracle CMBS_FINAL_PRODUCT (max 200 chars). */
-  mbsFinalProduct?: string | undefined;
+  mbsFinalProduct?:
+    | string
+    | undefined;
+  /** Optional Oracle CMBS_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
+  mbsRunLdrPct?: number | undefined;
 }
 
 /** CreateMBSpinResponse is the response for creating an MB Spin record. */
@@ -1947,7 +1967,11 @@ export interface UpdateMBSpinRequest {
     | number
     | undefined;
   /** Optional Oracle CMBS_FINAL_PRODUCT (max 200 chars). */
-  mbsFinalProduct?: string | undefined;
+  mbsFinalProduct?:
+    | string
+    | undefined;
+  /** Optional Oracle CMBS_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
+  mbsRunLdrPct?: number | undefined;
 }
 
 /** UpdateMBSpinResponse is the response for updating an MB Spin record. */
@@ -13076,6 +13100,7 @@ function createBaseMBHead(): MBHead {
     paramThroughputPerHour: "",
     paramNoOfProcess: "",
     machineId: undefined,
+    mbhRunLdrPct: undefined,
   };
 }
 
@@ -13188,6 +13213,9 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.machineId !== undefined) {
       writer.uint32(290).string(message.machineId);
+    }
+    if (message.mbhRunLdrPct !== undefined) {
+      writer.uint32(297).double(message.mbhRunLdrPct);
     }
     return writer;
   },
@@ -13487,6 +13515,14 @@ export const MBHead: MessageFns<MBHead> = {
           message.machineId = reader.string();
           continue;
         }
+        case 37: {
+          if (tag !== 297) {
+            break;
+          }
+
+          message.mbhRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13674,6 +13710,11 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.machine_id)
         ? globalThis.String(object.machine_id)
         : undefined,
+      mbhRunLdrPct: isSet(object.mbhRunLdrPct)
+        ? globalThis.Number(object.mbhRunLdrPct)
+        : isSet(object.mbh_run_ldr_pct)
+        ? globalThis.Number(object.mbh_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -13787,6 +13828,9 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.machineId !== undefined) {
       obj.machineId = message.machineId;
     }
+    if (message.mbhRunLdrPct !== undefined) {
+      obj.mbhRunLdrPct = message.mbhRunLdrPct;
+    }
     return obj;
   },
 
@@ -13833,6 +13877,7 @@ export const MBHead: MessageFns<MBHead> = {
     message.paramThroughputPerHour = object.paramThroughputPerHour ?? "";
     message.paramNoOfProcess = object.paramNoOfProcess ?? "";
     message.machineId = object.machineId ?? undefined;
+    message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
     return message;
   },
 };
@@ -13857,6 +13902,7 @@ function createBaseCreateMBHeadRequest(): CreateMBHeadRequest {
     mbhCrossSection: undefined,
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
+    mbhRunLdrPct: undefined,
   };
 }
 
@@ -13915,6 +13961,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       writer.uint32(146).string(message.mbhMachineId);
+    }
+    if (message.mbhRunLdrPct !== undefined) {
+      writer.uint32(153).double(message.mbhRunLdrPct);
     }
     return writer;
   },
@@ -14070,6 +14119,14 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
           message.mbhMachineId = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 153) {
+            break;
+          }
+
+          message.mbhRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14171,6 +14228,11 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         : isSet(object.mbh_machine_id)
         ? globalThis.String(object.mbh_machine_id)
         : undefined,
+      mbhRunLdrPct: isSet(object.mbhRunLdrPct)
+        ? globalThis.Number(object.mbhRunLdrPct)
+        : isSet(object.mbh_run_ldr_pct)
+        ? globalThis.Number(object.mbh_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -14230,6 +14292,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhMachineId !== undefined) {
       obj.mbhMachineId = message.mbhMachineId;
     }
+    if (message.mbhRunLdrPct !== undefined) {
+      obj.mbhRunLdrPct = message.mbhRunLdrPct;
+    }
     return obj;
   },
 
@@ -14256,6 +14321,7 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     message.mbhCrossSection = object.mbhCrossSection ?? undefined;
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
+    message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
     return message;
   },
 };
@@ -14500,6 +14566,7 @@ function createBaseUpdateMBHeadRequest(): UpdateMBHeadRequest {
     mbhCrossSection: undefined,
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
+    mbhRunLdrPct: undefined,
   };
 }
 
@@ -14558,6 +14625,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.mbhMachineId !== undefined) {
       writer.uint32(146).string(message.mbhMachineId);
+    }
+    if (message.mbhRunLdrPct !== undefined) {
+      writer.uint32(153).double(message.mbhRunLdrPct);
     }
     return writer;
   },
@@ -14713,6 +14783,14 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
           message.mbhMachineId = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 153) {
+            break;
+          }
+
+          message.mbhRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14814,6 +14892,11 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         : isSet(object.mbh_machine_id)
         ? globalThis.String(object.mbh_machine_id)
         : undefined,
+      mbhRunLdrPct: isSet(object.mbhRunLdrPct)
+        ? globalThis.Number(object.mbhRunLdrPct)
+        : isSet(object.mbh_run_ldr_pct)
+        ? globalThis.Number(object.mbh_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -14873,6 +14956,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhMachineId !== undefined) {
       obj.mbhMachineId = message.mbhMachineId;
     }
+    if (message.mbhRunLdrPct !== undefined) {
+      obj.mbhRunLdrPct = message.mbhRunLdrPct;
+    }
     return obj;
   },
 
@@ -14899,6 +14985,7 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     message.mbhCrossSection = object.mbhCrossSection ?? undefined;
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
+    message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
     return message;
   },
 };
@@ -16668,6 +16755,7 @@ function createBaseMBSpin(): MBSpin {
     mbsStatus: undefined,
     mbsLdrPrsn: undefined,
     mbsFinalProduct: undefined,
+    mbsRunLdrPct: undefined,
     audit: undefined,
   };
 }
@@ -16715,6 +16803,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.mbsFinalProduct !== undefined) {
       writer.uint32(114).string(message.mbsFinalProduct);
+    }
+    if (message.mbsRunLdrPct !== undefined) {
+      writer.uint32(121).double(message.mbsRunLdrPct);
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
@@ -16841,6 +16932,14 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.mbsFinalProduct = reader.string();
           continue;
         }
+        case 15: {
+          if (tag !== 121) {
+            break;
+          }
+
+          message.mbsRunLdrPct = reader.double();
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -16930,6 +17029,11 @@ export const MBSpin: MessageFns<MBSpin> = {
         : isSet(object.mbs_final_product)
         ? globalThis.String(object.mbs_final_product)
         : undefined,
+      mbsRunLdrPct: isSet(object.mbsRunLdrPct)
+        ? globalThis.Number(object.mbsRunLdrPct)
+        : isSet(object.mbs_run_ldr_pct)
+        ? globalThis.Number(object.mbs_run_ldr_pct)
+        : undefined,
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
     };
   },
@@ -16978,6 +17082,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.mbsFinalProduct !== undefined) {
       obj.mbsFinalProduct = message.mbsFinalProduct;
     }
+    if (message.mbsRunLdrPct !== undefined) {
+      obj.mbsRunLdrPct = message.mbsRunLdrPct;
+    }
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
@@ -17003,6 +17110,7 @@ export const MBSpin: MessageFns<MBSpin> = {
     message.mbsStatus = object.mbsStatus ?? undefined;
     message.mbsLdrPrsn = object.mbsLdrPrsn ?? undefined;
     message.mbsFinalProduct = object.mbsFinalProduct ?? undefined;
+    message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;
@@ -17024,6 +17132,7 @@ function createBaseCreateMBSpinRequest(): CreateMBSpinRequest {
     mbsStatus: undefined,
     mbsLdrPrsn: undefined,
     mbsFinalProduct: undefined,
+    mbsRunLdrPct: undefined,
   };
 }
 
@@ -17064,6 +17173,9 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     }
     if (message.mbsFinalProduct !== undefined) {
       writer.uint32(98).string(message.mbsFinalProduct);
+    }
+    if (message.mbsRunLdrPct !== undefined) {
+      writer.uint32(105).double(message.mbsRunLdrPct);
     }
     return writer;
   },
@@ -17171,6 +17283,14 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
           message.mbsFinalProduct = reader.string();
           continue;
         }
+        case 13: {
+          if (tag !== 105) {
+            break;
+          }
+
+          message.mbsRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17242,6 +17362,11 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
         : isSet(object.mbs_final_product)
         ? globalThis.String(object.mbs_final_product)
         : undefined,
+      mbsRunLdrPct: isSet(object.mbsRunLdrPct)
+        ? globalThis.Number(object.mbsRunLdrPct)
+        : isSet(object.mbs_run_ldr_pct)
+        ? globalThis.Number(object.mbs_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -17283,6 +17408,9 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     if (message.mbsFinalProduct !== undefined) {
       obj.mbsFinalProduct = message.mbsFinalProduct;
     }
+    if (message.mbsRunLdrPct !== undefined) {
+      obj.mbsRunLdrPct = message.mbsRunLdrPct;
+    }
     return obj;
   },
 
@@ -17303,6 +17431,7 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     message.mbsStatus = object.mbsStatus ?? undefined;
     message.mbsLdrPrsn = object.mbsLdrPrsn ?? undefined;
     message.mbsFinalProduct = object.mbsFinalProduct ?? undefined;
+    message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     return message;
   },
 };
@@ -17562,6 +17691,7 @@ function createBaseUpdateMBSpinRequest(): UpdateMBSpinRequest {
     mbsStatus: undefined,
     mbsLdrPrsn: undefined,
     mbsFinalProduct: undefined,
+    mbsRunLdrPct: undefined,
   };
 }
 
@@ -17605,6 +17735,9 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     }
     if (message.mbsFinalProduct !== undefined) {
       writer.uint32(106).string(message.mbsFinalProduct);
+    }
+    if (message.mbsRunLdrPct !== undefined) {
+      writer.uint32(113).double(message.mbsRunLdrPct);
     }
     return writer;
   },
@@ -17720,6 +17853,14 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
           message.mbsFinalProduct = reader.string();
           continue;
         }
+        case 14: {
+          if (tag !== 113) {
+            break;
+          }
+
+          message.mbsRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17796,6 +17937,11 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
         : isSet(object.mbs_final_product)
         ? globalThis.String(object.mbs_final_product)
         : undefined,
+      mbsRunLdrPct: isSet(object.mbsRunLdrPct)
+        ? globalThis.Number(object.mbsRunLdrPct)
+        : isSet(object.mbs_run_ldr_pct)
+        ? globalThis.Number(object.mbs_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -17840,6 +17986,9 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     if (message.mbsFinalProduct !== undefined) {
       obj.mbsFinalProduct = message.mbsFinalProduct;
     }
+    if (message.mbsRunLdrPct !== undefined) {
+      obj.mbsRunLdrPct = message.mbsRunLdrPct;
+    }
     return obj;
   },
 
@@ -17861,6 +18010,7 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     message.mbsStatus = object.mbsStatus ?? undefined;
     message.mbsLdrPrsn = object.mbsLdrPrsn ?? undefined;
     message.mbsFinalProduct = object.mbsFinalProduct ?? undefined;
+    message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     return message;
   },
 };

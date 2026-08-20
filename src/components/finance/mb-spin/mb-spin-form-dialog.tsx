@@ -45,12 +45,15 @@ const formSchema = z.object({
   mbsOracleSysId: z.string().max(100).optional(),
   mbsDenier: z.coerce.number().positive().optional().or(z.literal("")),
   mbsFilament: z.coerce.number().int().positive().optional().or(z.literal("")),
+  // D30: mbsDozing is a retired, contaminated legacy column — kept in the schema so the
+  // value round-trips untouched, but deliberately NOT rendered in the form. Do not "fix" this.
   mbsDozing: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
   mbsMbCosting: z.string().max(50).optional(),
   mbsCc: z.string().max(100).optional(),
   mbsCostRateMkt: z.coerce.number().min(0).optional().nullable(),
   mbsStatus: z.string().max(100).optional(),
   mbsLdrPrsn: z.coerce.number().min(0).optional().nullable(),
+  mbsRunLdrPct: z.coerce.number().min(0).optional().nullable(),
   mbsFinalProduct: z.string().max(200).optional(),
   mbsIsActive: z.boolean(),
 })
@@ -81,7 +84,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
     defaultValues: {
       mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "",
       mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null,
-      mbsStatus: "", mbsLdrPrsn: null, mbsFinalProduct: "", mbsIsActive: true,
+      mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsIsActive: true,
     },
   })
 
@@ -101,10 +104,11 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               mbsCostRateMkt: mbSpin.mbsCostRateMkt ?? null,
               mbsStatus: mbSpin.mbsStatus || "",
               mbsLdrPrsn: mbSpin.mbsLdrPrsn ?? null,
+              mbsRunLdrPct: mbSpin.mbsRunLdrPct ?? null,
               mbsFinalProduct: mbSpin.mbsFinalProduct || "",
               mbsIsActive: mbSpin.mbsIsActive ?? true,
             }
-          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsFinalProduct: "", mbsIsActive: true }
+          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsIsActive: true }
       )
     }
   }, [open, mbSpin, headId, form])
@@ -127,6 +131,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             mbsCostRateMkt: values.mbsCostRateMkt ?? undefined,
             mbsStatus: values.mbsStatus || undefined,
             mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
+            mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
             mbsFinalProduct: values.mbsFinalProduct || undefined,
             mbsIsActive: values.mbsIsActive,
           },
@@ -144,6 +149,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
           mbsCostRateMkt: values.mbsCostRateMkt ?? undefined,
           mbsStatus: values.mbsStatus || undefined,
           mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
+          mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
           mbsFinalProduct: values.mbsFinalProduct || undefined,
         })
       }
@@ -281,19 +287,13 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="mbsDozing"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Dozing %</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" min="0" max="100" placeholder="Optional" disabled={isPending} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/*
+              D30: the "Dozing %" field (mbsDozing) is intentionally NOT rendered.
+              The legacy column mixes two different scales (LDR ~3.55 and oil dozing rate
+              ~0.03) and has been retired. Its data is preserved in the DB and still
+              round-trips through this form's state — it is only hidden from the UI.
+              Use "LDR Aktual (%)" (mbsRunLdrPct) instead. Do not re-add this input.
+            */}
 
             <FormField
               control={form.control}
@@ -329,11 +329,27 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                 name="mbsLdrPrsn"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>LDR Prsn <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    <FormLabel>LDR Rencana (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
                       <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
+                    <FormDescription>LDR awal saat produk baru, sebelum masuk mesin spinning.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mbsRunLdrPct"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>LDR Aktual (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.000001" min="0" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
+                    </FormControl>
+                    <FormDescription>LDR yang benar-benar dipakai saat produksi; nilai inilah yang dipakai perhitungan cost.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

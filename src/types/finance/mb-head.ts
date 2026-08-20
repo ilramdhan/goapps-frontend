@@ -117,6 +117,7 @@ export interface MBHeadFormData {
   mbhCheckStatus: string
   mbhStatus: string
   mbhLdrPrsn: number | null
+  mbhRunLdrPct: number | null
   mbhFinalProduct: string
   mbhCode: string
   mbhIsBoughtout: boolean
@@ -138,6 +139,7 @@ export const DEFAULT_MB_HEAD_FORM_VALUES: MBHeadFormData = {
   mbhCheckStatus: "",
   mbhStatus: "",
   mbhLdrPrsn: null,
+  mbhRunLdrPct: null,
   mbhFinalProduct: "",
   mbhCode: "",
   mbhIsBoughtout: false,
