@@ -1356,6 +1356,10 @@ export interface MBHead {
   mbhLdrPrsn?:
     | number
     | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
+  mbhRunLdrPct?:
+    | number
+    | undefined;
   /** Optional Oracle CMBH_FINAL_PRODUCT — final product description. */
   mbhFinalProduct?:
     | string
@@ -1412,10 +1416,6 @@ export interface MBHead {
   paramNoOfProcess: string;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). Optional. */
   machineId?: string | undefined;
-  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
-  mbhRunLdrPct?:
-    | number
-    | undefined;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1485,11 +1485,11 @@ export interface CreateMBHeadRequest {
     | string
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
-  mbhMachineId?: string | undefined;
-  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
-  mbhRunLdrPct?:
-    | number
+  mbhMachineId?:
+    | string
     | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
+  mbhRunLdrPct?: number | undefined;
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1587,11 +1587,11 @@ export interface UpdateMBHeadRequest {
     | string
     | undefined;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
-  mbhMachineId?: string | undefined;
-  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage used in production (D30: authoritative LDR for costing). */
-  mbhRunLdrPct?:
-    | number
+  mbhMachineId?:
+    | string
     | undefined;
+  /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
+  mbhRunLdrPct?: number | undefined;
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -13075,6 +13075,7 @@ function createBaseMBHead(): MBHead {
     mbhCheckStatus: undefined,
     mbhStatus: undefined,
     mbhLdrPrsn: undefined,
+    mbhRunLdrPct: undefined,
     mbhFinalProduct: undefined,
     mbhCode: undefined,
     entryStatus: "",
@@ -13100,7 +13101,6 @@ function createBaseMBHead(): MBHead {
     paramThroughputPerHour: "",
     paramNoOfProcess: "",
     machineId: undefined,
-    mbhRunLdrPct: undefined,
   };
 }
 
@@ -13138,6 +13138,9 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.mbhLdrPrsn !== undefined) {
       writer.uint32(89).double(message.mbhLdrPrsn);
+    }
+    if (message.mbhRunLdrPct !== undefined) {
+      writer.uint32(297).double(message.mbhRunLdrPct);
     }
     if (message.mbhFinalProduct !== undefined) {
       writer.uint32(98).string(message.mbhFinalProduct);
@@ -13213,9 +13216,6 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.machineId !== undefined) {
       writer.uint32(290).string(message.machineId);
-    }
-    if (message.mbhRunLdrPct !== undefined) {
-      writer.uint32(297).double(message.mbhRunLdrPct);
     }
     return writer;
   },
@@ -13313,6 +13313,14 @@ export const MBHead: MessageFns<MBHead> = {
           }
 
           message.mbhLdrPrsn = reader.double();
+          continue;
+        }
+        case 37: {
+          if (tag !== 297) {
+            break;
+          }
+
+          message.mbhRunLdrPct = reader.double();
           continue;
         }
         case 12: {
@@ -13515,14 +13523,6 @@ export const MBHead: MessageFns<MBHead> = {
           message.machineId = reader.string();
           continue;
         }
-        case 37: {
-          if (tag !== 297) {
-            break;
-          }
-
-          message.mbhRunLdrPct = reader.double();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13588,6 +13588,11 @@ export const MBHead: MessageFns<MBHead> = {
         ? globalThis.Number(object.mbhLdrPrsn)
         : isSet(object.mbh_ldr_prsn)
         ? globalThis.Number(object.mbh_ldr_prsn)
+        : undefined,
+      mbhRunLdrPct: isSet(object.mbhRunLdrPct)
+        ? globalThis.Number(object.mbhRunLdrPct)
+        : isSet(object.mbh_run_ldr_pct)
+        ? globalThis.Number(object.mbh_run_ldr_pct)
         : undefined,
       mbhFinalProduct: isSet(object.mbhFinalProduct)
         ? globalThis.String(object.mbhFinalProduct)
@@ -13710,11 +13715,6 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.machine_id)
         ? globalThis.String(object.machine_id)
         : undefined,
-      mbhRunLdrPct: isSet(object.mbhRunLdrPct)
-        ? globalThis.Number(object.mbhRunLdrPct)
-        : isSet(object.mbh_run_ldr_pct)
-        ? globalThis.Number(object.mbh_run_ldr_pct)
-        : undefined,
     };
   },
 
@@ -13752,6 +13752,9 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.mbhLdrPrsn !== undefined) {
       obj.mbhLdrPrsn = message.mbhLdrPrsn;
+    }
+    if (message.mbhRunLdrPct !== undefined) {
+      obj.mbhRunLdrPct = message.mbhRunLdrPct;
     }
     if (message.mbhFinalProduct !== undefined) {
       obj.mbhFinalProduct = message.mbhFinalProduct;
@@ -13828,9 +13831,6 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.machineId !== undefined) {
       obj.machineId = message.machineId;
     }
-    if (message.mbhRunLdrPct !== undefined) {
-      obj.mbhRunLdrPct = message.mbhRunLdrPct;
-    }
     return obj;
   },
 
@@ -13850,6 +13850,7 @@ export const MBHead: MessageFns<MBHead> = {
     message.mbhCheckStatus = object.mbhCheckStatus ?? undefined;
     message.mbhStatus = object.mbhStatus ?? undefined;
     message.mbhLdrPrsn = object.mbhLdrPrsn ?? undefined;
+    message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
     message.mbhFinalProduct = object.mbhFinalProduct ?? undefined;
     message.mbhCode = object.mbhCode ?? undefined;
     message.entryStatus = object.entryStatus ?? "";
@@ -13877,7 +13878,6 @@ export const MBHead: MessageFns<MBHead> = {
     message.paramThroughputPerHour = object.paramThroughputPerHour ?? "";
     message.paramNoOfProcess = object.paramNoOfProcess ?? "";
     message.machineId = object.machineId ?? undefined;
-    message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
     return message;
   },
 };
