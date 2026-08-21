@@ -1,5 +1,5 @@
 export { MBHeadTable } from "./mb-head-table"
 export { MBHeadFilters } from "./mb-head-filters"
-export { MBHeadFormDialog } from "./mb-head-form-dialog"
+export { MBHeadFormDialogLegacy } from "./mb-head-form-dialog-legacy"
 export { MBHeadDeleteDialog } from "./mb-head-delete-dialog"
 export { MBHeadImportDialog } from "./mb-head-import-dialog"

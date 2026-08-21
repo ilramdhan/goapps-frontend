@@ -57,14 +57,14 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-interface MBHeadFormDialogProps {
+interface MBRecipeFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   mbHead?: MBHead | null
   onSuccess?: () => void
 }
 
-export function MBHeadFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBHeadFormDialogProps) {
+export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MBRecipeFormDialogProps) {
   const isEditing = !!mbHead
   const createMutation = useCreateMBHead()
   const updateMutation = useUpdateMBHead()

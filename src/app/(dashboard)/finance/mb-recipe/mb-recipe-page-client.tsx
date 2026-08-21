@@ -15,8 +15,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MbRecipeTable, useMbRecipeTableColumns } from "@/components/finance/mb-recipe"
-import { MBHeadFormDialog, MBHeadImportDialog } from "@/components/finance/mb-head"
+import { MbRecipeTable, useMbRecipeTableColumns, MBRecipeFormDialog } from "@/components/finance/mb-recipe"
+import { MBHeadImportDialog } from "@/components/finance/mb-head"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
 import { useMBHeads, useExportMBHeads } from "@/hooks/finance/use-mb-head"
 import { useUrlState } from "@/lib/hooks"
@@ -137,7 +137,7 @@ export default function MbRecipePageClient() {
         />
       )}
 
-      <MBHeadFormDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <MBRecipeFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       <MBHeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )

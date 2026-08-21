@@ -22,7 +22,7 @@ import { DataTablePagination } from "@/components/shared"
 import {
   MBHeadTable,
   MBHeadFilters,
-  MBHeadFormDialog,
+  MBHeadFormDialogLegacy,
   MBHeadDeleteDialog,
   MBHeadImportDialog,
 } from "@/components/finance/mb-head"
@@ -141,7 +141,7 @@ function MBHeadPageContent() {
         </CardContent>
       </Card>
 
-      <MBHeadFormDialog
+      <MBHeadFormDialogLegacy
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mbHead={selectedItem}
