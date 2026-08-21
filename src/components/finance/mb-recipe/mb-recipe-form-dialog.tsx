@@ -38,7 +38,11 @@ const formSchema = z.object({
   mbhFilament: z.coerce.number().int().positive().optional().or(z.literal("")),
   // D30: mbhDozing is a retired, contaminated legacy column — kept in the schema so the
   // value round-trips untouched, but deliberately NOT rendered in the form. Do not "fix" this.
-  mbhDozing: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
+  // K-4: the empty literal MUST be the first union branch. With the coercion first, the
+  // empty default "" coerces to 0 and satisfies min(0) before `.or(z.literal(""))` is ever
+  // tried, so an untouched form would write a fake 0 into a retired column. "" stays "" here,
+  // which `toOptNum` turns into `undefined` → field omitted on the wire → column stays NULL.
+  mbhDozing: z.literal("").or(z.coerce.number().min(0).max(100)).optional(),
   mbhCheckStatus: z.string().max(50).optional(),
   mbhStatus: z.string().max(100).optional(),
   mbhLdrPrsn: z.coerce.number().min(0).optional().nullable(),
