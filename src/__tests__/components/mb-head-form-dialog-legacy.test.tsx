@@ -110,7 +110,10 @@ async function submit() {
 
 /** Fields the frozen form renders when creating. Bought-out is a Switch, not [name]. */
 const CREATE_FIELD_NAMES = [
-  "mbhCheckStatus",
+  // ⛔ "mbhCheckStatus" was REMOVED from this list on 2026-08-23 (plan §11 item 105,
+  // decision K-1) because the field itself was removed from the legacy form.
+  // `mbh_check_status` is the FROZEN Oracle import trace: read-only on the detail
+  // page, never writable. The reverse-guard describe block below fails if it returns.
   "mbhCode",
   "mbhCrossSection",
   "mbhDenier",
@@ -146,6 +149,42 @@ describe("MBHeadFormDialogLegacy — frozen field contract", () => {
   it("renders the same field set in edit mode", () => {
     renderDialog(EXISTING_ROW)
     expect(renderedFieldNames()).toEqual(CREATE_FIELD_NAMES)
+  })
+
+  // ── REVERSE GUARD: plan §11 item 105 + decision K-1 ────────────────────────
+  // `mbh_check_status` is the FROZEN Oracle import trace. The user explicitly
+  // ordered the writable field removed from this legacy form (the freeze on this
+  // file was lifted for that one change). These tests FAIL if it ever comes back —
+  // as a rendered input, or silently inside a create/update payload.
+  it("never renders a check-status input (create mode)", () => {
+    renderDialog()
+    expect(document.querySelector('[name="mbhCheckStatus"]')).toBeNull()
+    expect(renderedFieldNames()).not.toContain("mbhCheckStatus")
+    expect(screen.queryByLabelText(/check status/i)).toBeNull()
+  })
+
+  it("never renders a check-status input (edit mode, row already has one)", () => {
+    renderDialog(EXISTING_ROW)
+    expect(document.querySelector('[name="mbhCheckStatus"]')).toBeNull()
+    expect(renderedFieldNames()).not.toContain("mbhCheckStatus")
+    expect(screen.queryByLabelText(/check status/i)).toBeNull()
+  })
+
+  it("never sends mbhCheckStatus in a create payload", async () => {
+    renderDialog()
+    fireEvent.change(input(/mb costing code/i), { target: { value: "MBH-GUARD-1" } })
+    await submit()
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1))
+    expect(createMutateAsync.mock.calls[0][0]).not.toHaveProperty("mbhCheckStatus")
+  })
+
+  it("never sends mbhCheckStatus in an update payload, even when the row carries one", async () => {
+    renderDialog(EXISTING_ROW)
+    await submit()
+
+    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledTimes(1))
+    expect(updateMutateAsync.mock.calls[0][0].data).not.toHaveProperty("mbhCheckStatus")
   })
 
   it("renders the frozen section headings and dialog copy", () => {
@@ -215,7 +254,6 @@ describe("MBHeadFormDialogLegacy — payload shape", () => {
       mbhDenier: undefined,
       mbhFilament: undefined,
       mbhDozing: 0, // see the D30 test above — frozen quirk, not a target value
-      mbhCheckStatus: undefined,
       mbhStatus: undefined,
       mbhLdrPrsn: undefined,
       mbhRunLdrPct: undefined,

@@ -1320,6 +1320,32 @@ export interface DownloadProductGradeTemplateResponse {
   fileName: string;
 }
 
+/**
+ * MBHeadShade is one additional shade of an MB recipe (max 2 per recipe).
+ * Mirrors mst_mb_head_shade (migration 000483): mbhs_shade_code is NOT NULL,
+ * mbhs_shade_name is nullable, and mbhs_seq_no is constrained to (1, 2).
+ */
+export interface MBHeadShade {
+  /** UUID primary key (mbhs_id). */
+  mbhsId: string;
+  /** Sequence number of the additional shade. 1 or 2. */
+  mbhsSeqNo: number;
+  /** Shade code. Always present (NOT NULL in DB). */
+  mbhsShadeCode: string;
+  /** Shade name. May be empty — column is nullable in DB. */
+  mbhsShadeName: string;
+}
+
+/** MBHeadShadeInput is an additional-shade row supplied on create/update. */
+export interface MBHeadShadeInput {
+  /** Sequence number of the additional shade. 1 or 2 (DB CHECK mbhs_seq_no IN (1, 2)). */
+  mbhsSeqNo: number;
+  /** Shade code (max 20 chars). Required — NOT NULL in DB. */
+  mbhsShadeCode: string;
+  /** Shade name (max 100 chars). Optional — nullable in DB. */
+  mbhsShadeName?: string | undefined;
+}
+
 /** MBHead represents a Melange Batch head master record (MEL yarn type only). */
 export interface MBHead {
   /** UUID primary key. */
@@ -1368,7 +1394,7 @@ export interface MBHead {
   mbhCode?:
     | string
     | undefined;
-  /** MB Costing Suite workflow state (mbh_entry_status). One of DRAFT/SUBMITTED/APPROVED/VALIDATED/UN_APPROVED/REVOKED. */
+  /** MB Costing Suite workflow state (mbh_entry_status). One of DRAFT/SUBMITTED/APPROVED/VALIDATED/UN_APPROVED/REVOKED/REJECTED (REJECTED added by user decision K-2). */
   entryStatus: string;
   /** Whether this MB is a bought-out item (no internal spinning cost). */
   isBoughtout: boolean;
@@ -1415,7 +1441,61 @@ export interface MBHead {
   /** Frozen param snapshot at VALIDATED — number of process; stores option code, e.g. "D". */
   paramNoOfProcess: string;
   /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). Optional. */
-  machineId?: string | undefined;
+  machineId?:
+    | string
+    | undefined;
+  /** Optional VS number (free text, e.g. "NA"). Wired from existing column mbh_vs_number. */
+  mbhVsNumber?:
+    | string
+    | undefined;
+  /** Optional number-of-process option code: "S", "D" or "T". No default is implied — absent means NULL. */
+  mbhNoOfProcess?:
+    | string
+    | undefined;
+  /** Additional shades (max 2). Combined with the header shade this yields up to 3 shades per recipe. */
+  additionalShades: MBHeadShade[];
+  /** Whether the record is locked. Field only — lock/unlock BEHAVIOUR is out of scope here (P10). */
+  mbhIsLocked?:
+    | boolean
+    | undefined;
+  /** Timestamp when an unlock was requested (RFC3339). Field only — behaviour is P10. */
+  mbhUnlockRequestedAt?:
+    | string
+    | undefined;
+  /** User who requested the unlock. Field only — behaviour is P10. */
+  mbhUnlockRequestedBy?:
+    | string
+    | undefined;
+  /**
+   * DERIVED check status (mbh_check_status_calc), computed by the backend from
+   * mbh_entry_status + mbh_is_boughtout. User decision K-1 option 2: the legacy
+   * mbh_check_status (field 9) stays FROZEN as the Oracle import trace and is never
+   * written by the application; THIS field is the computed one.
+   * ABSENT means "never calculated by the application" — 207 legacy heads keep it
+   * absent permanently, there is no backfill. Clients MUST render that explicitly
+   * (e.g. "Belum dihitung"); they MUST NOT coerce it to "" or to a placeholder that
+   * reads as a stored value, and they MUST NOT compute it themselves.
+   */
+  mbhCheckStatusCalc?:
+    | string
+    | undefined;
+  /**
+   * Reason WRITTEN BY THE REQUESTER when calling RequestUnlockMBHead, i.e. the
+   * free-text justification for why the locked recipe needs to be reopened.
+   * Persisted in mst_mb_head.mbh_unlock_reason.
+   *
+   * ABSENT means no unlock request has ever been recorded for this head. It is
+   * deliberately NOT cleared when an unlock is granted or rejected — the trail of
+   * why the unlock was asked for must survive the decision.
+   *
+   * Rendered next to mbh_unlock_requested_by (43) and mbh_unlock_requested_at (42)
+   * so the approver sees WHO asked, WHEN, and WHY before deciding.
+   *
+   * ⛔ This is NOT state_reason. state_reason carries the reason of the PREVIOUS
+   * workflow step (principle U-2) and is left untouched by RequestUnlockMBHead —
+   * never substitute one for the other.
+   */
+  mbhUnlockReason?: string | undefined;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1484,12 +1564,30 @@ export interface CreateMBHeadRequest {
   mbhLustureCode?:
     | string
     | undefined;
-  /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
+  /**
+   * DEPRECATED (A5) — removed from the UI; the backend ignores this value and always resolves
+   * the "MB" machine. Retained in the contract because removing a field would be breaking.
+   * (Intentionally not using the Go "Deprecated:" doc marker: it would propagate into the
+   * generated code and trip staticcheck SA1019 in existing handwritten handlers.)
+   * Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id).
+   */
   mbhMachineId?:
     | string
     | undefined;
   /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
-  mbhRunLdrPct?: number | undefined;
+  mbhRunLdrPct?:
+    | number
+    | undefined;
+  /** Optional VS number (free text, max 50 chars). No pattern, no uniqueness — literal "NA" is valid. */
+  mbhVsNumber?:
+    | string
+    | undefined;
+  /** Optional number-of-process option code: "S", "D" or "T". No default is implied — absent means NULL. */
+  mbhNoOfProcess?:
+    | string
+    | undefined;
+  /** Additional shades (max 2). */
+  additionalShades: MBHeadShadeInput[];
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1586,12 +1684,35 @@ export interface UpdateMBHeadRequest {
   mbhLustureCode?:
     | string
     | undefined;
-  /** Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id). */
+  /**
+   * DEPRECATED (A5) — removed from the UI; the backend ignores this value and always resolves
+   * the "MB" machine. Retained in the contract because removing a field would be breaking.
+   * (Intentionally not using the Go "Deprecated:" doc marker: it would propagate into the
+   * generated code and trip staticcheck SA1019 in existing handwritten handlers.)
+   * Machine assigned for MACHINE_MB_FIXED_TOTAL cost resolution (references mst_machine.mc_id).
+   */
   mbhMachineId?:
     | string
     | undefined;
   /** Optional Oracle CMBH_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
-  mbhRunLdrPct?: number | undefined;
+  mbhRunLdrPct?:
+    | number
+    | undefined;
+  /** Optional VS number (free text, max 50 chars). No pattern, no uniqueness — literal "NA" is valid. */
+  mbhVsNumber?:
+    | string
+    | undefined;
+  /** Optional number-of-process option code: "S", "D" or "T". No default is implied — absent means NULL. */
+  mbhNoOfProcess?:
+    | string
+    | undefined;
+  /** Additional shades (max 2). */
+  additionalShades: MBHeadShadeInput[];
+  /**
+   * Whether additional_shades should replace the stored shade list. Only when true is the
+   * list rewritten. Legacy forms omit this flag, so their updates never wipe existing shades.
+   */
+  replaceAdditionalShades?: boolean | undefined;
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -1630,6 +1751,15 @@ export interface ListMBHeadsRequest {
   sortBy: string;
   /** Sort direction. */
   sortOrder: string;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (R16) — Filter by linked cost product (mst_mb_head.mbh_cost_product_id).
+   * Optional; 0 (unset) means no filter, matching the existing product_type_id convention in
+   * ListCostProductMastersRequest. Lets the product detail page look up its MB Head(s) from the
+   * product side — mbh_cost_product_id is the only direction this FK exists in; CostProductMaster
+   * has no column pointing back to MB. NOTE: this column is only populated when a head reaches
+   * VALIDATED (mb_autogen_repository.go), so a still-DRAFT head will not be found by this filter.
+   */
+  costProductId: number;
 }
 
 /** ListMBHeadsResponse is the response for listing MB Head records. */
@@ -1648,10 +1778,73 @@ export interface ListMBHeadsResponse {
 export interface ExportMBHeadsRequest {
   /** Filter by active status. */
   activeFilter: ActiveFilter;
+  /**
+   * Whether to include REJECTED documents in the export.
+   *
+   * Default false (proto3 zero value) EXCLUDES rejected documents, keeping this
+   * export byte-for-byte identical to its behaviour before this field existed.
+   * Set to true to include them (audit use case).
+   */
+  includeRejected: boolean;
 }
 
 /** ExportMBHeadsResponse is the response for exporting MB Head records. */
 export interface ExportMBHeadsResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Excel file content. */
+  fileContent: Uint8Array;
+  /** Excel file name. */
+  fileName: string;
+}
+
+/**
+ * ExportMBRecipeFullRequest is the request for the denormalized full recipe export
+ * (P12 / items C1 + C2): one Excel row per composition line, with the MB cost block
+ * joined in. Read-only — it never writes to cst_mb_cost or cst_product_cost.
+ */
+export interface ExportMBRecipeFullRequest {
+  /** Filter by active status of the MB head. */
+  activeFilter: ActiveFilter;
+  /** Cost period YYYYMM. Empty means "latest period per head". */
+  period: string;
+  /**
+   * Cost type to include. Empty defaults to ACTUAL, which keeps the row count
+   * bounded to one cost row per composition line.
+   */
+  costType: string;
+  /**
+   * Filter by the DERIVED check status (mst_mb_head.mbh_check_status_calc, P10).
+   *
+   * Empty means ALL ROWS, including heads whose derived status is still NULL — so
+   * leaving this unset keeps the export byte-for-byte identical to its behaviour
+   * before this filter existed. A non-empty value keeps only heads carrying exactly
+   * that value, which necessarily EXCLUDES the NULL ("Belum dihitung") heads.
+   *
+   * The six accepted values are the six allowed by the CHECK constraint
+   * chk_mbh_check_status_calc (migration 000487). ⚠ Only THREE of them are produced
+   * by DeriveCheckStatus today — "Boughtout", "Approved", "Waiting". Filtering by
+   * "Current", "Outdated" or "Rejected" is therefore VALID but returns ZERO ROWS
+   * until the corresponding user gates are decided. ⛔ Not a bug.
+   *
+   * ⛔ There is deliberately NO sentinel for "only the NULL heads" — that semantic
+   * has not been decided by the user.
+   */
+  checkStatusCalc: string;
+  /**
+   * Whether to include REJECTED documents in the export.
+   *
+   * Default false (proto3 zero value) EXCLUDES rejected documents, keeping this
+   * export byte-for-byte identical to its behaviour before this field existed.
+   * Set to true to include them (audit use case).
+   */
+  includeRejected: boolean;
+}
+
+/** ExportMBRecipeFullResponse carries the full-recipe Excel workbook bytes. */
+export interface ExportMBRecipeFullResponse {
   /** Standard response metadata. */
   base:
     | BaseResponse
@@ -1788,6 +1981,100 @@ export interface RevokeMBHeadResponse {
   data: MBHead | undefined;
 }
 
+/** RejectMBHeadRequest is the request for rejecting a submitted MB Head (K-2). */
+export interface RejectMBHeadRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+  /** Reason for rejecting. Required (K-2). */
+  reason: string;
+}
+
+/** RejectMBHeadResponse is the response for rejecting an MB Head. */
+export interface RejectMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
+/** ReturnMBHeadToDraftRequest is the request for returning a rejected MB Head back to draft (K-29). */
+export interface ReturnMBHeadToDraftRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+  /** Reason for returning to draft. Optional (K-29); when empty the existing state_reason is preserved. */
+  reason: string;
+}
+
+/** ReturnMBHeadToDraftResponse is the response for returning an MB Head to draft. */
+export interface ReturnMBHeadToDraftResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
+/** RequestUnlockMBHeadRequest is the request for asking that a locked MB Head be unlocked (P10). */
+export interface RequestUnlockMBHeadRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+  /**
+   * Reason for requesting the unlock. Required — the domain rejects an empty or
+   * whitespace-only reason with ErrReasonRequired.
+   */
+  reason: string;
+}
+
+/** RequestUnlockMBHeadResponse is the response for requesting an MB Head unlock. */
+export interface RequestUnlockMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
+/** GrantUnlockMBHeadRequest is the request for approving a pending MB Head unlock (P10). */
+export interface GrantUnlockMBHeadRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+}
+
+/** GrantUnlockMBHeadResponse is the response for granting an MB Head unlock. */
+export interface GrantUnlockMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
+/** RejectUnlockMBHeadRequest is the request for refusing a pending MB Head unlock (P10, K-52). */
+export interface RejectUnlockMBHeadRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+  /**
+   * Reason for refusing the unlock. Required — consistent with every other refusing
+   * transition on this service.
+   */
+  reason: string;
+}
+
+/** RejectUnlockMBHeadResponse is the response for refusing an MB Head unlock. */
+export interface RejectUnlockMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
 /** MBSpin represents a Melange Batch spin detail record (child of MBHead). */
 export interface MBSpin {
   /** UUID primary key. */
@@ -1839,7 +2126,21 @@ export interface MBSpin {
     | number
     | undefined;
   /** Audit metadata. */
-  audit: AuditInfo | undefined;
+  audit:
+    | AuditInfo
+    | undefined;
+  /**
+   * Fix/actual marker for the LDR value. Absent means "unknown", which the
+   * domain treats as FIXED (recalc-safe). true = fixed, false = computed.
+   */
+  mbsLdrIsFixed?:
+    | boolean
+    | undefined;
+  /**
+   * Fix/actual marker for the dozing value. Absent means "unknown", which the
+   * domain treats as FIXED (recalc-safe). true = fixed, false = computed.
+   */
+  mbsDozingIsFixed?: boolean | undefined;
 }
 
 /** CreateMBSpinRequest is the request for creating an MB Spin record. */
@@ -1889,7 +2190,15 @@ export interface CreateMBSpinRequest {
     | string
     | undefined;
   /** Optional Oracle CMBS_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
-  mbsRunLdrPct?: number | undefined;
+  mbsRunLdrPct?:
+    | number
+    | undefined;
+  /** Optional fix/actual marker for LDR. Absent = unknown (treated as fixed). */
+  mbsLdrIsFixed?:
+    | boolean
+    | undefined;
+  /** Optional fix/actual marker for dozing. Absent = unknown (treated as fixed). */
+  mbsDozingIsFixed?: boolean | undefined;
 }
 
 /** CreateMBSpinResponse is the response for creating an MB Spin record. */
@@ -1971,7 +2280,15 @@ export interface UpdateMBSpinRequest {
     | string
     | undefined;
   /** Optional Oracle CMBS_RUN_LDR_PRSN — actual LDR percentage (≥ 0). */
-  mbsRunLdrPct?: number | undefined;
+  mbsRunLdrPct?:
+    | number
+    | undefined;
+  /** Optional fix/actual marker for LDR. Absent = leave unchanged. */
+  mbsLdrIsFixed?:
+    | boolean
+    | undefined;
+  /** Optional fix/actual marker for dozing. Absent = leave unchanged. */
+  mbsDozingIsFixed?: boolean | undefined;
 }
 
 /** UpdateMBSpinResponse is the response for updating an MB Spin record. */
@@ -2090,6 +2407,114 @@ export interface DownloadMBSpinTemplateResponse {
   fileContent: Uint8Array;
   /** Excel file name. */
   fileName: string;
+}
+
+/**
+ * DuplicateMBSpinRequest is the request for duplicating an MB Spin record.
+ *
+ * Shape follows design §3.7. mbs_oracle_sys_id, mbs_orion_item_code and
+ * mbs_mb_costing are DELIBERATELY ABSENT: decision D19 requires all three to be
+ * NULL on the clone, so there is no field to carry them. The user fills them in
+ * afterwards via UpdateMBSpin.
+ */
+export interface DuplicateMBSpinRequest {
+  /** Parent MB Head UUID. */
+  mbhId: string;
+  /** Source MB Spin UUID — the record being duplicated. */
+  mbsId: string;
+  /**
+   * Optional override for the clone's management display name (max 100 chars).
+   * Absent means the server derives it as "<source name> (copy)".
+   */
+  mbsMgtName?:
+    | string
+    | undefined;
+  /**
+   * Optional override for the clone's denier, strictly greater than zero.
+   * Absent means the source value is copied as-is.
+   *
+   * NOTE — the > 0 rule is INTENTIONALLY STRICTER than CreateMBSpinRequest /
+   * UpdateMBSpinRequest, which accept any double. This field is never a
+   * passthrough of stored legacy data: it exists only to carry a value a user
+   * just typed into the duplicate dialog, and a zero/negative denier there is
+   * always a mistake. Legacy rows keep flowing through Create/Update untouched.
+   */
+  mbsDenier?:
+    | number
+    | undefined;
+  /**
+   * Optional override for the clone's filament count, strictly greater than
+   * zero. Absent means the source value is copied as-is. Same stricter-than-
+   * Create/Update reasoning as mbs_denier above.
+   */
+  mbsFilament?: number | undefined;
+}
+
+/**
+ * MBSpinRecalcSkipped is one child spin that the duplicate/recalc pass did NOT
+ * touch (rule A7).
+ *
+ * Children are recalculated only when mbs_status = 'R and D'. A child in
+ * 'Spinning' or 'Boughtout', or one whose status is absent, carries an actual
+ * production value that must never be overwritten by a derived one — it is
+ * skipped and reported here so the UI can say WHICH children were left alone
+ * and why, instead of silently doing less than the user expected.
+ */
+export interface MBSpinRecalcSkipped {
+  /** Skipped child spin UUID. */
+  mbsId: string;
+  /** Skipped child spin management display name, for display without a refetch. */
+  mbsMgtName: string;
+  /**
+   * Status that caused the skip. Absent = the child has no status at all, which
+   * is itself a skip reason (an absent status is treated as non-recalculable).
+   */
+  mbsStatus?:
+    | string
+    | undefined;
+  /** Machine-readable skip reason, e.g. STATUS_NOT_RND or STATUS_ABSENT. */
+  reason: string;
+}
+
+/**
+ * DuplicateMBSpinResponse is the response for duplicating an MB Spin record.
+ *
+ * ⚠ The impact_* fields are a PREVIEW ONLY (decision D24). Nothing in this
+ * response is the result of a yarn-product recalculation: duplicating a spin
+ * NEVER recalculates yarn products. The rows only tell the user which products
+ * would be affected, so they can decide what to do next.
+ */
+export interface DuplicateMBSpinResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** The newly created clone. */
+  data:
+    | MBSpin
+    | undefined;
+  /**
+   * Child spins deliberately left untouched by the recalc pass (rule A7).
+   * Empty when every candidate child was recalculated.
+   */
+  skipped: MBSpinRecalcSkipped[];
+  /**
+   * Number of skipped child spins. Equals len(skipped) — sent explicitly so a
+   * caller that ignores the detail rows still gets the count.
+   */
+  skippedCount: number;
+  /**
+   * Products that WOULD be affected, Top-N. ⛔ NOT a recalculation result (D24).
+   * Reuses DozingImpactRow, the same row type PreviewDozingImpact returns, so
+   * the UI can render both with one component.
+   */
+  impactPreview: DozingImpactRow[];
+  /** Total number of affected products, before truncation. */
+  impactTotalAffected: number;
+  /** Number of affected products whose costing is locked. */
+  impactTotalLocked: number;
+  /** True when impact_preview was truncated by the server's row cap. */
+  impactTruncated: boolean;
 }
 
 /** GetLookupFillValuesRequest requests auto-fill values from a master lookup selection. */
@@ -2275,12 +2700,59 @@ export interface MasterOption {
   value: string;
   /** The "label" field value displayed to the user. */
   label: string;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (U-mbspin-lookup-detail): spin denier (dtex).
+   * Currently only populated for the MB_SPIN lookup master, so users can tell
+   * visually-similar MB Spin entries apart. Unset for every other lookup master.
+   */
+  denier?:
+    | number
+    | undefined;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (U-mbspin-lookup-detail): number of filaments.
+   * Currently only populated for the MB_SPIN lookup master. Unset otherwise.
+   */
+  filament?:
+    | number
+    | undefined;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (U-mbspin-lookup-detail): planned LDR percentage
+   * (mst_mb_spin.mbs_ldr_prsn, "LDR Rencana (%)"). Only populated for the
+   * MB_SPIN lookup master. Unset otherwise.
+   */
+  ldrPrsn?:
+    | number
+    | undefined;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (U-mbspin-lookup-detail): actual/run LDR
+   * percentage used in cost calculation (mst_mb_spin.mbs_run_ldr_pct,
+   * "LDR Aktual (%)"). Only populated for the MB_SPIN lookup master. Unset
+   * otherwise.
+   */
+  runLdrPct?: number | undefined;
 }
 
 /** ListMasterOptionsRequest queries the registered table to populate a combobox. */
 export interface ListMasterOptionsRequest {
   /** lookup_master_code (e.g., "MACHINE") — used to resolve table_name + code/label fields. */
   masterCode: string;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (perf: SP Code dropdown lag, server-side search) —
+   * optional search keyword, matched (case-insensitive) against both the
+   * master's code column and its label column. Empty/absent means no search
+   * predicate (returns the same rows as before, subject to the new limit
+   * below).
+   */
+  search?:
+    | string
+    | undefined;
+  /**
+   * ⭐ DIPERBARUI 2026-08-26 (perf: SP Code dropdown lag, server-side search) —
+   * optional max rows to return. Absent or 0 falls back to a server-side
+   * default (200 — see LookupMasterRepository.ListMasterOptions) instead of
+   * returning the whole table.
+   */
+  limit?: number | undefined;
 }
 
 /** ListMasterOptionsResponse is the response for ListMasterOptions. */
@@ -3140,6 +3612,389 @@ export interface TriggerMbBatchResponse {
   durationMs: number;
   /** Per-MB failure details, one entry per failed MB Head. */
   errors: MbBatchError[];
+}
+
+/**
+ * MbCrossSection is a master lookup entry for MB cross-section codes
+ * (mst_mb_cross_section).
+ */
+export interface MbCrossSection {
+  /** UUID primary key (mbcs_id). */
+  mbcsId: string;
+  /** Unique cross-section code (mbcs_code, max 10 chars), e.g. RND / TBL / RSD. */
+  code: string;
+  /** Display name (mbcs_display_name). */
+  displayName: string;
+  /** Free-text description (mbcs_description). */
+  description: string;
+  /** Whether the record is active (mbcs_is_active). */
+  isActive: boolean;
+  /** Display ordering hint (mbcs_display_order). */
+  displayOrder: number;
+  /** Audit metadata. */
+  audit: AuditInfo | undefined;
+}
+
+/**
+ * MbCrossSectionFactor is one ORDERED (from_code -> to_code) LDR conversion
+ * factor (mst_mb_cross_section_factor). The operation carries the direction of
+ * the arithmetic and is not derivable from the factor alone.
+ */
+export interface MbCrossSectionFactor {
+  /** UUID primary key (mbcf_id). */
+  mbcfId: string;
+  /** Source cross-section code (mbcf_from_code). */
+  fromCode: string;
+  /** Target cross-section code (mbcf_to_code). */
+  toCode: string;
+  /** Conversion factor (mbcf_factor), strictly greater than zero. */
+  factor: number;
+  /** Arithmetic direction (mbcf_operation): MULTIPLY or DIVIDE. */
+  operation: string;
+  /** Free-text note (mbcf_note). */
+  note: string;
+  /** Whether the record is active (mbcf_is_active). */
+  isActive: boolean;
+  /** Audit metadata. */
+  audit: AuditInfo | undefined;
+}
+
+/** CreateMbCrossSectionRequest is the request for creating an MB cross-section master record. */
+export interface CreateMbCrossSectionRequest {
+  /** Unique cross-section code (1-10 chars). */
+  code: string;
+  /** Display name. */
+  displayName: string;
+  /** Free-text description. */
+  description: string;
+  /** Whether the record is active. */
+  isActive: boolean;
+  /** Display ordering hint. */
+  displayOrder: number;
+}
+
+/** CreateMbCrossSectionResponse is the response for creating an MB cross-section master record. */
+export interface CreateMbCrossSectionResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Created cross-section record. */
+  data: MbCrossSection | undefined;
+}
+
+/** GetMbCrossSectionRequest is the request for retrieving an MB cross-section master record by ID. */
+export interface GetMbCrossSectionRequest {
+  /** Cross-section UUID. */
+  mbcsId: string;
+}
+
+/** GetMbCrossSectionResponse is the response for retrieving an MB cross-section master record. */
+export interface GetMbCrossSectionResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Cross-section record. */
+  data: MbCrossSection | undefined;
+}
+
+/** ListMbCrossSectionRequest is the request for listing MB cross-section master records. */
+export interface ListMbCrossSectionRequest {
+  /** Page number (>= 1). */
+  page: number;
+  /** Page size (1-100). */
+  pageSize: number;
+  /** Search across code and display_name. */
+  search: string;
+  /** Sort field. */
+  sortBy: string;
+  /** Sort direction. */
+  sortDir: string;
+  /** Filter by active status. */
+  activeFilter: ActiveFilter;
+}
+
+/** ListMbCrossSectionResponse is the response for listing MB cross-section master records. */
+export interface ListMbCrossSectionResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Cross-section records. */
+  data: MbCrossSection[];
+  /** Pagination metadata. */
+  pagination: PaginationResponse | undefined;
+}
+
+/** UpdateMbCrossSectionRequest is the request for updating an MB cross-section master record. */
+export interface UpdateMbCrossSectionRequest {
+  /** Cross-section UUID. */
+  mbcsId: string;
+  /** Updated display name. */
+  displayName: string;
+  /** Updated description. */
+  description: string;
+  /** Updated active status. */
+  isActive: boolean;
+  /** Updated display ordering hint. */
+  displayOrder: number;
+}
+
+/** UpdateMbCrossSectionResponse is the response for updating an MB cross-section master record. */
+export interface UpdateMbCrossSectionResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated cross-section record. */
+  data: MbCrossSection | undefined;
+}
+
+/** DeleteMbCrossSectionRequest is the request for deleting an MB cross-section master record. */
+export interface DeleteMbCrossSectionRequest {
+  /** Cross-section UUID. */
+  mbcsId: string;
+}
+
+/** DeleteMbCrossSectionResponse is the response for deleting an MB cross-section master record. */
+export interface DeleteMbCrossSectionResponse {
+  /** Standard response metadata. */
+  base: BaseResponse | undefined;
+}
+
+/** CreateMbCrossSectionFactorRequest is the request for creating a cross-section conversion factor. */
+export interface CreateMbCrossSectionFactorRequest {
+  /** Source cross-section code (1-10 chars). */
+  fromCode: string;
+  /** Target cross-section code (1-10 chars). */
+  toCode: string;
+  /** Conversion factor, strictly greater than zero. */
+  factor: number;
+  /** Arithmetic direction: MULTIPLY or DIVIDE. */
+  operation: string;
+  /** Free-text note. */
+  note: string;
+  /** Whether the record is active. */
+  isActive: boolean;
+}
+
+/** CreateMbCrossSectionFactorResponse is the response for creating a cross-section conversion factor. */
+export interface CreateMbCrossSectionFactorResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Created factor record. */
+  data: MbCrossSectionFactor | undefined;
+}
+
+/** GetMbCrossSectionFactorRequest is the request for retrieving a cross-section conversion factor by ID. */
+export interface GetMbCrossSectionFactorRequest {
+  /** Factor UUID. */
+  mbcfId: string;
+}
+
+/** GetMbCrossSectionFactorResponse is the response for retrieving a cross-section conversion factor. */
+export interface GetMbCrossSectionFactorResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Factor record. */
+  data: MbCrossSectionFactor | undefined;
+}
+
+/** ListMbCrossSectionFactorRequest is the request for listing cross-section conversion factors. */
+export interface ListMbCrossSectionFactorRequest {
+  /** Page number (>= 1). */
+  page: number;
+  /** Page size (1-100). */
+  pageSize: number;
+  /** Search across from_code and to_code. */
+  search: string;
+  /** Sort field. */
+  sortBy: string;
+  /** Sort direction. */
+  sortDir: string;
+  /** Filter by active status. */
+  activeFilter: ActiveFilter;
+  /** Optional exact filter on the source cross-section code. */
+  fromCode: string;
+  /** Optional exact filter on the target cross-section code. */
+  toCode: string;
+}
+
+/** ListMbCrossSectionFactorResponse is the response for listing cross-section conversion factors. */
+export interface ListMbCrossSectionFactorResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Factor records. */
+  data: MbCrossSectionFactor[];
+  /** Pagination metadata. */
+  pagination: PaginationResponse | undefined;
+}
+
+/** UpdateMbCrossSectionFactorRequest is the request for updating a cross-section conversion factor. */
+export interface UpdateMbCrossSectionFactorRequest {
+  /** Factor UUID. */
+  mbcfId: string;
+  /** Updated conversion factor, strictly greater than zero. */
+  factor: number;
+  /** Updated arithmetic direction: MULTIPLY or DIVIDE. */
+  operation: string;
+  /** Updated note. */
+  note: string;
+  /** Updated active status. */
+  isActive: boolean;
+}
+
+/** UpdateMbCrossSectionFactorResponse is the response for updating a cross-section conversion factor. */
+export interface UpdateMbCrossSectionFactorResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated factor record. */
+  data: MbCrossSectionFactor | undefined;
+}
+
+/** DeleteMbCrossSectionFactorRequest is the request for deleting a cross-section conversion factor. */
+export interface DeleteMbCrossSectionFactorRequest {
+  /** Factor UUID. */
+  mbcfId: string;
+}
+
+/** DeleteMbCrossSectionFactorResponse is the response for deleting a cross-section conversion factor. */
+export interface DeleteMbCrossSectionFactorResponse {
+  /** Standard response metadata. */
+  base: BaseResponse | undefined;
+}
+
+/**
+ * CalculateDozingRequest is the request for the stateless dozing (LDR) calculator.
+ *
+ * Modes: SCALE and XSECTION only.
+ *
+ * NOTE — STRENGTH mode is INTENTIONALLY ABSENT from the `in:` rule below even
+ * though the consolidated design (§3.7) lists three modes. Decision gate G6-C3
+ * put STRENGTH on hold: its formula/direction semantics are not yet settled, so
+ * accepting the literal here would expose an RPC surface the backend cannot
+ * honor. This is a DELIBERATE DIVERGENCE from the design document. Field
+ * numbers 10, 11 and 12 are reserved below so STRENGTH can be added later
+ * without renumbering.
+ *
+ * NOTE — mode SCALE is computed in pure Go (math.Sqrt); mst_formula is read
+ * ONLY to populate formula_code and calculation_trace (decision K-16 / G19-SQRT).
+ */
+export interface CalculateDozingRequest {
+  /** Calculation mode: SCALE or XSECTION. */
+  mode: string;
+  /** Mode SCALE — reference LDR (dozing percentage) of the source recipe. */
+  ldrRef?:
+    | number
+    | undefined;
+  /** Mode SCALE — reference denier, strictly greater than zero. */
+  denierRef?:
+    | number
+    | undefined;
+  /**
+   * Mode SCALE — reference filament count, strictly greater than zero.
+   * Enforced here as well as in the domain layer (ErrZeroFilament).
+   */
+  filamentRef?:
+    | number
+    | undefined;
+  /** Mode SCALE — target denier, strictly greater than zero. */
+  denierTarget?:
+    | number
+    | undefined;
+  /**
+   * Mode SCALE — target filament count, strictly greater than zero.
+   * Enforced here as well as in the domain layer (ErrZeroFilament).
+   */
+  filamentTarget?:
+    | number
+    | undefined;
+  /** Mode XSECTION — source LDR (dozing percentage). */
+  ldrSource?:
+    | number
+    | undefined;
+  /** Mode XSECTION — source cross-section code (mst_mb_cross_section.mbcs_code). */
+  fromCrossSection?:
+    | string
+    | undefined;
+  /** Mode XSECTION — target cross-section code (mst_mb_cross_section.mbcs_code). */
+  toCrossSection?: string | undefined;
+}
+
+/** CalculateDozingResponse is the response for the dozing (LDR) calculator. */
+export interface CalculateDozingResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /**
+   * Resulting LDR. LEFT UNSET when the conversion factor is absent
+   * (factor_available = false). A 1.0 fallback is explicitly forbidden.
+   */
+  resultLdr?:
+    | number
+    | undefined;
+  /** Formula identifier, e.g. F_MB_LDR_SCALE or F_MB_LDR_XSECTION. */
+  formulaCode: string;
+  /** Human-readable substituted expression, for calculation transparency. */
+  calculationTrace: string;
+  /**
+   * False when no conversion factor exists for the requested pair; the UI must
+   * disable the apply action and show an explicit message.
+   */
+  factorAvailable: boolean;
+}
+
+/**
+ * PreviewDozingImpactRequest is the request for previewing products affected by
+ * a dozing change. Spin path only.
+ */
+export interface PreviewDozingImpactRequest {
+  /** MB spin UUID. Required. */
+  mbsId: string;
+  /** Maximum number of rows to return. 0 means the server default (20). */
+  limit: number;
+}
+
+/** DozingImpactRow is a single product affected by a dozing change. */
+export interface DozingImpactRow {
+  /** Product system ID. */
+  cpmProductSysId: number;
+  /** Product code. */
+  cpmProductCode: string;
+  /** Product name. */
+  cpmProductName: string;
+  /** Whether the product costing is locked. */
+  cpmIsLocked: boolean;
+  /** Dozing value frozen on the product, when present. */
+  frozenDozing?: number | undefined;
+}
+
+/** PreviewDozingImpactResponse is the response for the dozing impact preview. */
+export interface PreviewDozingImpactResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Affected product rows (Top-N, capped by the request limit). */
+  data: DozingImpactRow[];
+  /** Total number of affected products, before truncation. */
+  totalAffected: number;
+  /** Number of affected products that are locked. */
+  totalLocked: number;
+  /** True when data was truncated by the limit. */
+  truncated: boolean;
+  /** Free-form note used to report data anomalies detected while resolving impact. */
+  note: string;
 }
 
 function createBaseMachine(): Machine {
@@ -13062,6 +13917,234 @@ export const DownloadProductGradeTemplateResponse: MessageFns<DownloadProductGra
   },
 };
 
+function createBaseMBHeadShade(): MBHeadShade {
+  return { mbhsId: "", mbhsSeqNo: 0, mbhsShadeCode: "", mbhsShadeName: "" };
+}
+
+export const MBHeadShade: MessageFns<MBHeadShade> = {
+  encode(message: MBHeadShade, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhsId !== "") {
+      writer.uint32(10).string(message.mbhsId);
+    }
+    if (message.mbhsSeqNo !== 0) {
+      writer.uint32(16).int32(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      writer.uint32(26).string(message.mbhsShadeCode);
+    }
+    if (message.mbhsShadeName !== "") {
+      writer.uint32(34).string(message.mbhsShadeName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBHeadShade {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBHeadShade();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.mbhsSeqNo = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbhsShadeCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.mbhsShadeName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBHeadShade {
+    return {
+      mbhsId: isSet(object.mbhsId)
+        ? globalThis.String(object.mbhsId)
+        : isSet(object.mbhs_id)
+        ? globalThis.String(object.mbhs_id)
+        : "",
+      mbhsSeqNo: isSet(object.mbhsSeqNo)
+        ? globalThis.Number(object.mbhsSeqNo)
+        : isSet(object.mbhs_seq_no)
+        ? globalThis.Number(object.mbhs_seq_no)
+        : 0,
+      mbhsShadeCode: isSet(object.mbhsShadeCode)
+        ? globalThis.String(object.mbhsShadeCode)
+        : isSet(object.mbhs_shade_code)
+        ? globalThis.String(object.mbhs_shade_code)
+        : "",
+      mbhsShadeName: isSet(object.mbhsShadeName)
+        ? globalThis.String(object.mbhsShadeName)
+        : isSet(object.mbhs_shade_name)
+        ? globalThis.String(object.mbhs_shade_name)
+        : "",
+    };
+  },
+
+  toJSON(message: MBHeadShade): unknown {
+    const obj: any = {};
+    if (message.mbhsId !== "") {
+      obj.mbhsId = message.mbhsId;
+    }
+    if (message.mbhsSeqNo !== 0) {
+      obj.mbhsSeqNo = Math.round(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      obj.mbhsShadeCode = message.mbhsShadeCode;
+    }
+    if (message.mbhsShadeName !== "") {
+      obj.mbhsShadeName = message.mbhsShadeName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBHeadShade>): MBHeadShade {
+    return MBHeadShade.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBHeadShade>): MBHeadShade {
+    const message = createBaseMBHeadShade();
+    message.mbhsId = object.mbhsId ?? "";
+    message.mbhsSeqNo = object.mbhsSeqNo ?? 0;
+    message.mbhsShadeCode = object.mbhsShadeCode ?? "";
+    message.mbhsShadeName = object.mbhsShadeName ?? "";
+    return message;
+  },
+};
+
+function createBaseMBHeadShadeInput(): MBHeadShadeInput {
+  return { mbhsSeqNo: 0, mbhsShadeCode: "", mbhsShadeName: undefined };
+}
+
+export const MBHeadShadeInput: MessageFns<MBHeadShadeInput> = {
+  encode(message: MBHeadShadeInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhsSeqNo !== 0) {
+      writer.uint32(8).int32(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      writer.uint32(18).string(message.mbhsShadeCode);
+    }
+    if (message.mbhsShadeName !== undefined) {
+      writer.uint32(26).string(message.mbhsShadeName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBHeadShadeInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBHeadShadeInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.mbhsSeqNo = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbhsShadeCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbhsShadeName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBHeadShadeInput {
+    return {
+      mbhsSeqNo: isSet(object.mbhsSeqNo)
+        ? globalThis.Number(object.mbhsSeqNo)
+        : isSet(object.mbhs_seq_no)
+        ? globalThis.Number(object.mbhs_seq_no)
+        : 0,
+      mbhsShadeCode: isSet(object.mbhsShadeCode)
+        ? globalThis.String(object.mbhsShadeCode)
+        : isSet(object.mbhs_shade_code)
+        ? globalThis.String(object.mbhs_shade_code)
+        : "",
+      mbhsShadeName: isSet(object.mbhsShadeName)
+        ? globalThis.String(object.mbhsShadeName)
+        : isSet(object.mbhs_shade_name)
+        ? globalThis.String(object.mbhs_shade_name)
+        : undefined,
+    };
+  },
+
+  toJSON(message: MBHeadShadeInput): unknown {
+    const obj: any = {};
+    if (message.mbhsSeqNo !== 0) {
+      obj.mbhsSeqNo = Math.round(message.mbhsSeqNo);
+    }
+    if (message.mbhsShadeCode !== "") {
+      obj.mbhsShadeCode = message.mbhsShadeCode;
+    }
+    if (message.mbhsShadeName !== undefined) {
+      obj.mbhsShadeName = message.mbhsShadeName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBHeadShadeInput>): MBHeadShadeInput {
+    return MBHeadShadeInput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBHeadShadeInput>): MBHeadShadeInput {
+    const message = createBaseMBHeadShadeInput();
+    message.mbhsSeqNo = object.mbhsSeqNo ?? 0;
+    message.mbhsShadeCode = object.mbhsShadeCode ?? "";
+    message.mbhsShadeName = object.mbhsShadeName ?? undefined;
+    return message;
+  },
+};
+
 function createBaseMBHead(): MBHead {
   return {
     mbhId: "",
@@ -13101,6 +14184,14 @@ function createBaseMBHead(): MBHead {
     paramThroughputPerHour: "",
     paramNoOfProcess: "",
     machineId: undefined,
+    mbhVsNumber: undefined,
+    mbhNoOfProcess: undefined,
+    additionalShades: [],
+    mbhIsLocked: undefined,
+    mbhUnlockRequestedAt: undefined,
+    mbhUnlockRequestedBy: undefined,
+    mbhCheckStatusCalc: undefined,
+    mbhUnlockReason: undefined,
   };
 }
 
@@ -13216,6 +14307,30 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.machineId !== undefined) {
       writer.uint32(290).string(message.machineId);
+    }
+    if (message.mbhVsNumber !== undefined) {
+      writer.uint32(306).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      writer.uint32(314).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.additionalShades) {
+      MBHeadShade.encode(v!, writer.uint32(322).fork()).join();
+    }
+    if (message.mbhIsLocked !== undefined) {
+      writer.uint32(328).bool(message.mbhIsLocked);
+    }
+    if (message.mbhUnlockRequestedAt !== undefined) {
+      writer.uint32(338).string(message.mbhUnlockRequestedAt);
+    }
+    if (message.mbhUnlockRequestedBy !== undefined) {
+      writer.uint32(346).string(message.mbhUnlockRequestedBy);
+    }
+    if (message.mbhCheckStatusCalc !== undefined) {
+      writer.uint32(354).string(message.mbhCheckStatusCalc);
+    }
+    if (message.mbhUnlockReason !== undefined) {
+      writer.uint32(362).string(message.mbhUnlockReason);
     }
     return writer;
   },
@@ -13523,6 +14638,70 @@ export const MBHead: MessageFns<MBHead> = {
           message.machineId = reader.string();
           continue;
         }
+        case 38: {
+          if (tag !== 306) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 39: {
+          if (tag !== 314) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 40: {
+          if (tag !== 322) {
+            break;
+          }
+
+          message.additionalShades.push(MBHeadShade.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 41: {
+          if (tag !== 328) {
+            break;
+          }
+
+          message.mbhIsLocked = reader.bool();
+          continue;
+        }
+        case 42: {
+          if (tag !== 338) {
+            break;
+          }
+
+          message.mbhUnlockRequestedAt = reader.string();
+          continue;
+        }
+        case 43: {
+          if (tag !== 346) {
+            break;
+          }
+
+          message.mbhUnlockRequestedBy = reader.string();
+          continue;
+        }
+        case 44: {
+          if (tag !== 354) {
+            break;
+          }
+
+          message.mbhCheckStatusCalc = reader.string();
+          continue;
+        }
+        case 45: {
+          if (tag !== 362) {
+            break;
+          }
+
+          message.mbhUnlockReason = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13715,6 +14894,46 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.machine_id)
         ? globalThis.String(object.machine_id)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : undefined,
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : undefined,
+      additionalShades: globalThis.Array.isArray(object?.additionalShades)
+        ? object.additionalShades.map((e: any) => MBHeadShade.fromJSON(e))
+        : globalThis.Array.isArray(object?.additional_shades)
+        ? object.additional_shades.map((e: any) => MBHeadShade.fromJSON(e))
+        : [],
+      mbhIsLocked: isSet(object.mbhIsLocked)
+        ? globalThis.Boolean(object.mbhIsLocked)
+        : isSet(object.mbh_is_locked)
+        ? globalThis.Boolean(object.mbh_is_locked)
+        : undefined,
+      mbhUnlockRequestedAt: isSet(object.mbhUnlockRequestedAt)
+        ? globalThis.String(object.mbhUnlockRequestedAt)
+        : isSet(object.mbh_unlock_requested_at)
+        ? globalThis.String(object.mbh_unlock_requested_at)
+        : undefined,
+      mbhUnlockRequestedBy: isSet(object.mbhUnlockRequestedBy)
+        ? globalThis.String(object.mbhUnlockRequestedBy)
+        : isSet(object.mbh_unlock_requested_by)
+        ? globalThis.String(object.mbh_unlock_requested_by)
+        : undefined,
+      mbhCheckStatusCalc: isSet(object.mbhCheckStatusCalc)
+        ? globalThis.String(object.mbhCheckStatusCalc)
+        : isSet(object.mbh_check_status_calc)
+        ? globalThis.String(object.mbh_check_status_calc)
+        : undefined,
+      mbhUnlockReason: isSet(object.mbhUnlockReason)
+        ? globalThis.String(object.mbhUnlockReason)
+        : isSet(object.mbh_unlock_reason)
+        ? globalThis.String(object.mbh_unlock_reason)
+        : undefined,
     };
   },
 
@@ -13831,6 +15050,30 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.machineId !== undefined) {
       obj.machineId = message.machineId;
     }
+    if (message.mbhVsNumber !== undefined) {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.additionalShades?.length) {
+      obj.additionalShades = message.additionalShades.map((e) => MBHeadShade.toJSON(e));
+    }
+    if (message.mbhIsLocked !== undefined) {
+      obj.mbhIsLocked = message.mbhIsLocked;
+    }
+    if (message.mbhUnlockRequestedAt !== undefined) {
+      obj.mbhUnlockRequestedAt = message.mbhUnlockRequestedAt;
+    }
+    if (message.mbhUnlockRequestedBy !== undefined) {
+      obj.mbhUnlockRequestedBy = message.mbhUnlockRequestedBy;
+    }
+    if (message.mbhCheckStatusCalc !== undefined) {
+      obj.mbhCheckStatusCalc = message.mbhCheckStatusCalc;
+    }
+    if (message.mbhUnlockReason !== undefined) {
+      obj.mbhUnlockReason = message.mbhUnlockReason;
+    }
     return obj;
   },
 
@@ -13878,6 +15121,14 @@ export const MBHead: MessageFns<MBHead> = {
     message.paramThroughputPerHour = object.paramThroughputPerHour ?? "";
     message.paramNoOfProcess = object.paramNoOfProcess ?? "";
     message.machineId = object.machineId ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? undefined;
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? undefined;
+    message.additionalShades = object.additionalShades?.map((e) => MBHeadShade.fromPartial(e)) || [];
+    message.mbhIsLocked = object.mbhIsLocked ?? undefined;
+    message.mbhUnlockRequestedAt = object.mbhUnlockRequestedAt ?? undefined;
+    message.mbhUnlockRequestedBy = object.mbhUnlockRequestedBy ?? undefined;
+    message.mbhCheckStatusCalc = object.mbhCheckStatusCalc ?? undefined;
+    message.mbhUnlockReason = object.mbhUnlockReason ?? undefined;
     return message;
   },
 };
@@ -13903,6 +15154,9 @@ function createBaseCreateMBHeadRequest(): CreateMBHeadRequest {
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
     mbhRunLdrPct: undefined,
+    mbhVsNumber: undefined,
+    mbhNoOfProcess: undefined,
+    additionalShades: [],
   };
 }
 
@@ -13964,6 +15218,15 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     if (message.mbhRunLdrPct !== undefined) {
       writer.uint32(153).double(message.mbhRunLdrPct);
+    }
+    if (message.mbhVsNumber !== undefined) {
+      writer.uint32(162).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      writer.uint32(170).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.additionalShades) {
+      MBHeadShadeInput.encode(v!, writer.uint32(178).fork()).join();
     }
     return writer;
   },
@@ -14127,6 +15390,30 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
           message.mbhRunLdrPct = reader.double();
           continue;
         }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 22: {
+          if (tag !== 178) {
+            break;
+          }
+
+          message.additionalShades.push(MBHeadShadeInput.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14233,6 +15520,21 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         : isSet(object.mbh_run_ldr_pct)
         ? globalThis.Number(object.mbh_run_ldr_pct)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : undefined,
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : undefined,
+      additionalShades: globalThis.Array.isArray(object?.additionalShades)
+        ? object.additionalShades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : globalThis.Array.isArray(object?.additional_shades)
+        ? object.additional_shades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : [],
     };
   },
 
@@ -14295,6 +15597,15 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.mbhRunLdrPct !== undefined) {
       obj.mbhRunLdrPct = message.mbhRunLdrPct;
     }
+    if (message.mbhVsNumber !== undefined) {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.additionalShades?.length) {
+      obj.additionalShades = message.additionalShades.map((e) => MBHeadShadeInput.toJSON(e));
+    }
     return obj;
   },
 
@@ -14322,6 +15633,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
     message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? undefined;
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? undefined;
+    message.additionalShades = object.additionalShades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
     return message;
   },
 };
@@ -14567,6 +15881,10 @@ function createBaseUpdateMBHeadRequest(): UpdateMBHeadRequest {
     mbhLustureCode: undefined,
     mbhMachineId: undefined,
     mbhRunLdrPct: undefined,
+    mbhVsNumber: undefined,
+    mbhNoOfProcess: undefined,
+    additionalShades: [],
+    replaceAdditionalShades: undefined,
   };
 }
 
@@ -14628,6 +15946,18 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.mbhRunLdrPct !== undefined) {
       writer.uint32(153).double(message.mbhRunLdrPct);
+    }
+    if (message.mbhVsNumber !== undefined) {
+      writer.uint32(162).string(message.mbhVsNumber);
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      writer.uint32(170).string(message.mbhNoOfProcess);
+    }
+    for (const v of message.additionalShades) {
+      MBHeadShadeInput.encode(v!, writer.uint32(178).fork()).join();
+    }
+    if (message.replaceAdditionalShades !== undefined) {
+      writer.uint32(184).bool(message.replaceAdditionalShades);
     }
     return writer;
   },
@@ -14791,6 +16121,38 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
           message.mbhRunLdrPct = reader.double();
           continue;
         }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.mbhVsNumber = reader.string();
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.mbhNoOfProcess = reader.string();
+          continue;
+        }
+        case 22: {
+          if (tag !== 178) {
+            break;
+          }
+
+          message.additionalShades.push(MBHeadShadeInput.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 23: {
+          if (tag !== 184) {
+            break;
+          }
+
+          message.replaceAdditionalShades = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14897,6 +16259,26 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         : isSet(object.mbh_run_ldr_pct)
         ? globalThis.Number(object.mbh_run_ldr_pct)
         : undefined,
+      mbhVsNumber: isSet(object.mbhVsNumber)
+        ? globalThis.String(object.mbhVsNumber)
+        : isSet(object.mbh_vs_number)
+        ? globalThis.String(object.mbh_vs_number)
+        : undefined,
+      mbhNoOfProcess: isSet(object.mbhNoOfProcess)
+        ? globalThis.String(object.mbhNoOfProcess)
+        : isSet(object.mbh_no_of_process)
+        ? globalThis.String(object.mbh_no_of_process)
+        : undefined,
+      additionalShades: globalThis.Array.isArray(object?.additionalShades)
+        ? object.additionalShades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : globalThis.Array.isArray(object?.additional_shades)
+        ? object.additional_shades.map((e: any) => MBHeadShadeInput.fromJSON(e))
+        : [],
+      replaceAdditionalShades: isSet(object.replaceAdditionalShades)
+        ? globalThis.Boolean(object.replaceAdditionalShades)
+        : isSet(object.replace_additional_shades)
+        ? globalThis.Boolean(object.replace_additional_shades)
+        : undefined,
     };
   },
 
@@ -14959,6 +16341,18 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.mbhRunLdrPct !== undefined) {
       obj.mbhRunLdrPct = message.mbhRunLdrPct;
     }
+    if (message.mbhVsNumber !== undefined) {
+      obj.mbhVsNumber = message.mbhVsNumber;
+    }
+    if (message.mbhNoOfProcess !== undefined) {
+      obj.mbhNoOfProcess = message.mbhNoOfProcess;
+    }
+    if (message.additionalShades?.length) {
+      obj.additionalShades = message.additionalShades.map((e) => MBHeadShadeInput.toJSON(e));
+    }
+    if (message.replaceAdditionalShades !== undefined) {
+      obj.replaceAdditionalShades = message.replaceAdditionalShades;
+    }
     return obj;
   },
 
@@ -14986,6 +16380,10 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     message.mbhLustureCode = object.mbhLustureCode ?? undefined;
     message.mbhMachineId = object.mbhMachineId ?? undefined;
     message.mbhRunLdrPct = object.mbhRunLdrPct ?? undefined;
+    message.mbhVsNumber = object.mbhVsNumber ?? undefined;
+    message.mbhNoOfProcess = object.mbhNoOfProcess ?? undefined;
+    message.additionalShades = object.additionalShades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
+    message.replaceAdditionalShades = object.replaceAdditionalShades ?? undefined;
     return message;
   },
 };
@@ -15193,7 +16591,7 @@ export const DeleteMBHeadResponse: MessageFns<DeleteMBHeadResponse> = {
 };
 
 function createBaseListMBHeadsRequest(): ListMBHeadsRequest {
-  return { page: 0, pageSize: 0, search: "", activeFilter: 0, sortBy: "", sortOrder: "" };
+  return { page: 0, pageSize: 0, search: "", activeFilter: 0, sortBy: "", sortOrder: "", costProductId: 0 };
 }
 
 export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
@@ -15215,6 +16613,9 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     }
     if (message.sortOrder !== "") {
       writer.uint32(50).string(message.sortOrder);
+    }
+    if (message.costProductId !== 0) {
+      writer.uint32(56).int64(message.costProductId);
     }
     return writer;
   },
@@ -15274,6 +16675,14 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
           message.sortOrder = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.costProductId = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15307,6 +16716,11 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
         : isSet(object.sort_order)
         ? globalThis.String(object.sort_order)
         : "",
+      costProductId: isSet(object.costProductId)
+        ? globalThis.Number(object.costProductId)
+        : isSet(object.cost_product_id)
+        ? globalThis.Number(object.cost_product_id)
+        : 0,
     };
   },
 
@@ -15330,6 +16744,9 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     if (message.sortOrder !== "") {
       obj.sortOrder = message.sortOrder;
     }
+    if (message.costProductId !== 0) {
+      obj.costProductId = Math.round(message.costProductId);
+    }
     return obj;
   },
 
@@ -15344,6 +16761,7 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     message.activeFilter = object.activeFilter ?? 0;
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
+    message.costProductId = object.costProductId ?? 0;
     return message;
   },
 };
@@ -15445,13 +16863,16 @@ export const ListMBHeadsResponse: MessageFns<ListMBHeadsResponse> = {
 };
 
 function createBaseExportMBHeadsRequest(): ExportMBHeadsRequest {
-  return { activeFilter: 0 };
+  return { activeFilter: 0, includeRejected: false };
 }
 
 export const ExportMBHeadsRequest: MessageFns<ExportMBHeadsRequest> = {
   encode(message: ExportMBHeadsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.activeFilter !== 0) {
       writer.uint32(8).int32(message.activeFilter);
+    }
+    if (message.includeRejected !== false) {
+      writer.uint32(16).bool(message.includeRejected);
     }
     return writer;
   },
@@ -15471,6 +16892,14 @@ export const ExportMBHeadsRequest: MessageFns<ExportMBHeadsRequest> = {
           message.activeFilter = reader.int32() as any;
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.includeRejected = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15487,6 +16916,11 @@ export const ExportMBHeadsRequest: MessageFns<ExportMBHeadsRequest> = {
         : isSet(object.active_filter)
         ? activeFilterFromJSON(object.active_filter)
         : 0,
+      includeRejected: isSet(object.includeRejected)
+        ? globalThis.Boolean(object.includeRejected)
+        : isSet(object.include_rejected)
+        ? globalThis.Boolean(object.include_rejected)
+        : false,
     };
   },
 
@@ -15494,6 +16928,9 @@ export const ExportMBHeadsRequest: MessageFns<ExportMBHeadsRequest> = {
     const obj: any = {};
     if (message.activeFilter !== 0) {
       obj.activeFilter = activeFilterToJSON(message.activeFilter);
+    }
+    if (message.includeRejected !== false) {
+      obj.includeRejected = message.includeRejected;
     }
     return obj;
   },
@@ -15504,6 +16941,7 @@ export const ExportMBHeadsRequest: MessageFns<ExportMBHeadsRequest> = {
   fromPartial(object: DeepPartial<ExportMBHeadsRequest>): ExportMBHeadsRequest {
     const message = createBaseExportMBHeadsRequest();
     message.activeFilter = object.activeFilter ?? 0;
+    message.includeRejected = object.includeRejected ?? false;
     return message;
   },
 };
@@ -15601,6 +17039,248 @@ export const ExportMBHeadsResponse: MessageFns<ExportMBHeadsResponse> = {
   },
   fromPartial(object: DeepPartial<ExportMBHeadsResponse>): ExportMBHeadsResponse {
     const message = createBaseExportMBHeadsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.fileContent = object.fileContent ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseExportMBRecipeFullRequest(): ExportMBRecipeFullRequest {
+  return { activeFilter: 0, period: "", costType: "", checkStatusCalc: "", includeRejected: false };
+}
+
+export const ExportMBRecipeFullRequest: MessageFns<ExportMBRecipeFullRequest> = {
+  encode(message: ExportMBRecipeFullRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.activeFilter !== 0) {
+      writer.uint32(8).int32(message.activeFilter);
+    }
+    if (message.period !== "") {
+      writer.uint32(18).string(message.period);
+    }
+    if (message.costType !== "") {
+      writer.uint32(26).string(message.costType);
+    }
+    if (message.checkStatusCalc !== "") {
+      writer.uint32(34).string(message.checkStatusCalc);
+    }
+    if (message.includeRejected !== false) {
+      writer.uint32(40).bool(message.includeRejected);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportMBRecipeFullRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportMBRecipeFullRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.activeFilter = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.costType = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.checkStatusCalc = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.includeRejected = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportMBRecipeFullRequest {
+    return {
+      activeFilter: isSet(object.activeFilter)
+        ? activeFilterFromJSON(object.activeFilter)
+        : isSet(object.active_filter)
+        ? activeFilterFromJSON(object.active_filter)
+        : 0,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      costType: isSet(object.costType)
+        ? globalThis.String(object.costType)
+        : isSet(object.cost_type)
+        ? globalThis.String(object.cost_type)
+        : "",
+      checkStatusCalc: isSet(object.checkStatusCalc)
+        ? globalThis.String(object.checkStatusCalc)
+        : isSet(object.check_status_calc)
+        ? globalThis.String(object.check_status_calc)
+        : "",
+      includeRejected: isSet(object.includeRejected)
+        ? globalThis.Boolean(object.includeRejected)
+        : isSet(object.include_rejected)
+        ? globalThis.Boolean(object.include_rejected)
+        : false,
+    };
+  },
+
+  toJSON(message: ExportMBRecipeFullRequest): unknown {
+    const obj: any = {};
+    if (message.activeFilter !== 0) {
+      obj.activeFilter = activeFilterToJSON(message.activeFilter);
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.costType !== "") {
+      obj.costType = message.costType;
+    }
+    if (message.checkStatusCalc !== "") {
+      obj.checkStatusCalc = message.checkStatusCalc;
+    }
+    if (message.includeRejected !== false) {
+      obj.includeRejected = message.includeRejected;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportMBRecipeFullRequest>): ExportMBRecipeFullRequest {
+    return ExportMBRecipeFullRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportMBRecipeFullRequest>): ExportMBRecipeFullRequest {
+    const message = createBaseExportMBRecipeFullRequest();
+    message.activeFilter = object.activeFilter ?? 0;
+    message.period = object.period ?? "";
+    message.costType = object.costType ?? "";
+    message.checkStatusCalc = object.checkStatusCalc ?? "";
+    message.includeRejected = object.includeRejected ?? false;
+    return message;
+  },
+};
+
+function createBaseExportMBRecipeFullResponse(): ExportMBRecipeFullResponse {
+  return { base: undefined, fileContent: new Uint8Array(0), fileName: "" };
+}
+
+export const ExportMBRecipeFullResponse: MessageFns<ExportMBRecipeFullResponse> = {
+  encode(message: ExportMBRecipeFullResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.fileContent.length !== 0) {
+      writer.uint32(18).bytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(26).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportMBRecipeFullResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportMBRecipeFullResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileContent = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportMBRecipeFullResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      fileContent: isSet(object.fileContent)
+        ? bytesFromBase64(object.fileContent)
+        : isSet(object.file_content)
+        ? bytesFromBase64(object.file_content)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: ExportMBRecipeFullResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.fileContent.length !== 0) {
+      obj.fileContent = base64FromBytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportMBRecipeFullResponse>): ExportMBRecipeFullResponse {
+    return ExportMBRecipeFullResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportMBRecipeFullResponse>): ExportMBRecipeFullResponse {
+    const message = createBaseExportMBRecipeFullResponse();
     message.base = (object.base !== undefined && object.base !== null)
       ? BaseResponse.fromPartial(object.base)
       : undefined;
@@ -16739,6 +18419,780 @@ export const RevokeMBHeadResponse: MessageFns<RevokeMBHeadResponse> = {
   },
 };
 
+function createBaseRejectMBHeadRequest(): RejectMBHeadRequest {
+  return { mbhId: "", reason: "" };
+}
+
+export const RejectMBHeadRequest: MessageFns<RejectMBHeadRequest> = {
+  encode(message: RejectMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RejectMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRejectMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RejectMBHeadRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: RejectMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RejectMBHeadRequest>): RejectMBHeadRequest {
+    return RejectMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RejectMBHeadRequest>): RejectMBHeadRequest {
+    const message = createBaseRejectMBHeadRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseRejectMBHeadResponse(): RejectMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const RejectMBHeadResponse: MessageFns<RejectMBHeadResponse> = {
+  encode(message: RejectMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RejectMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRejectMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RejectMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: RejectMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RejectMBHeadResponse>): RejectMBHeadResponse {
+    return RejectMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RejectMBHeadResponse>): RejectMBHeadResponse {
+    const message = createBaseRejectMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseReturnMBHeadToDraftRequest(): ReturnMBHeadToDraftRequest {
+  return { mbhId: "", reason: "" };
+}
+
+export const ReturnMBHeadToDraftRequest: MessageFns<ReturnMBHeadToDraftRequest> = {
+  encode(message: ReturnMBHeadToDraftRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReturnMBHeadToDraftRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseReturnMBHeadToDraftRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ReturnMBHeadToDraftRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: ReturnMBHeadToDraftRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ReturnMBHeadToDraftRequest>): ReturnMBHeadToDraftRequest {
+    return ReturnMBHeadToDraftRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ReturnMBHeadToDraftRequest>): ReturnMBHeadToDraftRequest {
+    const message = createBaseReturnMBHeadToDraftRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseReturnMBHeadToDraftResponse(): ReturnMBHeadToDraftResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const ReturnMBHeadToDraftResponse: MessageFns<ReturnMBHeadToDraftResponse> = {
+  encode(message: ReturnMBHeadToDraftResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReturnMBHeadToDraftResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseReturnMBHeadToDraftResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ReturnMBHeadToDraftResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: ReturnMBHeadToDraftResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ReturnMBHeadToDraftResponse>): ReturnMBHeadToDraftResponse {
+    return ReturnMBHeadToDraftResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ReturnMBHeadToDraftResponse>): ReturnMBHeadToDraftResponse {
+    const message = createBaseReturnMBHeadToDraftResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseRequestUnlockMBHeadRequest(): RequestUnlockMBHeadRequest {
+  return { mbhId: "", reason: "" };
+}
+
+export const RequestUnlockMBHeadRequest: MessageFns<RequestUnlockMBHeadRequest> = {
+  encode(message: RequestUnlockMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RequestUnlockMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRequestUnlockMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RequestUnlockMBHeadRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: RequestUnlockMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RequestUnlockMBHeadRequest>): RequestUnlockMBHeadRequest {
+    return RequestUnlockMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RequestUnlockMBHeadRequest>): RequestUnlockMBHeadRequest {
+    const message = createBaseRequestUnlockMBHeadRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseRequestUnlockMBHeadResponse(): RequestUnlockMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const RequestUnlockMBHeadResponse: MessageFns<RequestUnlockMBHeadResponse> = {
+  encode(message: RequestUnlockMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RequestUnlockMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRequestUnlockMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RequestUnlockMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: RequestUnlockMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RequestUnlockMBHeadResponse>): RequestUnlockMBHeadResponse {
+    return RequestUnlockMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RequestUnlockMBHeadResponse>): RequestUnlockMBHeadResponse {
+    const message = createBaseRequestUnlockMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseGrantUnlockMBHeadRequest(): GrantUnlockMBHeadRequest {
+  return { mbhId: "" };
+}
+
+export const GrantUnlockMBHeadRequest: MessageFns<GrantUnlockMBHeadRequest> = {
+  encode(message: GrantUnlockMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GrantUnlockMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGrantUnlockMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GrantUnlockMBHeadRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GrantUnlockMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GrantUnlockMBHeadRequest>): GrantUnlockMBHeadRequest {
+    return GrantUnlockMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GrantUnlockMBHeadRequest>): GrantUnlockMBHeadRequest {
+    const message = createBaseGrantUnlockMBHeadRequest();
+    message.mbhId = object.mbhId ?? "";
+    return message;
+  },
+};
+
+function createBaseGrantUnlockMBHeadResponse(): GrantUnlockMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const GrantUnlockMBHeadResponse: MessageFns<GrantUnlockMBHeadResponse> = {
+  encode(message: GrantUnlockMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GrantUnlockMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGrantUnlockMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GrantUnlockMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: GrantUnlockMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GrantUnlockMBHeadResponse>): GrantUnlockMBHeadResponse {
+    return GrantUnlockMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GrantUnlockMBHeadResponse>): GrantUnlockMBHeadResponse {
+    const message = createBaseGrantUnlockMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseRejectUnlockMBHeadRequest(): RejectUnlockMBHeadRequest {
+  return { mbhId: "", reason: "" };
+}
+
+export const RejectUnlockMBHeadRequest: MessageFns<RejectUnlockMBHeadRequest> = {
+  encode(message: RejectUnlockMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RejectUnlockMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRejectUnlockMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RejectUnlockMBHeadRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: RejectUnlockMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RejectUnlockMBHeadRequest>): RejectUnlockMBHeadRequest {
+    return RejectUnlockMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RejectUnlockMBHeadRequest>): RejectUnlockMBHeadRequest {
+    const message = createBaseRejectUnlockMBHeadRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseRejectUnlockMBHeadResponse(): RejectUnlockMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const RejectUnlockMBHeadResponse: MessageFns<RejectUnlockMBHeadResponse> = {
+  encode(message: RejectUnlockMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RejectUnlockMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRejectUnlockMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RejectUnlockMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: RejectUnlockMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RejectUnlockMBHeadResponse>): RejectUnlockMBHeadResponse {
+    return RejectUnlockMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RejectUnlockMBHeadResponse>): RejectUnlockMBHeadResponse {
+    const message = createBaseRejectUnlockMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
 function createBaseMBSpin(): MBSpin {
   return {
     mbsId: "",
@@ -16757,6 +19211,8 @@ function createBaseMBSpin(): MBSpin {
     mbsFinalProduct: undefined,
     mbsRunLdrPct: undefined,
     audit: undefined,
+    mbsLdrIsFixed: undefined,
+    mbsDozingIsFixed: undefined,
   };
 }
 
@@ -16809,6 +19265,12 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
+    }
+    if (message.mbsLdrIsFixed !== undefined) {
+      writer.uint32(136).bool(message.mbsLdrIsFixed);
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      writer.uint32(144).bool(message.mbsDozingIsFixed);
     }
     return writer;
   },
@@ -16948,6 +19410,22 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.audit = AuditInfo.decode(reader, reader.uint32());
           continue;
         }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.mbsLdrIsFixed = reader.bool();
+          continue;
+        }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.mbsDozingIsFixed = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17035,6 +19513,16 @@ export const MBSpin: MessageFns<MBSpin> = {
         ? globalThis.Number(object.mbs_run_ldr_pct)
         : undefined,
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
+      mbsLdrIsFixed: isSet(object.mbsLdrIsFixed)
+        ? globalThis.Boolean(object.mbsLdrIsFixed)
+        : isSet(object.mbs_ldr_is_fixed)
+        ? globalThis.Boolean(object.mbs_ldr_is_fixed)
+        : undefined,
+      mbsDozingIsFixed: isSet(object.mbsDozingIsFixed)
+        ? globalThis.Boolean(object.mbsDozingIsFixed)
+        : isSet(object.mbs_dozing_is_fixed)
+        ? globalThis.Boolean(object.mbs_dozing_is_fixed)
+        : undefined,
     };
   },
 
@@ -17088,6 +19576,12 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
+    if (message.mbsLdrIsFixed !== undefined) {
+      obj.mbsLdrIsFixed = message.mbsLdrIsFixed;
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
+    }
     return obj;
   },
 
@@ -17114,6 +19608,8 @@ export const MBSpin: MessageFns<MBSpin> = {
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;
+    message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
+    message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
     return message;
   },
 };
@@ -17133,6 +19629,8 @@ function createBaseCreateMBSpinRequest(): CreateMBSpinRequest {
     mbsLdrPrsn: undefined,
     mbsFinalProduct: undefined,
     mbsRunLdrPct: undefined,
+    mbsLdrIsFixed: undefined,
+    mbsDozingIsFixed: undefined,
   };
 }
 
@@ -17176,6 +19674,12 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     }
     if (message.mbsRunLdrPct !== undefined) {
       writer.uint32(105).double(message.mbsRunLdrPct);
+    }
+    if (message.mbsLdrIsFixed !== undefined) {
+      writer.uint32(112).bool(message.mbsLdrIsFixed);
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      writer.uint32(120).bool(message.mbsDozingIsFixed);
     }
     return writer;
   },
@@ -17291,6 +19795,22 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
           message.mbsRunLdrPct = reader.double();
           continue;
         }
+        case 14: {
+          if (tag !== 112) {
+            break;
+          }
+
+          message.mbsLdrIsFixed = reader.bool();
+          continue;
+        }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.mbsDozingIsFixed = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17367,6 +19887,16 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
         : isSet(object.mbs_run_ldr_pct)
         ? globalThis.Number(object.mbs_run_ldr_pct)
         : undefined,
+      mbsLdrIsFixed: isSet(object.mbsLdrIsFixed)
+        ? globalThis.Boolean(object.mbsLdrIsFixed)
+        : isSet(object.mbs_ldr_is_fixed)
+        ? globalThis.Boolean(object.mbs_ldr_is_fixed)
+        : undefined,
+      mbsDozingIsFixed: isSet(object.mbsDozingIsFixed)
+        ? globalThis.Boolean(object.mbsDozingIsFixed)
+        : isSet(object.mbs_dozing_is_fixed)
+        ? globalThis.Boolean(object.mbs_dozing_is_fixed)
+        : undefined,
     };
   },
 
@@ -17411,6 +19941,12 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     if (message.mbsRunLdrPct !== undefined) {
       obj.mbsRunLdrPct = message.mbsRunLdrPct;
     }
+    if (message.mbsLdrIsFixed !== undefined) {
+      obj.mbsLdrIsFixed = message.mbsLdrIsFixed;
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
+    }
     return obj;
   },
 
@@ -17432,6 +19968,8 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     message.mbsLdrPrsn = object.mbsLdrPrsn ?? undefined;
     message.mbsFinalProduct = object.mbsFinalProduct ?? undefined;
     message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
+    message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
+    message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
     return message;
   },
 };
@@ -17692,6 +20230,8 @@ function createBaseUpdateMBSpinRequest(): UpdateMBSpinRequest {
     mbsLdrPrsn: undefined,
     mbsFinalProduct: undefined,
     mbsRunLdrPct: undefined,
+    mbsLdrIsFixed: undefined,
+    mbsDozingIsFixed: undefined,
   };
 }
 
@@ -17738,6 +20278,12 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     }
     if (message.mbsRunLdrPct !== undefined) {
       writer.uint32(113).double(message.mbsRunLdrPct);
+    }
+    if (message.mbsLdrIsFixed !== undefined) {
+      writer.uint32(120).bool(message.mbsLdrIsFixed);
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      writer.uint32(128).bool(message.mbsDozingIsFixed);
     }
     return writer;
   },
@@ -17861,6 +20407,22 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
           message.mbsRunLdrPct = reader.double();
           continue;
         }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.mbsLdrIsFixed = reader.bool();
+          continue;
+        }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.mbsDozingIsFixed = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17942,6 +20504,16 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
         : isSet(object.mbs_run_ldr_pct)
         ? globalThis.Number(object.mbs_run_ldr_pct)
         : undefined,
+      mbsLdrIsFixed: isSet(object.mbsLdrIsFixed)
+        ? globalThis.Boolean(object.mbsLdrIsFixed)
+        : isSet(object.mbs_ldr_is_fixed)
+        ? globalThis.Boolean(object.mbs_ldr_is_fixed)
+        : undefined,
+      mbsDozingIsFixed: isSet(object.mbsDozingIsFixed)
+        ? globalThis.Boolean(object.mbsDozingIsFixed)
+        : isSet(object.mbs_dozing_is_fixed)
+        ? globalThis.Boolean(object.mbs_dozing_is_fixed)
+        : undefined,
     };
   },
 
@@ -17989,6 +20561,12 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     if (message.mbsRunLdrPct !== undefined) {
       obj.mbsRunLdrPct = message.mbsRunLdrPct;
     }
+    if (message.mbsLdrIsFixed !== undefined) {
+      obj.mbsLdrIsFixed = message.mbsLdrIsFixed;
+    }
+    if (message.mbsDozingIsFixed !== undefined) {
+      obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
+    }
     return obj;
   },
 
@@ -18011,6 +20589,8 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     message.mbsLdrPrsn = object.mbsLdrPrsn ?? undefined;
     message.mbsFinalProduct = object.mbsFinalProduct ?? undefined;
     message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
+    message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
+    message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
     return message;
   },
 };
@@ -19099,6 +21679,475 @@ export const DownloadMBSpinTemplateResponse: MessageFns<DownloadMBSpinTemplateRe
       : undefined;
     message.fileContent = object.fileContent ?? new Uint8Array(0);
     message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseDuplicateMBSpinRequest(): DuplicateMBSpinRequest {
+  return { mbhId: "", mbsId: "", mbsMgtName: undefined, mbsDenier: undefined, mbsFilament: undefined };
+}
+
+export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
+  encode(message: DuplicateMBSpinRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.mbsId !== "") {
+      writer.uint32(18).string(message.mbsId);
+    }
+    if (message.mbsMgtName !== undefined) {
+      writer.uint32(26).string(message.mbsMgtName);
+    }
+    if (message.mbsDenier !== undefined) {
+      writer.uint32(33).double(message.mbsDenier);
+    }
+    if (message.mbsFilament !== undefined) {
+      writer.uint32(40).int32(message.mbsFilament);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DuplicateMBSpinRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDuplicateMBSpinRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbsId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbsMgtName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 33) {
+            break;
+          }
+
+          message.mbsDenier = reader.double();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.mbsFilament = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DuplicateMBSpinRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      mbsId: isSet(object.mbsId)
+        ? globalThis.String(object.mbsId)
+        : isSet(object.mbs_id)
+        ? globalThis.String(object.mbs_id)
+        : "",
+      mbsMgtName: isSet(object.mbsMgtName)
+        ? globalThis.String(object.mbsMgtName)
+        : isSet(object.mbs_mgt_name)
+        ? globalThis.String(object.mbs_mgt_name)
+        : undefined,
+      mbsDenier: isSet(object.mbsDenier)
+        ? globalThis.Number(object.mbsDenier)
+        : isSet(object.mbs_denier)
+        ? globalThis.Number(object.mbs_denier)
+        : undefined,
+      mbsFilament: isSet(object.mbsFilament)
+        ? globalThis.Number(object.mbsFilament)
+        : isSet(object.mbs_filament)
+        ? globalThis.Number(object.mbs_filament)
+        : undefined,
+    };
+  },
+
+  toJSON(message: DuplicateMBSpinRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.mbsId !== "") {
+      obj.mbsId = message.mbsId;
+    }
+    if (message.mbsMgtName !== undefined) {
+      obj.mbsMgtName = message.mbsMgtName;
+    }
+    if (message.mbsDenier !== undefined) {
+      obj.mbsDenier = message.mbsDenier;
+    }
+    if (message.mbsFilament !== undefined) {
+      obj.mbsFilament = Math.round(message.mbsFilament);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DuplicateMBSpinRequest>): DuplicateMBSpinRequest {
+    return DuplicateMBSpinRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DuplicateMBSpinRequest>): DuplicateMBSpinRequest {
+    const message = createBaseDuplicateMBSpinRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.mbsId = object.mbsId ?? "";
+    message.mbsMgtName = object.mbsMgtName ?? undefined;
+    message.mbsDenier = object.mbsDenier ?? undefined;
+    message.mbsFilament = object.mbsFilament ?? undefined;
+    return message;
+  },
+};
+
+function createBaseMBSpinRecalcSkipped(): MBSpinRecalcSkipped {
+  return { mbsId: "", mbsMgtName: "", mbsStatus: undefined, reason: "" };
+}
+
+export const MBSpinRecalcSkipped: MessageFns<MBSpinRecalcSkipped> = {
+  encode(message: MBSpinRecalcSkipped, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbsId !== "") {
+      writer.uint32(10).string(message.mbsId);
+    }
+    if (message.mbsMgtName !== "") {
+      writer.uint32(18).string(message.mbsMgtName);
+    }
+    if (message.mbsStatus !== undefined) {
+      writer.uint32(26).string(message.mbsStatus);
+    }
+    if (message.reason !== "") {
+      writer.uint32(34).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBSpinRecalcSkipped {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBSpinRecalcSkipped();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbsMgtName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mbsStatus = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBSpinRecalcSkipped {
+    return {
+      mbsId: isSet(object.mbsId)
+        ? globalThis.String(object.mbsId)
+        : isSet(object.mbs_id)
+        ? globalThis.String(object.mbs_id)
+        : "",
+      mbsMgtName: isSet(object.mbsMgtName)
+        ? globalThis.String(object.mbsMgtName)
+        : isSet(object.mbs_mgt_name)
+        ? globalThis.String(object.mbs_mgt_name)
+        : "",
+      mbsStatus: isSet(object.mbsStatus)
+        ? globalThis.String(object.mbsStatus)
+        : isSet(object.mbs_status)
+        ? globalThis.String(object.mbs_status)
+        : undefined,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: MBSpinRecalcSkipped): unknown {
+    const obj: any = {};
+    if (message.mbsId !== "") {
+      obj.mbsId = message.mbsId;
+    }
+    if (message.mbsMgtName !== "") {
+      obj.mbsMgtName = message.mbsMgtName;
+    }
+    if (message.mbsStatus !== undefined) {
+      obj.mbsStatus = message.mbsStatus;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBSpinRecalcSkipped>): MBSpinRecalcSkipped {
+    return MBSpinRecalcSkipped.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBSpinRecalcSkipped>): MBSpinRecalcSkipped {
+    const message = createBaseMBSpinRecalcSkipped();
+    message.mbsId = object.mbsId ?? "";
+    message.mbsMgtName = object.mbsMgtName ?? "";
+    message.mbsStatus = object.mbsStatus ?? undefined;
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseDuplicateMBSpinResponse(): DuplicateMBSpinResponse {
+  return {
+    base: undefined,
+    data: undefined,
+    skipped: [],
+    skippedCount: 0,
+    impactPreview: [],
+    impactTotalAffected: 0,
+    impactTotalLocked: 0,
+    impactTruncated: false,
+  };
+}
+
+export const DuplicateMBSpinResponse: MessageFns<DuplicateMBSpinResponse> = {
+  encode(message: DuplicateMBSpinResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBSpin.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.skipped) {
+      MBSpinRecalcSkipped.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.skippedCount !== 0) {
+      writer.uint32(32).int32(message.skippedCount);
+    }
+    for (const v of message.impactPreview) {
+      DozingImpactRow.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.impactTotalAffected !== 0) {
+      writer.uint32(48).int32(message.impactTotalAffected);
+    }
+    if (message.impactTotalLocked !== 0) {
+      writer.uint32(56).int32(message.impactTotalLocked);
+    }
+    if (message.impactTruncated !== false) {
+      writer.uint32(64).bool(message.impactTruncated);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DuplicateMBSpinResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDuplicateMBSpinResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBSpin.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.skipped.push(MBSpinRecalcSkipped.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.skippedCount = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.impactPreview.push(DozingImpactRow.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.impactTotalAffected = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.impactTotalLocked = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.impactTruncated = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DuplicateMBSpinResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBSpin.fromJSON(object.data) : undefined,
+      skipped: globalThis.Array.isArray(object?.skipped)
+        ? object.skipped.map((e: any) => MBSpinRecalcSkipped.fromJSON(e))
+        : [],
+      skippedCount: isSet(object.skippedCount)
+        ? globalThis.Number(object.skippedCount)
+        : isSet(object.skipped_count)
+        ? globalThis.Number(object.skipped_count)
+        : 0,
+      impactPreview: globalThis.Array.isArray(object?.impactPreview)
+        ? object.impactPreview.map((e: any) => DozingImpactRow.fromJSON(e))
+        : globalThis.Array.isArray(object?.impact_preview)
+        ? object.impact_preview.map((e: any) => DozingImpactRow.fromJSON(e))
+        : [],
+      impactTotalAffected: isSet(object.impactTotalAffected)
+        ? globalThis.Number(object.impactTotalAffected)
+        : isSet(object.impact_total_affected)
+        ? globalThis.Number(object.impact_total_affected)
+        : 0,
+      impactTotalLocked: isSet(object.impactTotalLocked)
+        ? globalThis.Number(object.impactTotalLocked)
+        : isSet(object.impact_total_locked)
+        ? globalThis.Number(object.impact_total_locked)
+        : 0,
+      impactTruncated: isSet(object.impactTruncated)
+        ? globalThis.Boolean(object.impactTruncated)
+        : isSet(object.impact_truncated)
+        ? globalThis.Boolean(object.impact_truncated)
+        : false,
+    };
+  },
+
+  toJSON(message: DuplicateMBSpinResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBSpin.toJSON(message.data);
+    }
+    if (message.skipped?.length) {
+      obj.skipped = message.skipped.map((e) => MBSpinRecalcSkipped.toJSON(e));
+    }
+    if (message.skippedCount !== 0) {
+      obj.skippedCount = Math.round(message.skippedCount);
+    }
+    if (message.impactPreview?.length) {
+      obj.impactPreview = message.impactPreview.map((e) => DozingImpactRow.toJSON(e));
+    }
+    if (message.impactTotalAffected !== 0) {
+      obj.impactTotalAffected = Math.round(message.impactTotalAffected);
+    }
+    if (message.impactTotalLocked !== 0) {
+      obj.impactTotalLocked = Math.round(message.impactTotalLocked);
+    }
+    if (message.impactTruncated !== false) {
+      obj.impactTruncated = message.impactTruncated;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DuplicateMBSpinResponse>): DuplicateMBSpinResponse {
+    return DuplicateMBSpinResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DuplicateMBSpinResponse>): DuplicateMBSpinResponse {
+    const message = createBaseDuplicateMBSpinResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBSpin.fromPartial(object.data) : undefined;
+    message.skipped = object.skipped?.map((e) => MBSpinRecalcSkipped.fromPartial(e)) || [];
+    message.skippedCount = object.skippedCount ?? 0;
+    message.impactPreview = object.impactPreview?.map((e) => DozingImpactRow.fromPartial(e)) || [];
+    message.impactTotalAffected = object.impactTotalAffected ?? 0;
+    message.impactTotalLocked = object.impactTotalLocked ?? 0;
+    message.impactTruncated = object.impactTruncated ?? false;
     return message;
   },
 };
@@ -21376,7 +24425,7 @@ export const ListTableColumnsResponse: MessageFns<ListTableColumnsResponse> = {
 };
 
 function createBaseMasterOption(): MasterOption {
-  return { value: "", label: "" };
+  return { value: "", label: "", denier: undefined, filament: undefined, ldrPrsn: undefined, runLdrPct: undefined };
 }
 
 export const MasterOption: MessageFns<MasterOption> = {
@@ -21386,6 +24435,18 @@ export const MasterOption: MessageFns<MasterOption> = {
     }
     if (message.label !== "") {
       writer.uint32(18).string(message.label);
+    }
+    if (message.denier !== undefined) {
+      writer.uint32(25).double(message.denier);
+    }
+    if (message.filament !== undefined) {
+      writer.uint32(32).int32(message.filament);
+    }
+    if (message.ldrPrsn !== undefined) {
+      writer.uint32(49).double(message.ldrPrsn);
+    }
+    if (message.runLdrPct !== undefined) {
+      writer.uint32(57).double(message.runLdrPct);
     }
     return writer;
   },
@@ -21413,6 +24474,38 @@ export const MasterOption: MessageFns<MasterOption> = {
           message.label = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 25) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.filament = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 49) {
+            break;
+          }
+
+          message.ldrPrsn = reader.double();
+          continue;
+        }
+        case 7: {
+          if (tag !== 57) {
+            break;
+          }
+
+          message.runLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -21426,6 +24519,18 @@ export const MasterOption: MessageFns<MasterOption> = {
     return {
       value: isSet(object.value) ? globalThis.String(object.value) : "",
       label: isSet(object.label) ? globalThis.String(object.label) : "",
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : undefined,
+      filament: isSet(object.filament) ? globalThis.Number(object.filament) : undefined,
+      ldrPrsn: isSet(object.ldrPrsn)
+        ? globalThis.Number(object.ldrPrsn)
+        : isSet(object.ldr_prsn)
+        ? globalThis.Number(object.ldr_prsn)
+        : undefined,
+      runLdrPct: isSet(object.runLdrPct)
+        ? globalThis.Number(object.runLdrPct)
+        : isSet(object.run_ldr_pct)
+        ? globalThis.Number(object.run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -21437,6 +24542,18 @@ export const MasterOption: MessageFns<MasterOption> = {
     if (message.label !== "") {
       obj.label = message.label;
     }
+    if (message.denier !== undefined) {
+      obj.denier = message.denier;
+    }
+    if (message.filament !== undefined) {
+      obj.filament = Math.round(message.filament);
+    }
+    if (message.ldrPrsn !== undefined) {
+      obj.ldrPrsn = message.ldrPrsn;
+    }
+    if (message.runLdrPct !== undefined) {
+      obj.runLdrPct = message.runLdrPct;
+    }
     return obj;
   },
 
@@ -21447,18 +24564,28 @@ export const MasterOption: MessageFns<MasterOption> = {
     const message = createBaseMasterOption();
     message.value = object.value ?? "";
     message.label = object.label ?? "";
+    message.denier = object.denier ?? undefined;
+    message.filament = object.filament ?? undefined;
+    message.ldrPrsn = object.ldrPrsn ?? undefined;
+    message.runLdrPct = object.runLdrPct ?? undefined;
     return message;
   },
 };
 
 function createBaseListMasterOptionsRequest(): ListMasterOptionsRequest {
-  return { masterCode: "" };
+  return { masterCode: "", search: undefined, limit: undefined };
 }
 
 export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
   encode(message: ListMasterOptionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.masterCode !== "") {
       writer.uint32(10).string(message.masterCode);
+    }
+    if (message.search !== undefined) {
+      writer.uint32(18).string(message.search);
+    }
+    if (message.limit !== undefined) {
+      writer.uint32(24).int32(message.limit);
     }
     return writer;
   },
@@ -21478,6 +24605,22 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
           message.masterCode = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -21494,6 +24637,8 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
         : isSet(object.master_code)
         ? globalThis.String(object.master_code)
         : "",
+      search: isSet(object.search) ? globalThis.String(object.search) : undefined,
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : undefined,
     };
   },
 
@@ -21501,6 +24646,12 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
     const obj: any = {};
     if (message.masterCode !== "") {
       obj.masterCode = message.masterCode;
+    }
+    if (message.search !== undefined) {
+      obj.search = message.search;
+    }
+    if (message.limit !== undefined) {
+      obj.limit = Math.round(message.limit);
     }
     return obj;
   },
@@ -21511,6 +24662,8 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
   fromPartial(object: DeepPartial<ListMasterOptionsRequest>): ListMasterOptionsRequest {
     const message = createBaseListMasterOptionsRequest();
     message.masterCode = object.masterCode ?? "";
+    message.search = object.search ?? undefined;
+    message.limit = object.limit ?? undefined;
     return message;
   },
 };
@@ -29643,6 +32796,3085 @@ export const TriggerMbBatchResponse: MessageFns<TriggerMbBatchResponse> = {
   },
 };
 
+function createBaseMbCrossSection(): MbCrossSection {
+  return { mbcsId: "", code: "", displayName: "", description: "", isActive: false, displayOrder: 0, audit: undefined };
+}
+
+export const MbCrossSection: MessageFns<MbCrossSection> = {
+  encode(message: MbCrossSection, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcsId !== "") {
+      writer.uint32(10).string(message.mbcsId);
+    }
+    if (message.code !== "") {
+      writer.uint32(18).string(message.code);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
+    }
+    if (message.description !== "") {
+      writer.uint32(34).string(message.description);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(40).bool(message.isActive);
+    }
+    if (message.displayOrder !== 0) {
+      writer.uint32(48).int32(message.displayOrder);
+    }
+    if (message.audit !== undefined) {
+      AuditInfo.encode(message.audit, writer.uint32(58).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MbCrossSection {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMbCrossSection();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.displayOrder = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.audit = AuditInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MbCrossSection {
+    return {
+      mbcsId: isSet(object.mbcsId)
+        ? globalThis.String(object.mbcsId)
+        : isSet(object.mbcs_id)
+        ? globalThis.String(object.mbcs_id)
+        : "",
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      displayName: isSet(object.displayName)
+        ? globalThis.String(object.displayName)
+        : isSet(object.display_name)
+        ? globalThis.String(object.display_name)
+        : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+      displayOrder: isSet(object.displayOrder)
+        ? globalThis.Number(object.displayOrder)
+        : isSet(object.display_order)
+        ? globalThis.Number(object.display_order)
+        : 0,
+      audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
+    };
+  },
+
+  toJSON(message: MbCrossSection): unknown {
+    const obj: any = {};
+    if (message.mbcsId !== "") {
+      obj.mbcsId = message.mbcsId;
+    }
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    if (message.displayOrder !== 0) {
+      obj.displayOrder = Math.round(message.displayOrder);
+    }
+    if (message.audit !== undefined) {
+      obj.audit = AuditInfo.toJSON(message.audit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MbCrossSection>): MbCrossSection {
+    return MbCrossSection.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MbCrossSection>): MbCrossSection {
+    const message = createBaseMbCrossSection();
+    message.mbcsId = object.mbcsId ?? "";
+    message.code = object.code ?? "";
+    message.displayName = object.displayName ?? "";
+    message.description = object.description ?? "";
+    message.isActive = object.isActive ?? false;
+    message.displayOrder = object.displayOrder ?? 0;
+    message.audit = (object.audit !== undefined && object.audit !== null)
+      ? AuditInfo.fromPartial(object.audit)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseMbCrossSectionFactor(): MbCrossSectionFactor {
+  return {
+    mbcfId: "",
+    fromCode: "",
+    toCode: "",
+    factor: 0,
+    operation: "",
+    note: "",
+    isActive: false,
+    audit: undefined,
+  };
+}
+
+export const MbCrossSectionFactor: MessageFns<MbCrossSectionFactor> = {
+  encode(message: MbCrossSectionFactor, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcfId !== "") {
+      writer.uint32(10).string(message.mbcfId);
+    }
+    if (message.fromCode !== "") {
+      writer.uint32(18).string(message.fromCode);
+    }
+    if (message.toCode !== "") {
+      writer.uint32(26).string(message.toCode);
+    }
+    if (message.factor !== 0) {
+      writer.uint32(33).double(message.factor);
+    }
+    if (message.operation !== "") {
+      writer.uint32(42).string(message.operation);
+    }
+    if (message.note !== "") {
+      writer.uint32(50).string(message.note);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(56).bool(message.isActive);
+    }
+    if (message.audit !== undefined) {
+      AuditInfo.encode(message.audit, writer.uint32(66).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MbCrossSectionFactor {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMbCrossSectionFactor();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcfId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fromCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.toCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 33) {
+            break;
+          }
+
+          message.factor = reader.double();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.operation = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.note = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.audit = AuditInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MbCrossSectionFactor {
+    return {
+      mbcfId: isSet(object.mbcfId)
+        ? globalThis.String(object.mbcfId)
+        : isSet(object.mbcf_id)
+        ? globalThis.String(object.mbcf_id)
+        : "",
+      fromCode: isSet(object.fromCode)
+        ? globalThis.String(object.fromCode)
+        : isSet(object.from_code)
+        ? globalThis.String(object.from_code)
+        : "",
+      toCode: isSet(object.toCode)
+        ? globalThis.String(object.toCode)
+        : isSet(object.to_code)
+        ? globalThis.String(object.to_code)
+        : "",
+      factor: isSet(object.factor) ? globalThis.Number(object.factor) : 0,
+      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+      note: isSet(object.note) ? globalThis.String(object.note) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+      audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
+    };
+  },
+
+  toJSON(message: MbCrossSectionFactor): unknown {
+    const obj: any = {};
+    if (message.mbcfId !== "") {
+      obj.mbcfId = message.mbcfId;
+    }
+    if (message.fromCode !== "") {
+      obj.fromCode = message.fromCode;
+    }
+    if (message.toCode !== "") {
+      obj.toCode = message.toCode;
+    }
+    if (message.factor !== 0) {
+      obj.factor = message.factor;
+    }
+    if (message.operation !== "") {
+      obj.operation = message.operation;
+    }
+    if (message.note !== "") {
+      obj.note = message.note;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    if (message.audit !== undefined) {
+      obj.audit = AuditInfo.toJSON(message.audit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MbCrossSectionFactor>): MbCrossSectionFactor {
+    return MbCrossSectionFactor.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MbCrossSectionFactor>): MbCrossSectionFactor {
+    const message = createBaseMbCrossSectionFactor();
+    message.mbcfId = object.mbcfId ?? "";
+    message.fromCode = object.fromCode ?? "";
+    message.toCode = object.toCode ?? "";
+    message.factor = object.factor ?? 0;
+    message.operation = object.operation ?? "";
+    message.note = object.note ?? "";
+    message.isActive = object.isActive ?? false;
+    message.audit = (object.audit !== undefined && object.audit !== null)
+      ? AuditInfo.fromPartial(object.audit)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreateMbCrossSectionRequest(): CreateMbCrossSectionRequest {
+  return { code: "", displayName: "", description: "", isActive: false, displayOrder: 0 };
+}
+
+export const CreateMbCrossSectionRequest: MessageFns<CreateMbCrossSectionRequest> = {
+  encode(message: CreateMbCrossSectionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.code !== "") {
+      writer.uint32(10).string(message.code);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(18).string(message.displayName);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(32).bool(message.isActive);
+    }
+    if (message.displayOrder !== 0) {
+      writer.uint32(40).int32(message.displayOrder);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateMbCrossSectionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateMbCrossSectionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.displayOrder = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateMbCrossSectionRequest {
+    return {
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      displayName: isSet(object.displayName)
+        ? globalThis.String(object.displayName)
+        : isSet(object.display_name)
+        ? globalThis.String(object.display_name)
+        : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+      displayOrder: isSet(object.displayOrder)
+        ? globalThis.Number(object.displayOrder)
+        : isSet(object.display_order)
+        ? globalThis.Number(object.display_order)
+        : 0,
+    };
+  },
+
+  toJSON(message: CreateMbCrossSectionRequest): unknown {
+    const obj: any = {};
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    if (message.displayOrder !== 0) {
+      obj.displayOrder = Math.round(message.displayOrder);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateMbCrossSectionRequest>): CreateMbCrossSectionRequest {
+    return CreateMbCrossSectionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateMbCrossSectionRequest>): CreateMbCrossSectionRequest {
+    const message = createBaseCreateMbCrossSectionRequest();
+    message.code = object.code ?? "";
+    message.displayName = object.displayName ?? "";
+    message.description = object.description ?? "";
+    message.isActive = object.isActive ?? false;
+    message.displayOrder = object.displayOrder ?? 0;
+    return message;
+  },
+};
+
+function createBaseCreateMbCrossSectionResponse(): CreateMbCrossSectionResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const CreateMbCrossSectionResponse: MessageFns<CreateMbCrossSectionResponse> = {
+  encode(message: CreateMbCrossSectionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSection.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateMbCrossSectionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateMbCrossSectionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSection.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateMbCrossSectionResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSection.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: CreateMbCrossSectionResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSection.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateMbCrossSectionResponse>): CreateMbCrossSectionResponse {
+    return CreateMbCrossSectionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateMbCrossSectionResponse>): CreateMbCrossSectionResponse {
+    const message = createBaseCreateMbCrossSectionResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSection.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetMbCrossSectionRequest(): GetMbCrossSectionRequest {
+  return { mbcsId: "" };
+}
+
+export const GetMbCrossSectionRequest: MessageFns<GetMbCrossSectionRequest> = {
+  encode(message: GetMbCrossSectionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcsId !== "") {
+      writer.uint32(10).string(message.mbcsId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetMbCrossSectionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetMbCrossSectionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcsId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetMbCrossSectionRequest {
+    return {
+      mbcsId: isSet(object.mbcsId)
+        ? globalThis.String(object.mbcsId)
+        : isSet(object.mbcs_id)
+        ? globalThis.String(object.mbcs_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetMbCrossSectionRequest): unknown {
+    const obj: any = {};
+    if (message.mbcsId !== "") {
+      obj.mbcsId = message.mbcsId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetMbCrossSectionRequest>): GetMbCrossSectionRequest {
+    return GetMbCrossSectionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetMbCrossSectionRequest>): GetMbCrossSectionRequest {
+    const message = createBaseGetMbCrossSectionRequest();
+    message.mbcsId = object.mbcsId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetMbCrossSectionResponse(): GetMbCrossSectionResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const GetMbCrossSectionResponse: MessageFns<GetMbCrossSectionResponse> = {
+  encode(message: GetMbCrossSectionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSection.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetMbCrossSectionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetMbCrossSectionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSection.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetMbCrossSectionResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSection.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: GetMbCrossSectionResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSection.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetMbCrossSectionResponse>): GetMbCrossSectionResponse {
+    return GetMbCrossSectionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetMbCrossSectionResponse>): GetMbCrossSectionResponse {
+    const message = createBaseGetMbCrossSectionResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSection.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListMbCrossSectionRequest(): ListMbCrossSectionRequest {
+  return { page: 0, pageSize: 0, search: "", sortBy: "", sortDir: "", activeFilter: 0 };
+}
+
+export const ListMbCrossSectionRequest: MessageFns<ListMbCrossSectionRequest> = {
+  encode(message: ListMbCrossSectionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.page !== 0) {
+      writer.uint32(8).int32(message.page);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).int32(message.pageSize);
+    }
+    if (message.search !== "") {
+      writer.uint32(26).string(message.search);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(34).string(message.sortBy);
+    }
+    if (message.sortDir !== "") {
+      writer.uint32(42).string(message.sortDir);
+    }
+    if (message.activeFilter !== 0) {
+      writer.uint32(48).int32(message.activeFilter);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListMbCrossSectionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListMbCrossSectionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sortDir = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.activeFilter = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListMbCrossSectionRequest {
+    return {
+      page: isSet(object.page) ? globalThis.Number(object.page) : 0,
+      pageSize: isSet(object.pageSize)
+        ? globalThis.Number(object.pageSize)
+        : isSet(object.page_size)
+        ? globalThis.Number(object.page_size)
+        : 0,
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      sortBy: isSet(object.sortBy)
+        ? globalThis.String(object.sortBy)
+        : isSet(object.sort_by)
+        ? globalThis.String(object.sort_by)
+        : "",
+      sortDir: isSet(object.sortDir)
+        ? globalThis.String(object.sortDir)
+        : isSet(object.sort_dir)
+        ? globalThis.String(object.sort_dir)
+        : "",
+      activeFilter: isSet(object.activeFilter)
+        ? activeFilterFromJSON(object.activeFilter)
+        : isSet(object.active_filter)
+        ? activeFilterFromJSON(object.active_filter)
+        : 0,
+    };
+  },
+
+  toJSON(message: ListMbCrossSectionRequest): unknown {
+    const obj: any = {};
+    if (message.page !== 0) {
+      obj.page = Math.round(message.page);
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.sortBy !== "") {
+      obj.sortBy = message.sortBy;
+    }
+    if (message.sortDir !== "") {
+      obj.sortDir = message.sortDir;
+    }
+    if (message.activeFilter !== 0) {
+      obj.activeFilter = activeFilterToJSON(message.activeFilter);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListMbCrossSectionRequest>): ListMbCrossSectionRequest {
+    return ListMbCrossSectionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListMbCrossSectionRequest>): ListMbCrossSectionRequest {
+    const message = createBaseListMbCrossSectionRequest();
+    message.page = object.page ?? 0;
+    message.pageSize = object.pageSize ?? 0;
+    message.search = object.search ?? "";
+    message.sortBy = object.sortBy ?? "";
+    message.sortDir = object.sortDir ?? "";
+    message.activeFilter = object.activeFilter ?? 0;
+    return message;
+  },
+};
+
+function createBaseListMbCrossSectionResponse(): ListMbCrossSectionResponse {
+  return { base: undefined, data: [], pagination: undefined };
+}
+
+export const ListMbCrossSectionResponse: MessageFns<ListMbCrossSectionResponse> = {
+  encode(message: ListMbCrossSectionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      MbCrossSection.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.pagination !== undefined) {
+      PaginationResponse.encode(message.pagination, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListMbCrossSectionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListMbCrossSectionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(MbCrossSection.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pagination = PaginationResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListMbCrossSectionResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => MbCrossSection.fromJSON(e)) : [],
+      pagination: isSet(object.pagination) ? PaginationResponse.fromJSON(object.pagination) : undefined,
+    };
+  },
+
+  toJSON(message: ListMbCrossSectionResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => MbCrossSection.toJSON(e));
+    }
+    if (message.pagination !== undefined) {
+      obj.pagination = PaginationResponse.toJSON(message.pagination);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListMbCrossSectionResponse>): ListMbCrossSectionResponse {
+    return ListMbCrossSectionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListMbCrossSectionResponse>): ListMbCrossSectionResponse {
+    const message = createBaseListMbCrossSectionResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => MbCrossSection.fromPartial(e)) || [];
+    message.pagination = (object.pagination !== undefined && object.pagination !== null)
+      ? PaginationResponse.fromPartial(object.pagination)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateMbCrossSectionRequest(): UpdateMbCrossSectionRequest {
+  return { mbcsId: "", displayName: "", description: "", isActive: false, displayOrder: 0 };
+}
+
+export const UpdateMbCrossSectionRequest: MessageFns<UpdateMbCrossSectionRequest> = {
+  encode(message: UpdateMbCrossSectionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcsId !== "") {
+      writer.uint32(10).string(message.mbcsId);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(18).string(message.displayName);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(32).bool(message.isActive);
+    }
+    if (message.displayOrder !== 0) {
+      writer.uint32(40).int32(message.displayOrder);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateMbCrossSectionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateMbCrossSectionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.displayOrder = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateMbCrossSectionRequest {
+    return {
+      mbcsId: isSet(object.mbcsId)
+        ? globalThis.String(object.mbcsId)
+        : isSet(object.mbcs_id)
+        ? globalThis.String(object.mbcs_id)
+        : "",
+      displayName: isSet(object.displayName)
+        ? globalThis.String(object.displayName)
+        : isSet(object.display_name)
+        ? globalThis.String(object.display_name)
+        : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+      displayOrder: isSet(object.displayOrder)
+        ? globalThis.Number(object.displayOrder)
+        : isSet(object.display_order)
+        ? globalThis.Number(object.display_order)
+        : 0,
+    };
+  },
+
+  toJSON(message: UpdateMbCrossSectionRequest): unknown {
+    const obj: any = {};
+    if (message.mbcsId !== "") {
+      obj.mbcsId = message.mbcsId;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    if (message.displayOrder !== 0) {
+      obj.displayOrder = Math.round(message.displayOrder);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateMbCrossSectionRequest>): UpdateMbCrossSectionRequest {
+    return UpdateMbCrossSectionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateMbCrossSectionRequest>): UpdateMbCrossSectionRequest {
+    const message = createBaseUpdateMbCrossSectionRequest();
+    message.mbcsId = object.mbcsId ?? "";
+    message.displayName = object.displayName ?? "";
+    message.description = object.description ?? "";
+    message.isActive = object.isActive ?? false;
+    message.displayOrder = object.displayOrder ?? 0;
+    return message;
+  },
+};
+
+function createBaseUpdateMbCrossSectionResponse(): UpdateMbCrossSectionResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UpdateMbCrossSectionResponse: MessageFns<UpdateMbCrossSectionResponse> = {
+  encode(message: UpdateMbCrossSectionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSection.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateMbCrossSectionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateMbCrossSectionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSection.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateMbCrossSectionResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSection.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UpdateMbCrossSectionResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSection.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateMbCrossSectionResponse>): UpdateMbCrossSectionResponse {
+    return UpdateMbCrossSectionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateMbCrossSectionResponse>): UpdateMbCrossSectionResponse {
+    const message = createBaseUpdateMbCrossSectionResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSection.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteMbCrossSectionRequest(): DeleteMbCrossSectionRequest {
+  return { mbcsId: "" };
+}
+
+export const DeleteMbCrossSectionRequest: MessageFns<DeleteMbCrossSectionRequest> = {
+  encode(message: DeleteMbCrossSectionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcsId !== "") {
+      writer.uint32(10).string(message.mbcsId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteMbCrossSectionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteMbCrossSectionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcsId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteMbCrossSectionRequest {
+    return {
+      mbcsId: isSet(object.mbcsId)
+        ? globalThis.String(object.mbcsId)
+        : isSet(object.mbcs_id)
+        ? globalThis.String(object.mbcs_id)
+        : "",
+    };
+  },
+
+  toJSON(message: DeleteMbCrossSectionRequest): unknown {
+    const obj: any = {};
+    if (message.mbcsId !== "") {
+      obj.mbcsId = message.mbcsId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteMbCrossSectionRequest>): DeleteMbCrossSectionRequest {
+    return DeleteMbCrossSectionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteMbCrossSectionRequest>): DeleteMbCrossSectionRequest {
+    const message = createBaseDeleteMbCrossSectionRequest();
+    message.mbcsId = object.mbcsId ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteMbCrossSectionResponse(): DeleteMbCrossSectionResponse {
+  return { base: undefined };
+}
+
+export const DeleteMbCrossSectionResponse: MessageFns<DeleteMbCrossSectionResponse> = {
+  encode(message: DeleteMbCrossSectionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteMbCrossSectionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteMbCrossSectionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteMbCrossSectionResponse {
+    return { base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined };
+  },
+
+  toJSON(message: DeleteMbCrossSectionResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteMbCrossSectionResponse>): DeleteMbCrossSectionResponse {
+    return DeleteMbCrossSectionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteMbCrossSectionResponse>): DeleteMbCrossSectionResponse {
+    const message = createBaseDeleteMbCrossSectionResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreateMbCrossSectionFactorRequest(): CreateMbCrossSectionFactorRequest {
+  return { fromCode: "", toCode: "", factor: 0, operation: "", note: "", isActive: false };
+}
+
+export const CreateMbCrossSectionFactorRequest: MessageFns<CreateMbCrossSectionFactorRequest> = {
+  encode(message: CreateMbCrossSectionFactorRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.fromCode !== "") {
+      writer.uint32(10).string(message.fromCode);
+    }
+    if (message.toCode !== "") {
+      writer.uint32(18).string(message.toCode);
+    }
+    if (message.factor !== 0) {
+      writer.uint32(25).double(message.factor);
+    }
+    if (message.operation !== "") {
+      writer.uint32(34).string(message.operation);
+    }
+    if (message.note !== "") {
+      writer.uint32(42).string(message.note);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(48).bool(message.isActive);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateMbCrossSectionFactorRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateMbCrossSectionFactorRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.fromCode = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.toCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 25) {
+            break;
+          }
+
+          message.factor = reader.double();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.operation = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.note = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateMbCrossSectionFactorRequest {
+    return {
+      fromCode: isSet(object.fromCode)
+        ? globalThis.String(object.fromCode)
+        : isSet(object.from_code)
+        ? globalThis.String(object.from_code)
+        : "",
+      toCode: isSet(object.toCode)
+        ? globalThis.String(object.toCode)
+        : isSet(object.to_code)
+        ? globalThis.String(object.to_code)
+        : "",
+      factor: isSet(object.factor) ? globalThis.Number(object.factor) : 0,
+      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+      note: isSet(object.note) ? globalThis.String(object.note) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+    };
+  },
+
+  toJSON(message: CreateMbCrossSectionFactorRequest): unknown {
+    const obj: any = {};
+    if (message.fromCode !== "") {
+      obj.fromCode = message.fromCode;
+    }
+    if (message.toCode !== "") {
+      obj.toCode = message.toCode;
+    }
+    if (message.factor !== 0) {
+      obj.factor = message.factor;
+    }
+    if (message.operation !== "") {
+      obj.operation = message.operation;
+    }
+    if (message.note !== "") {
+      obj.note = message.note;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateMbCrossSectionFactorRequest>): CreateMbCrossSectionFactorRequest {
+    return CreateMbCrossSectionFactorRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateMbCrossSectionFactorRequest>): CreateMbCrossSectionFactorRequest {
+    const message = createBaseCreateMbCrossSectionFactorRequest();
+    message.fromCode = object.fromCode ?? "";
+    message.toCode = object.toCode ?? "";
+    message.factor = object.factor ?? 0;
+    message.operation = object.operation ?? "";
+    message.note = object.note ?? "";
+    message.isActive = object.isActive ?? false;
+    return message;
+  },
+};
+
+function createBaseCreateMbCrossSectionFactorResponse(): CreateMbCrossSectionFactorResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const CreateMbCrossSectionFactorResponse: MessageFns<CreateMbCrossSectionFactorResponse> = {
+  encode(message: CreateMbCrossSectionFactorResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSectionFactor.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateMbCrossSectionFactorResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateMbCrossSectionFactorResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSectionFactor.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateMbCrossSectionFactorResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSectionFactor.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: CreateMbCrossSectionFactorResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSectionFactor.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateMbCrossSectionFactorResponse>): CreateMbCrossSectionFactorResponse {
+    return CreateMbCrossSectionFactorResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateMbCrossSectionFactorResponse>): CreateMbCrossSectionFactorResponse {
+    const message = createBaseCreateMbCrossSectionFactorResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSectionFactor.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetMbCrossSectionFactorRequest(): GetMbCrossSectionFactorRequest {
+  return { mbcfId: "" };
+}
+
+export const GetMbCrossSectionFactorRequest: MessageFns<GetMbCrossSectionFactorRequest> = {
+  encode(message: GetMbCrossSectionFactorRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcfId !== "") {
+      writer.uint32(10).string(message.mbcfId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetMbCrossSectionFactorRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetMbCrossSectionFactorRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcfId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetMbCrossSectionFactorRequest {
+    return {
+      mbcfId: isSet(object.mbcfId)
+        ? globalThis.String(object.mbcfId)
+        : isSet(object.mbcf_id)
+        ? globalThis.String(object.mbcf_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetMbCrossSectionFactorRequest): unknown {
+    const obj: any = {};
+    if (message.mbcfId !== "") {
+      obj.mbcfId = message.mbcfId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetMbCrossSectionFactorRequest>): GetMbCrossSectionFactorRequest {
+    return GetMbCrossSectionFactorRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetMbCrossSectionFactorRequest>): GetMbCrossSectionFactorRequest {
+    const message = createBaseGetMbCrossSectionFactorRequest();
+    message.mbcfId = object.mbcfId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetMbCrossSectionFactorResponse(): GetMbCrossSectionFactorResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const GetMbCrossSectionFactorResponse: MessageFns<GetMbCrossSectionFactorResponse> = {
+  encode(message: GetMbCrossSectionFactorResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSectionFactor.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetMbCrossSectionFactorResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetMbCrossSectionFactorResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSectionFactor.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetMbCrossSectionFactorResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSectionFactor.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: GetMbCrossSectionFactorResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSectionFactor.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetMbCrossSectionFactorResponse>): GetMbCrossSectionFactorResponse {
+    return GetMbCrossSectionFactorResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetMbCrossSectionFactorResponse>): GetMbCrossSectionFactorResponse {
+    const message = createBaseGetMbCrossSectionFactorResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSectionFactor.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListMbCrossSectionFactorRequest(): ListMbCrossSectionFactorRequest {
+  return { page: 0, pageSize: 0, search: "", sortBy: "", sortDir: "", activeFilter: 0, fromCode: "", toCode: "" };
+}
+
+export const ListMbCrossSectionFactorRequest: MessageFns<ListMbCrossSectionFactorRequest> = {
+  encode(message: ListMbCrossSectionFactorRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.page !== 0) {
+      writer.uint32(8).int32(message.page);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).int32(message.pageSize);
+    }
+    if (message.search !== "") {
+      writer.uint32(26).string(message.search);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(34).string(message.sortBy);
+    }
+    if (message.sortDir !== "") {
+      writer.uint32(42).string(message.sortDir);
+    }
+    if (message.activeFilter !== 0) {
+      writer.uint32(48).int32(message.activeFilter);
+    }
+    if (message.fromCode !== "") {
+      writer.uint32(58).string(message.fromCode);
+    }
+    if (message.toCode !== "") {
+      writer.uint32(66).string(message.toCode);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListMbCrossSectionFactorRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListMbCrossSectionFactorRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sortDir = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.activeFilter = reader.int32() as any;
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.fromCode = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.toCode = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListMbCrossSectionFactorRequest {
+    return {
+      page: isSet(object.page) ? globalThis.Number(object.page) : 0,
+      pageSize: isSet(object.pageSize)
+        ? globalThis.Number(object.pageSize)
+        : isSet(object.page_size)
+        ? globalThis.Number(object.page_size)
+        : 0,
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      sortBy: isSet(object.sortBy)
+        ? globalThis.String(object.sortBy)
+        : isSet(object.sort_by)
+        ? globalThis.String(object.sort_by)
+        : "",
+      sortDir: isSet(object.sortDir)
+        ? globalThis.String(object.sortDir)
+        : isSet(object.sort_dir)
+        ? globalThis.String(object.sort_dir)
+        : "",
+      activeFilter: isSet(object.activeFilter)
+        ? activeFilterFromJSON(object.activeFilter)
+        : isSet(object.active_filter)
+        ? activeFilterFromJSON(object.active_filter)
+        : 0,
+      fromCode: isSet(object.fromCode)
+        ? globalThis.String(object.fromCode)
+        : isSet(object.from_code)
+        ? globalThis.String(object.from_code)
+        : "",
+      toCode: isSet(object.toCode)
+        ? globalThis.String(object.toCode)
+        : isSet(object.to_code)
+        ? globalThis.String(object.to_code)
+        : "",
+    };
+  },
+
+  toJSON(message: ListMbCrossSectionFactorRequest): unknown {
+    const obj: any = {};
+    if (message.page !== 0) {
+      obj.page = Math.round(message.page);
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.sortBy !== "") {
+      obj.sortBy = message.sortBy;
+    }
+    if (message.sortDir !== "") {
+      obj.sortDir = message.sortDir;
+    }
+    if (message.activeFilter !== 0) {
+      obj.activeFilter = activeFilterToJSON(message.activeFilter);
+    }
+    if (message.fromCode !== "") {
+      obj.fromCode = message.fromCode;
+    }
+    if (message.toCode !== "") {
+      obj.toCode = message.toCode;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListMbCrossSectionFactorRequest>): ListMbCrossSectionFactorRequest {
+    return ListMbCrossSectionFactorRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListMbCrossSectionFactorRequest>): ListMbCrossSectionFactorRequest {
+    const message = createBaseListMbCrossSectionFactorRequest();
+    message.page = object.page ?? 0;
+    message.pageSize = object.pageSize ?? 0;
+    message.search = object.search ?? "";
+    message.sortBy = object.sortBy ?? "";
+    message.sortDir = object.sortDir ?? "";
+    message.activeFilter = object.activeFilter ?? 0;
+    message.fromCode = object.fromCode ?? "";
+    message.toCode = object.toCode ?? "";
+    return message;
+  },
+};
+
+function createBaseListMbCrossSectionFactorResponse(): ListMbCrossSectionFactorResponse {
+  return { base: undefined, data: [], pagination: undefined };
+}
+
+export const ListMbCrossSectionFactorResponse: MessageFns<ListMbCrossSectionFactorResponse> = {
+  encode(message: ListMbCrossSectionFactorResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      MbCrossSectionFactor.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.pagination !== undefined) {
+      PaginationResponse.encode(message.pagination, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListMbCrossSectionFactorResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListMbCrossSectionFactorResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(MbCrossSectionFactor.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pagination = PaginationResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListMbCrossSectionFactorResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => MbCrossSectionFactor.fromJSON(e)) : [],
+      pagination: isSet(object.pagination) ? PaginationResponse.fromJSON(object.pagination) : undefined,
+    };
+  },
+
+  toJSON(message: ListMbCrossSectionFactorResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => MbCrossSectionFactor.toJSON(e));
+    }
+    if (message.pagination !== undefined) {
+      obj.pagination = PaginationResponse.toJSON(message.pagination);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListMbCrossSectionFactorResponse>): ListMbCrossSectionFactorResponse {
+    return ListMbCrossSectionFactorResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListMbCrossSectionFactorResponse>): ListMbCrossSectionFactorResponse {
+    const message = createBaseListMbCrossSectionFactorResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => MbCrossSectionFactor.fromPartial(e)) || [];
+    message.pagination = (object.pagination !== undefined && object.pagination !== null)
+      ? PaginationResponse.fromPartial(object.pagination)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateMbCrossSectionFactorRequest(): UpdateMbCrossSectionFactorRequest {
+  return { mbcfId: "", factor: 0, operation: "", note: "", isActive: false };
+}
+
+export const UpdateMbCrossSectionFactorRequest: MessageFns<UpdateMbCrossSectionFactorRequest> = {
+  encode(message: UpdateMbCrossSectionFactorRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcfId !== "") {
+      writer.uint32(10).string(message.mbcfId);
+    }
+    if (message.factor !== 0) {
+      writer.uint32(17).double(message.factor);
+    }
+    if (message.operation !== "") {
+      writer.uint32(26).string(message.operation);
+    }
+    if (message.note !== "") {
+      writer.uint32(34).string(message.note);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(40).bool(message.isActive);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateMbCrossSectionFactorRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateMbCrossSectionFactorRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcfId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 17) {
+            break;
+          }
+
+          message.factor = reader.double();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.operation = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.note = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateMbCrossSectionFactorRequest {
+    return {
+      mbcfId: isSet(object.mbcfId)
+        ? globalThis.String(object.mbcfId)
+        : isSet(object.mbcf_id)
+        ? globalThis.String(object.mbcf_id)
+        : "",
+      factor: isSet(object.factor) ? globalThis.Number(object.factor) : 0,
+      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+      note: isSet(object.note) ? globalThis.String(object.note) : "",
+      isActive: isSet(object.isActive)
+        ? globalThis.Boolean(object.isActive)
+        : isSet(object.is_active)
+        ? globalThis.Boolean(object.is_active)
+        : false,
+    };
+  },
+
+  toJSON(message: UpdateMbCrossSectionFactorRequest): unknown {
+    const obj: any = {};
+    if (message.mbcfId !== "") {
+      obj.mbcfId = message.mbcfId;
+    }
+    if (message.factor !== 0) {
+      obj.factor = message.factor;
+    }
+    if (message.operation !== "") {
+      obj.operation = message.operation;
+    }
+    if (message.note !== "") {
+      obj.note = message.note;
+    }
+    if (message.isActive !== false) {
+      obj.isActive = message.isActive;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateMbCrossSectionFactorRequest>): UpdateMbCrossSectionFactorRequest {
+    return UpdateMbCrossSectionFactorRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateMbCrossSectionFactorRequest>): UpdateMbCrossSectionFactorRequest {
+    const message = createBaseUpdateMbCrossSectionFactorRequest();
+    message.mbcfId = object.mbcfId ?? "";
+    message.factor = object.factor ?? 0;
+    message.operation = object.operation ?? "";
+    message.note = object.note ?? "";
+    message.isActive = object.isActive ?? false;
+    return message;
+  },
+};
+
+function createBaseUpdateMbCrossSectionFactorResponse(): UpdateMbCrossSectionFactorResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UpdateMbCrossSectionFactorResponse: MessageFns<UpdateMbCrossSectionFactorResponse> = {
+  encode(message: UpdateMbCrossSectionFactorResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MbCrossSectionFactor.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateMbCrossSectionFactorResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateMbCrossSectionFactorResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MbCrossSectionFactor.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateMbCrossSectionFactorResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MbCrossSectionFactor.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UpdateMbCrossSectionFactorResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MbCrossSectionFactor.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateMbCrossSectionFactorResponse>): UpdateMbCrossSectionFactorResponse {
+    return UpdateMbCrossSectionFactorResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateMbCrossSectionFactorResponse>): UpdateMbCrossSectionFactorResponse {
+    const message = createBaseUpdateMbCrossSectionFactorResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? MbCrossSectionFactor.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteMbCrossSectionFactorRequest(): DeleteMbCrossSectionFactorRequest {
+  return { mbcfId: "" };
+}
+
+export const DeleteMbCrossSectionFactorRequest: MessageFns<DeleteMbCrossSectionFactorRequest> = {
+  encode(message: DeleteMbCrossSectionFactorRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbcfId !== "") {
+      writer.uint32(10).string(message.mbcfId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteMbCrossSectionFactorRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteMbCrossSectionFactorRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbcfId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteMbCrossSectionFactorRequest {
+    return {
+      mbcfId: isSet(object.mbcfId)
+        ? globalThis.String(object.mbcfId)
+        : isSet(object.mbcf_id)
+        ? globalThis.String(object.mbcf_id)
+        : "",
+    };
+  },
+
+  toJSON(message: DeleteMbCrossSectionFactorRequest): unknown {
+    const obj: any = {};
+    if (message.mbcfId !== "") {
+      obj.mbcfId = message.mbcfId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteMbCrossSectionFactorRequest>): DeleteMbCrossSectionFactorRequest {
+    return DeleteMbCrossSectionFactorRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteMbCrossSectionFactorRequest>): DeleteMbCrossSectionFactorRequest {
+    const message = createBaseDeleteMbCrossSectionFactorRequest();
+    message.mbcfId = object.mbcfId ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteMbCrossSectionFactorResponse(): DeleteMbCrossSectionFactorResponse {
+  return { base: undefined };
+}
+
+export const DeleteMbCrossSectionFactorResponse: MessageFns<DeleteMbCrossSectionFactorResponse> = {
+  encode(message: DeleteMbCrossSectionFactorResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteMbCrossSectionFactorResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteMbCrossSectionFactorResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteMbCrossSectionFactorResponse {
+    return { base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined };
+  },
+
+  toJSON(message: DeleteMbCrossSectionFactorResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteMbCrossSectionFactorResponse>): DeleteMbCrossSectionFactorResponse {
+    return DeleteMbCrossSectionFactorResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteMbCrossSectionFactorResponse>): DeleteMbCrossSectionFactorResponse {
+    const message = createBaseDeleteMbCrossSectionFactorResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCalculateDozingRequest(): CalculateDozingRequest {
+  return {
+    mode: "",
+    ldrRef: undefined,
+    denierRef: undefined,
+    filamentRef: undefined,
+    denierTarget: undefined,
+    filamentTarget: undefined,
+    ldrSource: undefined,
+    fromCrossSection: undefined,
+    toCrossSection: undefined,
+  };
+}
+
+export const CalculateDozingRequest: MessageFns<CalculateDozingRequest> = {
+  encode(message: CalculateDozingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mode !== "") {
+      writer.uint32(10).string(message.mode);
+    }
+    if (message.ldrRef !== undefined) {
+      writer.uint32(17).double(message.ldrRef);
+    }
+    if (message.denierRef !== undefined) {
+      writer.uint32(25).double(message.denierRef);
+    }
+    if (message.filamentRef !== undefined) {
+      writer.uint32(32).int32(message.filamentRef);
+    }
+    if (message.denierTarget !== undefined) {
+      writer.uint32(41).double(message.denierTarget);
+    }
+    if (message.filamentTarget !== undefined) {
+      writer.uint32(48).int32(message.filamentTarget);
+    }
+    if (message.ldrSource !== undefined) {
+      writer.uint32(57).double(message.ldrSource);
+    }
+    if (message.fromCrossSection !== undefined) {
+      writer.uint32(66).string(message.fromCrossSection);
+    }
+    if (message.toCrossSection !== undefined) {
+      writer.uint32(74).string(message.toCrossSection);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CalculateDozingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCalculateDozingRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mode = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 17) {
+            break;
+          }
+
+          message.ldrRef = reader.double();
+          continue;
+        }
+        case 3: {
+          if (tag !== 25) {
+            break;
+          }
+
+          message.denierRef = reader.double();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.filamentRef = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 41) {
+            break;
+          }
+
+          message.denierTarget = reader.double();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.filamentTarget = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 57) {
+            break;
+          }
+
+          message.ldrSource = reader.double();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.fromCrossSection = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.toCrossSection = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CalculateDozingRequest {
+    return {
+      mode: isSet(object.mode) ? globalThis.String(object.mode) : "",
+      ldrRef: isSet(object.ldrRef)
+        ? globalThis.Number(object.ldrRef)
+        : isSet(object.ldr_ref)
+        ? globalThis.Number(object.ldr_ref)
+        : undefined,
+      denierRef: isSet(object.denierRef)
+        ? globalThis.Number(object.denierRef)
+        : isSet(object.denier_ref)
+        ? globalThis.Number(object.denier_ref)
+        : undefined,
+      filamentRef: isSet(object.filamentRef)
+        ? globalThis.Number(object.filamentRef)
+        : isSet(object.filament_ref)
+        ? globalThis.Number(object.filament_ref)
+        : undefined,
+      denierTarget: isSet(object.denierTarget)
+        ? globalThis.Number(object.denierTarget)
+        : isSet(object.denier_target)
+        ? globalThis.Number(object.denier_target)
+        : undefined,
+      filamentTarget: isSet(object.filamentTarget)
+        ? globalThis.Number(object.filamentTarget)
+        : isSet(object.filament_target)
+        ? globalThis.Number(object.filament_target)
+        : undefined,
+      ldrSource: isSet(object.ldrSource)
+        ? globalThis.Number(object.ldrSource)
+        : isSet(object.ldr_source)
+        ? globalThis.Number(object.ldr_source)
+        : undefined,
+      fromCrossSection: isSet(object.fromCrossSection)
+        ? globalThis.String(object.fromCrossSection)
+        : isSet(object.from_cross_section)
+        ? globalThis.String(object.from_cross_section)
+        : undefined,
+      toCrossSection: isSet(object.toCrossSection)
+        ? globalThis.String(object.toCrossSection)
+        : isSet(object.to_cross_section)
+        ? globalThis.String(object.to_cross_section)
+        : undefined,
+    };
+  },
+
+  toJSON(message: CalculateDozingRequest): unknown {
+    const obj: any = {};
+    if (message.mode !== "") {
+      obj.mode = message.mode;
+    }
+    if (message.ldrRef !== undefined) {
+      obj.ldrRef = message.ldrRef;
+    }
+    if (message.denierRef !== undefined) {
+      obj.denierRef = message.denierRef;
+    }
+    if (message.filamentRef !== undefined) {
+      obj.filamentRef = Math.round(message.filamentRef);
+    }
+    if (message.denierTarget !== undefined) {
+      obj.denierTarget = message.denierTarget;
+    }
+    if (message.filamentTarget !== undefined) {
+      obj.filamentTarget = Math.round(message.filamentTarget);
+    }
+    if (message.ldrSource !== undefined) {
+      obj.ldrSource = message.ldrSource;
+    }
+    if (message.fromCrossSection !== undefined) {
+      obj.fromCrossSection = message.fromCrossSection;
+    }
+    if (message.toCrossSection !== undefined) {
+      obj.toCrossSection = message.toCrossSection;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CalculateDozingRequest>): CalculateDozingRequest {
+    return CalculateDozingRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CalculateDozingRequest>): CalculateDozingRequest {
+    const message = createBaseCalculateDozingRequest();
+    message.mode = object.mode ?? "";
+    message.ldrRef = object.ldrRef ?? undefined;
+    message.denierRef = object.denierRef ?? undefined;
+    message.filamentRef = object.filamentRef ?? undefined;
+    message.denierTarget = object.denierTarget ?? undefined;
+    message.filamentTarget = object.filamentTarget ?? undefined;
+    message.ldrSource = object.ldrSource ?? undefined;
+    message.fromCrossSection = object.fromCrossSection ?? undefined;
+    message.toCrossSection = object.toCrossSection ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCalculateDozingResponse(): CalculateDozingResponse {
+  return { base: undefined, resultLdr: undefined, formulaCode: "", calculationTrace: "", factorAvailable: false };
+}
+
+export const CalculateDozingResponse: MessageFns<CalculateDozingResponse> = {
+  encode(message: CalculateDozingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.resultLdr !== undefined) {
+      writer.uint32(17).double(message.resultLdr);
+    }
+    if (message.formulaCode !== "") {
+      writer.uint32(26).string(message.formulaCode);
+    }
+    if (message.calculationTrace !== "") {
+      writer.uint32(34).string(message.calculationTrace);
+    }
+    if (message.factorAvailable !== false) {
+      writer.uint32(40).bool(message.factorAvailable);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CalculateDozingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCalculateDozingResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 17) {
+            break;
+          }
+
+          message.resultLdr = reader.double();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.formulaCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.calculationTrace = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.factorAvailable = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CalculateDozingResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      resultLdr: isSet(object.resultLdr)
+        ? globalThis.Number(object.resultLdr)
+        : isSet(object.result_ldr)
+        ? globalThis.Number(object.result_ldr)
+        : undefined,
+      formulaCode: isSet(object.formulaCode)
+        ? globalThis.String(object.formulaCode)
+        : isSet(object.formula_code)
+        ? globalThis.String(object.formula_code)
+        : "",
+      calculationTrace: isSet(object.calculationTrace)
+        ? globalThis.String(object.calculationTrace)
+        : isSet(object.calculation_trace)
+        ? globalThis.String(object.calculation_trace)
+        : "",
+      factorAvailable: isSet(object.factorAvailable)
+        ? globalThis.Boolean(object.factorAvailable)
+        : isSet(object.factor_available)
+        ? globalThis.Boolean(object.factor_available)
+        : false,
+    };
+  },
+
+  toJSON(message: CalculateDozingResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.resultLdr !== undefined) {
+      obj.resultLdr = message.resultLdr;
+    }
+    if (message.formulaCode !== "") {
+      obj.formulaCode = message.formulaCode;
+    }
+    if (message.calculationTrace !== "") {
+      obj.calculationTrace = message.calculationTrace;
+    }
+    if (message.factorAvailable !== false) {
+      obj.factorAvailable = message.factorAvailable;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CalculateDozingResponse>): CalculateDozingResponse {
+    return CalculateDozingResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CalculateDozingResponse>): CalculateDozingResponse {
+    const message = createBaseCalculateDozingResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.resultLdr = object.resultLdr ?? undefined;
+    message.formulaCode = object.formulaCode ?? "";
+    message.calculationTrace = object.calculationTrace ?? "";
+    message.factorAvailable = object.factorAvailable ?? false;
+    return message;
+  },
+};
+
+function createBasePreviewDozingImpactRequest(): PreviewDozingImpactRequest {
+  return { mbsId: "", limit: 0 };
+}
+
+export const PreviewDozingImpactRequest: MessageFns<PreviewDozingImpactRequest> = {
+  encode(message: PreviewDozingImpactRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbsId !== "") {
+      writer.uint32(18).string(message.mbsId);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(24).int32(message.limit);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewDozingImpactRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePreviewDozingImpactRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbsId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PreviewDozingImpactRequest {
+    return {
+      mbsId: isSet(object.mbsId)
+        ? globalThis.String(object.mbsId)
+        : isSet(object.mbs_id)
+        ? globalThis.String(object.mbs_id)
+        : "",
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+    };
+  },
+
+  toJSON(message: PreviewDozingImpactRequest): unknown {
+    const obj: any = {};
+    if (message.mbsId !== "") {
+      obj.mbsId = message.mbsId;
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PreviewDozingImpactRequest>): PreviewDozingImpactRequest {
+    return PreviewDozingImpactRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PreviewDozingImpactRequest>): PreviewDozingImpactRequest {
+    const message = createBasePreviewDozingImpactRequest();
+    message.mbsId = object.mbsId ?? "";
+    message.limit = object.limit ?? 0;
+    return message;
+  },
+};
+
+function createBaseDozingImpactRow(): DozingImpactRow {
+  return { cpmProductSysId: 0, cpmProductCode: "", cpmProductName: "", cpmIsLocked: false, frozenDozing: undefined };
+}
+
+export const DozingImpactRow: MessageFns<DozingImpactRow> = {
+  encode(message: DozingImpactRow, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.cpmProductSysId !== 0) {
+      writer.uint32(8).int64(message.cpmProductSysId);
+    }
+    if (message.cpmProductCode !== "") {
+      writer.uint32(18).string(message.cpmProductCode);
+    }
+    if (message.cpmProductName !== "") {
+      writer.uint32(26).string(message.cpmProductName);
+    }
+    if (message.cpmIsLocked !== false) {
+      writer.uint32(32).bool(message.cpmIsLocked);
+    }
+    if (message.frozenDozing !== undefined) {
+      writer.uint32(49).double(message.frozenDozing);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DozingImpactRow {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDozingImpactRow();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.cpmProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.cpmProductCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.cpmProductName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.cpmIsLocked = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 49) {
+            break;
+          }
+
+          message.frozenDozing = reader.double();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DozingImpactRow {
+    return {
+      cpmProductSysId: isSet(object.cpmProductSysId)
+        ? globalThis.Number(object.cpmProductSysId)
+        : isSet(object.cpm_product_sys_id)
+        ? globalThis.Number(object.cpm_product_sys_id)
+        : 0,
+      cpmProductCode: isSet(object.cpmProductCode)
+        ? globalThis.String(object.cpmProductCode)
+        : isSet(object.cpm_product_code)
+        ? globalThis.String(object.cpm_product_code)
+        : "",
+      cpmProductName: isSet(object.cpmProductName)
+        ? globalThis.String(object.cpmProductName)
+        : isSet(object.cpm_product_name)
+        ? globalThis.String(object.cpm_product_name)
+        : "",
+      cpmIsLocked: isSet(object.cpmIsLocked)
+        ? globalThis.Boolean(object.cpmIsLocked)
+        : isSet(object.cpm_is_locked)
+        ? globalThis.Boolean(object.cpm_is_locked)
+        : false,
+      frozenDozing: isSet(object.frozenDozing)
+        ? globalThis.Number(object.frozenDozing)
+        : isSet(object.frozen_dozing)
+        ? globalThis.Number(object.frozen_dozing)
+        : undefined,
+    };
+  },
+
+  toJSON(message: DozingImpactRow): unknown {
+    const obj: any = {};
+    if (message.cpmProductSysId !== 0) {
+      obj.cpmProductSysId = Math.round(message.cpmProductSysId);
+    }
+    if (message.cpmProductCode !== "") {
+      obj.cpmProductCode = message.cpmProductCode;
+    }
+    if (message.cpmProductName !== "") {
+      obj.cpmProductName = message.cpmProductName;
+    }
+    if (message.cpmIsLocked !== false) {
+      obj.cpmIsLocked = message.cpmIsLocked;
+    }
+    if (message.frozenDozing !== undefined) {
+      obj.frozenDozing = message.frozenDozing;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DozingImpactRow>): DozingImpactRow {
+    return DozingImpactRow.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DozingImpactRow>): DozingImpactRow {
+    const message = createBaseDozingImpactRow();
+    message.cpmProductSysId = object.cpmProductSysId ?? 0;
+    message.cpmProductCode = object.cpmProductCode ?? "";
+    message.cpmProductName = object.cpmProductName ?? "";
+    message.cpmIsLocked = object.cpmIsLocked ?? false;
+    message.frozenDozing = object.frozenDozing ?? undefined;
+    return message;
+  },
+};
+
+function createBasePreviewDozingImpactResponse(): PreviewDozingImpactResponse {
+  return { base: undefined, data: [], totalAffected: 0, totalLocked: 0, truncated: false, note: "" };
+}
+
+export const PreviewDozingImpactResponse: MessageFns<PreviewDozingImpactResponse> = {
+  encode(message: PreviewDozingImpactResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      DozingImpactRow.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.totalAffected !== 0) {
+      writer.uint32(24).int32(message.totalAffected);
+    }
+    if (message.totalLocked !== 0) {
+      writer.uint32(32).int32(message.totalLocked);
+    }
+    if (message.truncated !== false) {
+      writer.uint32(40).bool(message.truncated);
+    }
+    if (message.note !== "") {
+      writer.uint32(50).string(message.note);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewDozingImpactResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePreviewDozingImpactResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(DozingImpactRow.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.totalAffected = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.totalLocked = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.truncated = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.note = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PreviewDozingImpactResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => DozingImpactRow.fromJSON(e)) : [],
+      totalAffected: isSet(object.totalAffected)
+        ? globalThis.Number(object.totalAffected)
+        : isSet(object.total_affected)
+        ? globalThis.Number(object.total_affected)
+        : 0,
+      totalLocked: isSet(object.totalLocked)
+        ? globalThis.Number(object.totalLocked)
+        : isSet(object.total_locked)
+        ? globalThis.Number(object.total_locked)
+        : 0,
+      truncated: isSet(object.truncated) ? globalThis.Boolean(object.truncated) : false,
+      note: isSet(object.note) ? globalThis.String(object.note) : "",
+    };
+  },
+
+  toJSON(message: PreviewDozingImpactResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => DozingImpactRow.toJSON(e));
+    }
+    if (message.totalAffected !== 0) {
+      obj.totalAffected = Math.round(message.totalAffected);
+    }
+    if (message.totalLocked !== 0) {
+      obj.totalLocked = Math.round(message.totalLocked);
+    }
+    if (message.truncated !== false) {
+      obj.truncated = message.truncated;
+    }
+    if (message.note !== "") {
+      obj.note = message.note;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PreviewDozingImpactResponse>): PreviewDozingImpactResponse {
+    return PreviewDozingImpactResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PreviewDozingImpactResponse>): PreviewDozingImpactResponse {
+    const message = createBasePreviewDozingImpactResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => DozingImpactRow.fromPartial(e)) || [];
+    message.totalAffected = object.totalAffected ?? 0;
+    message.totalLocked = object.totalLocked ?? 0;
+    message.truncated = object.truncated ?? false;
+    message.note = object.note ?? "";
+    return message;
+  },
+};
+
 /** MachineService manages yarn machine master data. */
 export type MachineServiceDefinition = typeof MachineServiceDefinition;
 export const MachineServiceDefinition = {
@@ -30045,6 +36277,18 @@ export const MBHeadServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * ExportMBRecipeFull exports the denormalized full MB recipe (recipe + composition
+     * + MB cost) to Excel, one row per composition line.
+     */
+    exportMBRecipeFull: {
+      name: "ExportMBRecipeFull",
+      requestType: ExportMBRecipeFullRequest,
+      requestStream: false,
+      responseType: ExportMBRecipeFullResponse,
+      responseStream: false,
+      options: {},
+    },
     /** ImportMBHeads imports MB Head records from Excel. */
     importMBHeads: {
       name: "ImportMBHeads",
@@ -30105,6 +36349,61 @@ export const MBHeadServiceDefinition = {
       requestType: RevokeMBHeadRequest,
       requestStream: false,
       responseType: RevokeMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** RejectMBHead rejects a submitted MB Head (K-2). Reason is required. */
+    rejectMBHead: {
+      name: "RejectMBHead",
+      requestType: RejectMBHeadRequest,
+      requestStream: false,
+      responseType: RejectMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ReturnMBHeadToDraft returns a rejected MB Head back to draft (K-29). Reason is optional; when empty the existing state_reason is preserved. */
+    returnMBHeadToDraft: {
+      name: "ReturnMBHeadToDraft",
+      requestType: ReturnMBHeadToDraftRequest,
+      requestStream: false,
+      responseType: ReturnMBHeadToDraftResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * RequestUnlockMBHead parks a locked MB Head (APPROVED/VALIDATED) in UNLOCK_REQUESTED
+     * so an approver can decide (P10). Reason is REQUIRED — an unlock reopens content that
+     * was already approved, so the record must say why.
+     */
+    requestUnlockMBHead: {
+      name: "RequestUnlockMBHead",
+      requestType: RequestUnlockMBHeadRequest,
+      requestStream: false,
+      responseType: RequestUnlockMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * GrantUnlockMBHead approves a pending unlock request: the MB Head is unlocked and
+     * returns to DRAFT for editing (P10).
+     */
+    grantUnlockMBHead: {
+      name: "GrantUnlockMBHead",
+      requestType: GrantUnlockMBHeadRequest,
+      requestStream: false,
+      responseType: GrantUnlockMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * RejectUnlockMBHead refuses a pending unlock request: the MB Head stays locked and
+     * returns to the state it was parked from (P10, K-52). Reason is REQUIRED.
+     */
+    rejectUnlockMBHead: {
+      name: "RejectUnlockMBHead",
+      requestType: RejectUnlockMBHeadRequest,
+      requestStream: false,
+      responseType: RejectUnlockMBHeadResponse,
       responseStream: false,
       options: {},
     },
@@ -30186,6 +36485,21 @@ export const MBSpinServiceDefinition = {
       requestType: DownloadMBSpinTemplateRequest,
       requestStream: false,
       responseType: DownloadMBSpinTemplateResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * DuplicateMBSpin clones an MB Spin under the same head (decision D19: the
+     * clone is born with mbs_oracle_sys_id, mbs_orion_item_code and
+     * mbs_mb_costing NULL, and mbs_status = 'R and D'). Recalculates eligible
+     * child spins one level deep and reports the skipped ones; it does NOT
+     * recalculate yarn products (D24) — the response carries a preview only.
+     */
+    duplicateMBSpin: {
+      name: "DuplicateMBSpin",
+      requestType: DuplicateMBSpinRequest,
+      requestStream: false,
+      responseType: DuplicateMBSpinResponse,
       responseStream: false,
       options: {},
     },
@@ -30622,6 +36936,144 @@ export const MbBatchServiceDefinition = {
       requestType: TriggerMbBatchRequest,
       requestStream: false,
       responseType: TriggerMbBatchResponse,
+      responseStream: false,
+      options: {},
+    },
+  },
+} as const;
+
+/** MbCrossSectionService manages MB cross-section master data. */
+export type MbCrossSectionServiceDefinition = typeof MbCrossSectionServiceDefinition;
+export const MbCrossSectionServiceDefinition = {
+  name: "MbCrossSectionService",
+  fullName: "finance.v1.MbCrossSectionService",
+  methods: {
+    /** CreateMbCrossSection creates a new MB cross-section master record. */
+    createMbCrossSection: {
+      name: "CreateMbCrossSection",
+      requestType: CreateMbCrossSectionRequest,
+      requestStream: false,
+      responseType: CreateMbCrossSectionResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetMbCrossSection retrieves an MB cross-section master record by ID. */
+    getMbCrossSection: {
+      name: "GetMbCrossSection",
+      requestType: GetMbCrossSectionRequest,
+      requestStream: false,
+      responseType: GetMbCrossSectionResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ListMbCrossSection lists MB cross-section master records with search and pagination. */
+    listMbCrossSection: {
+      name: "ListMbCrossSection",
+      requestType: ListMbCrossSectionRequest,
+      requestStream: false,
+      responseType: ListMbCrossSectionResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** UpdateMbCrossSection updates an existing MB cross-section master record. */
+    updateMbCrossSection: {
+      name: "UpdateMbCrossSection",
+      requestType: UpdateMbCrossSectionRequest,
+      requestStream: false,
+      responseType: UpdateMbCrossSectionResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** DeleteMbCrossSection deletes an MB cross-section master record. */
+    deleteMbCrossSection: {
+      name: "DeleteMbCrossSection",
+      requestType: DeleteMbCrossSectionRequest,
+      requestStream: false,
+      responseType: DeleteMbCrossSectionResponse,
+      responseStream: false,
+      options: {},
+    },
+  },
+} as const;
+
+/** MbCrossSectionFactorService manages MB cross-section conversion factors. */
+export type MbCrossSectionFactorServiceDefinition = typeof MbCrossSectionFactorServiceDefinition;
+export const MbCrossSectionFactorServiceDefinition = {
+  name: "MbCrossSectionFactorService",
+  fullName: "finance.v1.MbCrossSectionFactorService",
+  methods: {
+    /** CreateMbCrossSectionFactor creates a new cross-section conversion factor. */
+    createMbCrossSectionFactor: {
+      name: "CreateMbCrossSectionFactor",
+      requestType: CreateMbCrossSectionFactorRequest,
+      requestStream: false,
+      responseType: CreateMbCrossSectionFactorResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetMbCrossSectionFactor retrieves a cross-section conversion factor by ID. */
+    getMbCrossSectionFactor: {
+      name: "GetMbCrossSectionFactor",
+      requestType: GetMbCrossSectionFactorRequest,
+      requestStream: false,
+      responseType: GetMbCrossSectionFactorResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ListMbCrossSectionFactor lists cross-section conversion factors with search and pagination. */
+    listMbCrossSectionFactor: {
+      name: "ListMbCrossSectionFactor",
+      requestType: ListMbCrossSectionFactorRequest,
+      requestStream: false,
+      responseType: ListMbCrossSectionFactorResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** UpdateMbCrossSectionFactor updates an existing cross-section conversion factor. */
+    updateMbCrossSectionFactor: {
+      name: "UpdateMbCrossSectionFactor",
+      requestType: UpdateMbCrossSectionFactorRequest,
+      requestStream: false,
+      responseType: UpdateMbCrossSectionFactorResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** DeleteMbCrossSectionFactor deletes a cross-section conversion factor. */
+    deleteMbCrossSectionFactor: {
+      name: "DeleteMbCrossSectionFactor",
+      requestType: DeleteMbCrossSectionFactorRequest,
+      requestStream: false,
+      responseType: DeleteMbCrossSectionFactorResponse,
+      responseStream: false,
+      options: {},
+    },
+  },
+} as const;
+
+/**
+ * MBDozingService provides read-only MB dozing (LDR) calculation and impact
+ * preview. No RPC in this service persists anything.
+ */
+export type MBDozingServiceDefinition = typeof MBDozingServiceDefinition;
+export const MBDozingServiceDefinition = {
+  name: "MBDozingService",
+  fullName: "finance.v1.MBDozingService",
+  methods: {
+    /** CalculateDozing computes a target LDR without persisting anything. */
+    calculateDozing: {
+      name: "CalculateDozing",
+      requestType: CalculateDozingRequest,
+      requestStream: false,
+      responseType: CalculateDozingResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** PreviewDozingImpact lists products that would be affected by a dozing change. */
+    previewDozingImpact: {
+      name: "PreviewDozingImpact",
+      requestType: PreviewDozingImpactRequest,
+      requestStream: false,
+      responseType: PreviewDozingImpactResponse,
       responseStream: false,
       options: {},
     },

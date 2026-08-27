@@ -35,11 +35,28 @@ export function MBHeadTable({ data, isLoading, onEdit, onDelete }: MBHeadTablePr
       cell: (row) => row.mbhStatus || <span className="text-muted-foreground">—</span>,
     },
     {
-      id: "mbhCheckStatus",
+      // ⭐ 2026-08-23 — user decision, plan §11 item 42 = option (2). The table
+      // shows the DERIVED column `mbh_check_status_calc`, not the frozen Oracle
+      // `mbh_check_status`. ~~The Oracle trace still exists and is still shown, but
+      // ONLY on the detail page (mb-recipe-form-dialog).~~
+      // ⭐ 2026-08-26 — the Oracle trace is no longer shown ANYWHERE in the UI (the
+      // detail dialog stopped rendering it too); it survives only in the database
+      // as an archive and in the fetched payload. This table is unchanged.
+      id: "mbhCheckStatusCalc",
       header: "Check Status",
-      width: "w-[110px]",
+      width: "w-[130px]",
       hideOnMobile: true,
-      cell: (row) => row.mbhCheckStatus || <span className="text-muted-foreground">—</span>,
+      // 🔴 An absent value is rendered EXPLICITLY as "Belum dihitung", never as an
+      // em dash or a blank: 207 legacy heads keep this column NULL permanently (no
+      // backfill, item 44), and NULL means "never calculated by the application" —
+      // ⛔ not "no status", which is what a dash would imply.
+      cell: (row) => (
+        <span data-testid="mb-head-check-status-calc-cell">
+          {row.mbhCheckStatusCalc?.trim() || (
+            <span className="text-muted-foreground italic">Belum dihitung</span>
+          )}
+        </span>
+      ),
     },
     {
       id: "mbhDenier",

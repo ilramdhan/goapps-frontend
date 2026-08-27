@@ -48,7 +48,9 @@ const formSchema = z.object({
   // D30: mbhDozing is a retired, contaminated legacy column — kept in the schema so the
   // value round-trips untouched, but deliberately NOT rendered in the form. Do not "fix" this.
   mbhDozing: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
-  mbhCheckStatus: z.string().max(50).optional(),
+  // ⛔ mbhCheckStatus REMOVED (plan §11 item 105, decision K-1). `mbh_check_status`
+  // is the FROZEN Oracle import trace — it is read-only on the detail page and must
+  // never be writable from any form. Do not re-add it here.
   mbhStatus: z.string().max(100).optional(),
   mbhLdrPrsn: z.coerce.number().min(0).optional().nullable(),
   mbhRunLdrPct: z.coerce.number().min(0).optional().nullable(),
@@ -83,7 +85,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
     defaultValues: {
       mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "",
       mbhDenier: "", mbhFilament: "", mbhDozing: "",
-      mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
+      mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
       mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
       mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
       mbhIsActive: true,
@@ -101,7 +103,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
               mbhDenier: mbHead.mbhDenier ?? "",
               mbhFilament: mbHead.mbhFilament ?? "",
               mbhDozing: mbHead.mbhDozing ?? "",
-              mbhCheckStatus: mbHead.mbhCheckStatus || "",
               mbhStatus: mbHead.mbhStatus || "",
               mbhLdrPrsn: mbHead.mbhLdrPrsn ?? null,
               mbhRunLdrPct: mbHead.mbhRunLdrPct ?? null,
@@ -118,7 +119,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
             }
           : {
               mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
-              mbhCheckStatus: "", mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
+              mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
               mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
               mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
               mbhIsActive: true,
@@ -140,7 +141,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
             mbhDenier: toOptNum(values.mbhDenier),
             mbhFilament: toOptNum(values.mbhFilament),
             mbhDozing: toOptNum(values.mbhDozing),
-            mbhCheckStatus: values.mbhCheckStatus || undefined,
             mbhStatus: values.mbhStatus || undefined,
             mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
             mbhRunLdrPct: values.mbhRunLdrPct ?? undefined,
@@ -163,7 +163,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
           mbhDenier: toOptNum(values.mbhDenier),
           mbhFilament: toOptNum(values.mbhFilament),
           mbhDozing: toOptNum(values.mbhDozing),
-          mbhCheckStatus: values.mbhCheckStatus || undefined,
           mbhStatus: values.mbhStatus || undefined,
           mbhLdrPrsn: values.mbhLdrPrsn ?? undefined,
           mbhRunLdrPct: values.mbhRunLdrPct ?? undefined,
@@ -301,19 +300,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Optional" disabled={isPending} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="mbhCheckStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Check Status <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Optional" disabled={isPending} />
                       </FormControl>

@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
                 activeFilter: Number(searchParams.get("activeFilter") || searchParams.get("active_filter")) || 0,
                 sortBy: searchParams.get("sortBy") || searchParams.get("sort_by") || "",
                 sortOrder: searchParams.get("sortOrder") || searchParams.get("sort_order") || "",
+                // ⭐ DIPERBARUI 2026-08-26 (R16) — optional reverse-lookup filter by linked
+                // cost product (mst_mb_head.mbh_cost_product_id). 0/absent means no filter.
+                costProductId: Number(searchParams.get("costProductId") || searchParams.get("cost_product_id")) || 0,
             },
             metadata
         )
