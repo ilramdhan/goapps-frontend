@@ -15,6 +15,7 @@ export {
   getSectionClient,
   getOrganizationClient,
   getUomClient,
+  getShadeClient,
   getBiDashboardClient,
   getBiChartDataClient,
   getBiDataSourceClient,
@@ -71,5 +72,8 @@ export {
   getMbPushClient,
   getMbWorkflowLogClient,
   getMbBatchClient,
+  getMbCrossSectionClient,
+  getMbCrossSectionFactorClient,
+  getMBDozingClient,
   getPpcClient,
 } from "./clients"
