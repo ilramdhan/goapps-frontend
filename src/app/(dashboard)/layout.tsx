@@ -107,7 +107,12 @@ export default function DashboardLayout({
                     </div>
                 </header>
                 {/* Main content */}
-                <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-w-0 overflow-x-hidden">
+                {/* overflow-x-clip (not overflow-x-hidden): hidden forces overflow-y:auto per
+                    CSS spec, which makes this div the sticky containing block instead of the
+                    viewport — since it never actually scrolls, that silently kills `sticky`
+                    for any descendant page content (e.g. product-master detail header, R17).
+                    clip gives the same horizontal-overflow protection without that promotion. */}
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-w-0 overflow-x-clip">
                     <main className="flex-1 pt-4 min-w-0 w-full">
                         {children}
                     </main>
