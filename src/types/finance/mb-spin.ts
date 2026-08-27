@@ -65,7 +65,11 @@ export interface ListMBSpinsParams {
   page?: number
   pageSize?: number
   search?: string
-  mbhId?: number
+  // ⭐ DIPERBARUI 2026-08-22 (P11 E1) — widened from `number` to `string | number`.
+  // mbh_id is a UUID; the BFF route already reads this param as a string
+  // (`searchParams.get("mbhId") || ""`), so `number` was never the wire shape.
+  // Widening, not replacing — existing numeric callers still type-check.
+  mbhId?: string | number
   activeFilter?: ActiveFilter
   sortBy?: string
   sortOrder?: string
