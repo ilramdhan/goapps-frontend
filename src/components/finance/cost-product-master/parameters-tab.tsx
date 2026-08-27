@@ -23,7 +23,12 @@ import {
   useRemoveApplicableParam,
 } from "@/hooks/finance/use-cost-product-parameter"
 import { useMbParams } from "@/hooks/finance/use-mb-param"
-import type { RequiredParamEntry, UpsertParamValuePayload } from "@/types/finance/cost-product-parameter"
+import {
+  getMbSpinAmbiguityState,
+  getMbSpinAmbiguityMessage,
+  type RequiredParamEntry,
+  type UpsertParamValuePayload,
+} from "@/types/finance/cost-product-parameter"
 import type { LookupFillValuesResponse } from "@/types/finance/yarn-master"
 import type { RemoveApplicablePreview } from "@/types/finance/lookup-master"
 import { AddParameterDialog } from "./add-parameter-dialog"
@@ -334,6 +339,8 @@ interface ParamRowProps {
 }
 
 function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLookupChange, disabled }: ParamRowProps) {
+  const mbSpinState = getMbSpinAmbiguityState(entry)
+
   return (
     <div className="grid grid-cols-12 gap-3 items-start">
       <div className="col-span-5">
@@ -352,6 +359,17 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
               <span className="text-amber-600"> · LOOKUP({entry.lookupMasterCode})</span>
             )}
           </div>
+          {mbSpinState && (
+            <div className="pt-0.5">
+              <Badge variant="destructive" className="gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {mbSpinState === "ambiguous" ? "Pilih varian" : "Kode tidak ditemukan"}
+              </Badge>
+              <p className="mt-1 text-[11px] normal-case tracking-normal text-muted-foreground">
+                {getMbSpinAmbiguityMessage(mbSpinState, entry.mbSpinCandidateCount)}
+              </p>
+            </div>
+          )}
           {entry.ownerDepartment && (
             <div className="text-[10px] uppercase tracking-wide">
               Owner: {entry.ownerDepartment}

@@ -31,9 +31,17 @@ interface ReasonProps {
   confirmLabel: string
   pending?: boolean
   onConfirm: (reason: string) => void
+  /**
+   * K-29: when true the reason is optional — the confirm button stays enabled with an
+   * empty box and `onConfirm("")` is a valid call. Defaults to `false`, which keeps the
+   * pre-existing mandatory-reason behaviour byte-for-byte for every existing caller
+   * (cost-product-request Reject/Cancel, MB Head Un-approve/Reject/Revoke), so this
+   * shared dialog gains a capability without any current caller changing behaviour.
+   */
+  reasonOptional?: boolean
 }
 
-export function ReasonDialog({ open, onOpenChange, title, description, confirmLabel, pending, onConfirm }: ReasonProps) {
+export function ReasonDialog({ open, onOpenChange, title, description, confirmLabel, pending, onConfirm, reasonOptional = false }: ReasonProps) {
   const [reason, setReason] = useState("")
   return (
     <Dialog
@@ -49,14 +57,18 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="reason-input">Reason *</Label>
+          <Label htmlFor="reason-input">Reason {reasonOptional ? "(optional)" : "*"}</Label>
           <Textarea id="reason-input" rows={4} value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="destructive" disabled={!reason.trim() || pending} onClick={() => onConfirm(reason.trim())}>
+          <Button
+            variant="destructive"
+            disabled={(!reasonOptional && !reason.trim()) || pending}
+            onClick={() => onConfirm(reason.trim())}
+          >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {confirmLabel}
           </Button>
