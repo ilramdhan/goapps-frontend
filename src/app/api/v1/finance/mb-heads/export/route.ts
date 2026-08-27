@@ -9,9 +9,18 @@ export async function GET(request: NextRequest) {
         const metadata = createMetadataFromRequest(request)
         const client = getMBHeadClient()
 
+        // includeRejected defaults to false (exclude REJECTED MB Heads) unless the
+        // caller explicitly asks for "true"/"1" — an absent or any other value must
+        // NOT include rejected documents. Do not use Boolean(param): the string
+        // "false" is truthy and would flip the default the wrong way.
+        const includeRejectedParam =
+            searchParams.get("includeRejected") ?? searchParams.get("include_rejected")
+        const includeRejected = includeRejectedParam === "true" || includeRejectedParam === "1"
+
         const response = await client.exportMBHeads(
             {
                 activeFilter: Number(searchParams.get("activeFilter") || searchParams.get("active_filter")) || 0,
+                includeRejected,
             },
             metadata
         )

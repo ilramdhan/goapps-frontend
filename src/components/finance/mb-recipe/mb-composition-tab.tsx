@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/shared"
 import { useMbCompositions, useDeleteMbComposition } from "@/hooks/finance/use-mb-composition"
 import { useRMGroup } from "@/hooks/finance/use-rm-group"
 import { useMBHead } from "@/hooks/finance/use-mb-head"
+import { isOffMbCompositionTotal, sumMbCompositionPct } from "@/lib/finance/mb-composition-total"
 import { MbCompositionLineDialog } from "./mb-composition-line-dialog"
 import type { MbComposition } from "@/types/finance/mb-composition"
 import type { MBHeadEntryStatus } from "@/types/finance/mb-head"
@@ -36,10 +37,11 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
   // the list refetch lands (the row is still rendered until invalidation resolves).
   const pendingDeleteId = deleteM.isPending ? deleteM.variables : undefined
 
-  const totalPct = useMemo(
-    () => items.reduce((sum, c) => sum + (Number(c.compositionPct) || 0), 0),
-    [items],
-  )
+  // [R22] Non-carrier total, matching the backend's composition-sum rule
+  // (sum_rule.go ValidateSum / sum_enforcement.go pctDelta) — carrier rows do
+  // not count toward the 100% target. Derived at render, not via effect+state.
+  const totalPct = useMemo(() => sumMbCompositionPct(items), [items])
+  const totalOff = isOffMbCompositionTotal(totalPct)
   const nextSeqNo = items.length > 0 ? Math.max(...items.map((c) => c.seqNo)) + 1 : 1
 
   function sourceLabel(c: MbComposition) {
@@ -53,8 +55,8 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-semibold">Composition</CardTitle>
         <div className="flex items-center gap-3">
-          <span className={`text-xs ${Math.abs(totalPct - 100) < 0.01 ? "text-muted-foreground" : "text-destructive font-medium"}`}>
-            Total: {totalPct.toFixed(3)}%
+          <span className={`text-xs ${totalOff ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+            Non-carrier total: {totalPct.toFixed(3)}%
           </span>
           {editable && (
             <Button size="sm" onClick={() => { setEditTarget(null); setDialogOpen(true) }}>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Download, Upload, Loader2 } from "lucide-react"
+import { Plus, Download, Upload, Loader2, FileSpreadsheet } from "lucide-react"
 
 import { PageHeader } from "@/components/common/page-header"
 import { DebouncedSearchInput } from "@/components/common/debounced-search-input"
@@ -13,14 +13,44 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MbRecipeTable, useMbRecipeTableColumns } from "@/components/finance/mb-recipe"
-import { MBHeadFormDialog, MBHeadImportDialog } from "@/components/finance/mb-head"
+import { MbRecipeTable, useMbRecipeTableColumns, MBRecipeFormDialog } from "@/components/finance/mb-recipe"
+import { MBHeadImportDialog } from "@/components/finance/mb-head"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
-import { useMBHeads, useExportMBHeads } from "@/hooks/finance/use-mb-head"
+import { useMBHeads, useExportMBHeads, useExportMBRecipeFull } from "@/hooks/finance/use-mb-head"
 import { useUrlState } from "@/lib/hooks"
-import { ActiveFilter, ACTIVE_FILTER_OPTIONS, type ListMBHeadsParams } from "@/types/finance/mb-head"
+import {
+  ActiveFilter,
+  ACTIVE_FILTER_OPTIONS,
+  type ListMBHeadsParams,
+  type MBRecipeFullCheckStatusCalc,
+} from "@/types/finance/mb-head"
+
+/**
+ * The derived check-status choices offered on the FULL export only.
+ *
+ * ⛔ Deliberately NOT wired into the paginated MB Head list filters (user decision
+ * K-26, form A): the list keeps its existing filter set untouched.
+ *
+ * ⚠ Only "Boughtout", "Approved" and "Waiting" are produced by the backend today.
+ * "Current", "Outdated" and "Rejected" are legal per the CHECK constraint but will
+ * export ZERO ROWS until the corresponding user gates are decided — they are listed
+ * anyway so the option set matches the database contract rather than silently drifting
+ * from it. ⛔ Do not remove them to "clean up" an empty result.
+ */
+const CHECK_STATUS_CALC_EXPORT_OPTIONS: MBRecipeFullCheckStatusCalc[] = [
+  "Waiting",
+  "Current",
+  "Boughtout",
+  "Approved",
+  "Outdated",
+  "Rejected",
+]
 
 const defaultFilters: ListMBHeadsParams = {
   search: "",
@@ -38,6 +68,7 @@ export default function MbRecipePageClient() {
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const exportMutation = useExportMBHeads()
+  const exportFullMutation = useExportMBRecipeFull()
 
   function handleSort(sortKey: string) {
     const nextOrder = filters.sortBy === sortKey && filters.sortOrder === "asc" ? "desc" : "asc"
@@ -55,7 +86,7 @@ export default function MbRecipePageClient() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
-                {exportMutation.isPending ? (
+                {exportMutation.isPending || exportFullMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="mr-2 h-4 w-4" />
@@ -71,6 +102,77 @@ export default function MbRecipePageClient() {
                 <Download className="mr-2 h-4 w-4" />
                 Export to Excel
               </DropdownMenuItem>
+              {/*
+                Audit-only opt-in: includes REJECTED MB Heads in the export. Default
+                path above stays byte-identical (no includeRejected param sent, so the
+                BFF/backend default excludes rejected documents).
+              */}
+              <DropdownMenuItem
+                onClick={() =>
+                  exportMutation.mutate({ activeFilter: filters.activeFilter, includeRejected: true })
+                }
+                disabled={exportMutation.isPending}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export to Excel (Include Rejected — Audit)
+              </DropdownMenuItem>
+              {/*
+                P12 full export: a READ-ONLY report (recipe + composition + MB cost,
+                one row per composition line). Kept as a separate action from
+                "Export to Excel" above, which is the round-trip IMPORT format (D7)
+                and must stay byte-identical.
+              */}
+              <DropdownMenuItem
+                onClick={() => exportFullMutation.mutate({ activeFilter: filters.activeFilter })}
+                disabled={exportFullMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export Full Recipe (with Cost)
+              </DropdownMenuItem>
+              {/*
+                Audit-only opt-in: includes REJECTED MB Heads in the full-recipe export.
+                Default path above stays as-is (no includeRejected param sent, so the
+                BFF/backend default excludes rejected documents).
+              */}
+              <DropdownMenuItem
+                onClick={() =>
+                  exportFullMutation.mutate({ activeFilter: filters.activeFilter, includeRejected: true })
+                }
+                disabled={exportFullMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export Full Recipe (Include Rejected — Audit)
+              </DropdownMenuItem>
+              {/*
+                Optional derived-check-status narrowing for the SAME full export. The
+                plain item above stays the default path and sends NO checkStatusCalc at
+                all, which means ALL rows — the NULL / "Belum dihitung" heads included.
+                Picking a status here EXCLUDES those NULL heads, because SQL equality
+                never matches NULL.
+              */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export Full Recipe by Check Status
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {CHECK_STATUS_CALC_EXPORT_OPTIONS.map((status) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() =>
+                        exportFullMutation.mutate({
+                          activeFilter: filters.activeFilter,
+                          checkStatusCalc: status,
+                        })
+                      }
+                      disabled={exportFullMutation.isPending}
+                    >
+                      {status}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setImportOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Import from Excel
@@ -137,7 +239,7 @@ export default function MbRecipePageClient() {
         />
       )}
 
-      <MBHeadFormDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <MBRecipeFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       <MBHeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )

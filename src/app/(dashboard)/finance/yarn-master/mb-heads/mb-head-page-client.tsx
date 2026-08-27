@@ -22,7 +22,7 @@ import { DataTablePagination } from "@/components/shared"
 import {
   MBHeadTable,
   MBHeadFilters,
-  MBHeadFormDialog,
+  MBHeadFormDialogLegacy,
   MBHeadDeleteDialog,
   MBHeadImportDialog,
 } from "@/components/finance/mb-head"
@@ -99,6 +99,20 @@ function MBHeadPageContent() {
                 <Download className="mr-2 h-4 w-4" />
                 Export to Excel
               </DropdownMenuItem>
+              {/*
+                Audit-only opt-in: includes REJECTED MB Heads in the export. Default
+                path above stays byte-identical (no includeRejected param sent, so the
+                BFF/backend default excludes rejected documents).
+              */}
+              <DropdownMenuItem
+                onClick={() =>
+                  exportMutation.mutate({ activeFilter: filters.activeFilter, includeRejected: true })
+                }
+                disabled={exportMutation.isPending}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export to Excel (Include Rejected — Audit)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setImportOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Import from Excel
@@ -141,7 +155,7 @@ function MBHeadPageContent() {
         </CardContent>
       </Card>
 
-      <MBHeadFormDialog
+      <MBHeadFormDialogLegacy
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mbHead={selectedItem}

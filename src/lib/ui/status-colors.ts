@@ -108,6 +108,9 @@ export const statusRegistry: Record<StatusType, Record<string, StatusDisplay>> =
     VALIDATED: { variant: "success", label: "Validated" },
     UN_APPROVED: { variant: "warning", label: "Un-Approved" },
     REVOKED: { variant: "destructive", label: "Revoked" },
+    REJECTED: { variant: "destructive", label: "Rejected" },
+    // P10: a locked recipe parked awaiting an unlock decision.
+    UNLOCK_REQUESTED: { variant: "warning", label: "Unlock Requested" },
   },
   // PPC — keyed by the short status token (see ppcStatusToken in types/ppc).
   ppcDemand: {

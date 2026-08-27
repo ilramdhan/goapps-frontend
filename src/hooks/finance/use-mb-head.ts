@@ -13,12 +13,14 @@ import {
   type UpdateMBHeadRequest,
   type ListMBHeadsParams,
   type ExportMBHeadsParams,
+  type ExportMBRecipeFullParams,
   type ListMBHeadsResponse,
   type CreateMBHeadResponse,
   type UpdateMBHeadResponse,
   type DeleteMBHeadResponse,
   type GetMBHeadResponse,
   type ExportMBHeadsResponse,
+  type ExportMBRecipeFullResponse,
   type ImportMBHeadsResponse,
   type DownloadMBHeadTemplateResponse,
   ListMBHeadsResponseParser,
@@ -27,6 +29,7 @@ import {
   DeleteMBHeadResponseParser,
   GetMBHeadResponseParser,
   ExportMBHeadsResponseParser,
+  ExportMBRecipeFullResponseParser,
   ImportMBHeadsResponseParser,
   DownloadMBHeadTemplateResponseParser,
 } from "@/types/finance/mb-head"
@@ -36,6 +39,11 @@ import {
   validateMBHead,
   unApproveMBHead,
   revokeMBHead,
+  rejectMBHead,
+  returnMBHeadToDraft,
+  requestUnlockMBHead,
+  grantUnlockMBHead,
+  rejectUnlockMBHead,
 } from "@/services/finance/mb-head-api"
 
 // ============================================================================
@@ -109,6 +117,42 @@ export function useExportMBHeads() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to export MB Heads")
+    },
+  })
+}
+
+/**
+ * P12 (C1 + C2) — denormalized full-recipe export: one row per composition line,
+ * with the MB cost block joined in.
+ *
+ * Deliberately SEPARATE from `useExportMBHeads`, which drives the round-trip import
+ * format (D7) and must not change. This one is a read-only report and is gated on the
+ * `finance.mb.recipe.export` permission server-side.
+ *
+ * Omitted params are sent omitted: `period` empty means "latest active period per
+ * head", `costType` empty means the backend default (ACTUAL), and `checkStatusCalc`
+ * empty means NO derived-check-status filter — every head, including the ones whose
+ * derived status is still NULL ("Belum dihitung").
+ */
+export function useExportMBRecipeFull() {
+  return useMutation({
+    mutationFn: async (params: ExportMBRecipeFullParams = {}): Promise<ExportMBRecipeFullResponse> => {
+      const queryString = buildQueryString(params as Record<string, unknown>)
+      const rawResponse = await apiClient.get<unknown>(
+        `/api/v1/finance/mb-heads/export-full${queryString}`
+      )
+      return ExportMBRecipeFullResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: (response) => {
+      if (response.base?.isSuccess && response.fileContent.length > 0) {
+        downloadFileFromBytes(response.fileContent, response.fileName || "mb-recipe-full-export.xlsx")
+        toast.success("Full recipe export completed successfully")
+      } else {
+        toast.error(response.base?.message || "Failed to export full MB recipe")
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to export full MB recipe")
     },
   })
 }
@@ -213,6 +257,55 @@ export function useUnApproveMBHead() {
 
 export function useRevokeMBHead() {
   return useMbHeadReasonTransition(revokeMBHead, "MB Head revoked", "Failed to revoke MB Head")
+}
+
+export function useRejectMBHead() {
+  return useMbHeadReasonTransition(rejectMBHead, "MB Head rejected", "Failed to reject MB Head")
+}
+
+// K-29: REJECTED → DRAFT. Same reason-carrying shape as the other transitions, but
+// the reason is OPTIONAL — callers may pass "" and the backend keeps the old stateReason.
+export function useReturnMBHeadToDraft() {
+  return useMbHeadReasonTransition(
+    returnMBHeadToDraft,
+    "MB Head returned to draft",
+    "Failed to return MB Head to draft",
+  )
+}
+
+// ============================================================================
+// P10 Unlock Hooks (request / grant / reject)
+// ============================================================================
+
+// P10: APPROVED|VALIDATED → UNLOCK_REQUESTED. The reason is MANDATORY — the domain
+// returns ErrReasonRequired for an empty or whitespace-only value — so this uses the
+// reason-carrying helper WITHOUT `reasonOptional` on the calling dialog.
+export function useRequestUnlockMBHead() {
+  return useMbHeadReasonTransition(
+    requestUnlockMBHead,
+    "Unlock requested",
+    "Failed to request unlock",
+  )
+}
+
+// P10: UNLOCK_REQUESTED → DRAFT. ⛔ Deliberately the NO-reason helper: GrantUnlockMBHeadRequest
+// carries no reason field at all (granting is an assent, and the original request reason is
+// what stays on record).
+export function useGrantUnlockMBHead() {
+  return useMbHeadTransition(
+    grantUnlockMBHead,
+    "Unlock granted",
+    "Failed to grant unlock",
+  )
+}
+
+// P10/K-52: UNLOCK_REQUESTED → back to whichever locked state it came from. Reason MANDATORY.
+export function useRejectUnlockMBHead() {
+  return useMbHeadReasonTransition(
+    rejectUnlockMBHead,
+    "Unlock request rejected",
+    "Failed to reject unlock request",
+  )
 }
 
 // ============================================================================

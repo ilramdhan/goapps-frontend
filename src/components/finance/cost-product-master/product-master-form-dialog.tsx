@@ -123,6 +123,9 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
                       <ProductTypeCombobox
                         value={field.value || undefined}
                         onChange={(typeId) => field.onChange(typeId)}
+                        // Guard E2: MB products are never created by hand — they
+                        // are born from an MB Recipe only.
+                        excludeTypeCodes={["MB"]}
                       />
                     </FormControl>
                     <FormDescription>The product code prefix derives from the selected type.</FormDescription>

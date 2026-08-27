@@ -25,10 +25,10 @@ const BACKEND_SORTABLE_KEYS = new Set(["mbh_mb_costing", "mbh_mgt_name", "mbh_de
 
 // Column ids double as backend sort keys (proto ListMBHeadsRequest sort_by values) where supported.
 export const MB_RECIPE_COLUMNS: ColumnDef<MBHead>[] = [
-  { id: "dev_code", header: "Dev Code", canHide: false },
+  { id: "dev_code", header: "Dev No", canHide: false },
   { id: "shade_code", header: "Shade Code" },
   { id: "shade_name", header: "Shade Name" },
-  { id: "mbh_mgt_name", header: "Mgt Name", defaultHidden: true },
+  { id: "mbh_mgt_name", header: "MB Name", defaultHidden: true },
   { id: "mbh_denier", header: "Denier", defaultHidden: true },
   { id: "mbh_status", header: "Status", defaultHidden: true },
   { id: "mbh_final_product", header: "Final Product", defaultHidden: true },

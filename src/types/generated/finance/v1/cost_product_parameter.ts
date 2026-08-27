@@ -61,6 +61,28 @@ export interface RequiredParamEntry {
   displayGroup: string;
   /** param_code of the MASTER_LOOKUP trigger param this child belongs to (empty = not a child param). */
   lookupFillGroupCode: string;
+  /**
+   * Resolved mst_mb_spin.mbs_id for MB_SPIN lookup params, when the current
+   * value_text was resolved to EXACTLY one active-or-not spin at save time.
+   * Empty = not yet resolved (either not an MB_SPIN param, no value, or the
+   * resolution was ambiguous/orphaned — see mb_spin_candidate_count).
+   */
+  valueMbSpinId: string;
+  /**
+   * Number of mst_mb_spin rows whose mbs_orion_item_code currently matches
+   * value_text, computed at read time (not stored) using the identical
+   * matching rule as the save-time resolver. Only meaningful for MB_SPIN
+   * lookup params with a non-empty value_text — see
+   * has_mb_spin_candidate_count. When value_mb_spin_id is already set this
+   * field is not needed to determine state, but is still populated.
+   */
+  mbSpinCandidateCount: number;
+  /**
+   * True when mb_spin_candidate_count was actually computed for this row
+   * (an MB_SPIN lookup param with a non-empty value_text). False means the
+   * count is not applicable — do not interpret 0 as "not applicable".
+   */
+  hasMbSpinCandidateCount: boolean;
   /** Existing value (zero/empty when not yet bound). */
   hasValue: boolean;
   valueNumeric: string;
@@ -754,6 +776,9 @@ function createBaseRequiredParamEntry(): RequiredParamEntry {
     displayOrder: 0,
     displayGroup: "",
     lookupFillGroupCode: "",
+    valueMbSpinId: "",
+    mbSpinCandidateCount: 0,
+    hasMbSpinCandidateCount: false,
     hasValue: false,
     valueNumeric: "",
     valueText: "",
@@ -803,6 +828,15 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     }
     if (message.lookupFillGroupCode !== "") {
       writer.uint32(106).string(message.lookupFillGroupCode);
+    }
+    if (message.valueMbSpinId !== "") {
+      writer.uint32(114).string(message.valueMbSpinId);
+    }
+    if (message.mbSpinCandidateCount !== 0) {
+      writer.uint32(120).int32(message.mbSpinCandidateCount);
+    }
+    if (message.hasMbSpinCandidateCount !== false) {
+      writer.uint32(128).bool(message.hasMbSpinCandidateCount);
     }
     if (message.hasValue !== false) {
       writer.uint32(160).bool(message.hasValue);
@@ -936,6 +970,30 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
           message.lookupFillGroupCode = reader.string();
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.valueMbSpinId = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.mbSpinCandidateCount = reader.int32();
+          continue;
+        }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.hasMbSpinCandidateCount = reader.bool();
+          continue;
+        }
         case 20: {
           if (tag !== 160) {
             break;
@@ -1060,6 +1118,21 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
         : isSet(object.lookup_fill_group_code)
         ? globalThis.String(object.lookup_fill_group_code)
         : "",
+      valueMbSpinId: isSet(object.valueMbSpinId)
+        ? globalThis.String(object.valueMbSpinId)
+        : isSet(object.value_mb_spin_id)
+        ? globalThis.String(object.value_mb_spin_id)
+        : "",
+      mbSpinCandidateCount: isSet(object.mbSpinCandidateCount)
+        ? globalThis.Number(object.mbSpinCandidateCount)
+        : isSet(object.mb_spin_candidate_count)
+        ? globalThis.Number(object.mb_spin_candidate_count)
+        : 0,
+      hasMbSpinCandidateCount: isSet(object.hasMbSpinCandidateCount)
+        ? globalThis.Boolean(object.hasMbSpinCandidateCount)
+        : isSet(object.has_mb_spin_candidate_count)
+        ? globalThis.Boolean(object.has_mb_spin_candidate_count)
+        : false,
       hasValue: isSet(object.hasValue)
         ? globalThis.Boolean(object.hasValue)
         : isSet(object.has_value)
@@ -1134,6 +1207,15 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     if (message.lookupFillGroupCode !== "") {
       obj.lookupFillGroupCode = message.lookupFillGroupCode;
     }
+    if (message.valueMbSpinId !== "") {
+      obj.valueMbSpinId = message.valueMbSpinId;
+    }
+    if (message.mbSpinCandidateCount !== 0) {
+      obj.mbSpinCandidateCount = Math.round(message.mbSpinCandidateCount);
+    }
+    if (message.hasMbSpinCandidateCount !== false) {
+      obj.hasMbSpinCandidateCount = message.hasMbSpinCandidateCount;
+    }
     if (message.hasValue !== false) {
       obj.hasValue = message.hasValue;
     }
@@ -1173,6 +1255,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     message.displayOrder = object.displayOrder ?? 0;
     message.displayGroup = object.displayGroup ?? "";
     message.lookupFillGroupCode = object.lookupFillGroupCode ?? "";
+    message.valueMbSpinId = object.valueMbSpinId ?? "";
+    message.mbSpinCandidateCount = object.mbSpinCandidateCount ?? 0;
+    message.hasMbSpinCandidateCount = object.hasMbSpinCandidateCount ?? false;
     message.hasValue = object.hasValue ?? false;
     message.valueNumeric = object.valueNumeric ?? "";
     message.valueText = object.valueText ?? "";

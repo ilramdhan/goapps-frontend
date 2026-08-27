@@ -152,6 +152,17 @@ This is the **most critical layout rule**. The entire scrolling behavior of the 
 3. **Never use `overflow-x-hidden` on body** — it hides scroll indicators and breaks sticky
 4. **`w-full` on the table wrapper** — ensures it fills the card before trying to shrink
 
+~~5. (not previously documented)~~ ⭐ **DIPERBARUI 2026-08-26** — the dashboard shell's own
+`(dashboard)/layout.tsx` content wrapper (around `<main>{children}</main>`) had drifted to
+`overflow-x-hidden`, which per the CSS overflow spec forces the other axis to `overflow-y: auto`,
+turning that wrapper — not the viewport — into the sticky containing block. Since the wrapper's
+height is unbounded (it never actually scrolls), any `position: sticky` element placed anywhere in
+page content silently stops pinning. Confirmed with a Playwright probe reproducing the exact
+ancestor chain: `overflow-x-hidden` → sticky element does not pin on scroll; swapping to
+`overflow-x-clip` → pins correctly, same horizontal-overflow protection preserved (`clip` doesn't
+trigger the axis promotion). Fixed in `layout.tsx` (R17). **Use `overflow-x-clip`, never
+`overflow-x-hidden`, on any ancestor of page content that also needs to host a sticky descendant.**
+
 #### Correct Table Wrapping
 
 ```tsx

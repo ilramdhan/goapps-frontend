@@ -18,6 +18,7 @@ import {
   OrganizationServiceDefinition,
 } from "@/types/generated/iam/v1/organization"
 import { UOMServiceDefinition } from "@/types/generated/finance/v1/uom"
+import { ShadeServiceDefinition } from "@/types/generated/finance/v1/shade"
 import {
   DashboardServiceDefinition,
   ChartDataServiceDefinition,
@@ -58,6 +59,9 @@ import {
   MbPushServiceDefinition,
   MbWorkflowLogServiceDefinition,
   MbBatchServiceDefinition,
+  MbCrossSectionServiceDefinition,
+  MbCrossSectionFactorServiceDefinition,
+  MBDozingServiceDefinition,
 } from "@/types/generated/finance/v1/yarn_master"
 import { CostRouteServiceDefinition } from "@/types/generated/finance/v1/cost_route"
 import { PPCServiceDefinition } from "@/types/generated/ppc/v1/ppc_service"
@@ -198,6 +202,12 @@ export function getOrganizationClient() {
 export function getUomClient() {
   return getOrCreate("uom", () =>
     createServiceClient(UOMServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getShadeClient() {
+  return getOrCreate("shade", () =>
+    createServiceClient(ShadeServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 
@@ -541,6 +551,26 @@ export function getMbPushClient() {
 export function getMbBatchClient() {
   return getOrCreate("mbBatch", () =>
     createServiceClient(MbBatchServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbCrossSectionClient() {
+  return getOrCreate("mbCrossSection", () =>
+    createServiceClient(MbCrossSectionServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getMbCrossSectionFactorClient() {
+  return getOrCreate("mbCrossSectionFactor", () =>
+    createServiceClient(MbCrossSectionFactorServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+// MB Dozing (LDR) calculator — READ-ONLY service (K-18): CalculateDozing and
+// PreviewDozingImpact, neither of which persists anything.
+export function getMBDozingClient() {
+  return getOrCreate("mbDozing", () =>
+    createServiceClient(MBDozingServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

@@ -21,6 +21,7 @@ import { ProductAuditTab } from "@/components/finance/cost-product-master/audit-
 import { CostHistoryTab } from "@/components/finance/cost-results/cost-history-tab"
 import { ProductTypeName } from "@/components/common/product-type-name"
 import { UnlockProductMasterDialog } from "@/components/finance/cost-product-master/unlock-dialog"
+import { MbRecipeLinkCard } from "@/components/finance/cost-product-master/mb-recipe-link-card"
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
 
 interface Props {
@@ -62,7 +63,10 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div
+        data-testid="product-master-sticky-header"
+        className="sticky top-16 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b flex flex-wrap items-start justify-between gap-3"
+      >
         <PageHeader
           title={
             isLoading
@@ -150,6 +154,11 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* ⭐ DIPERBARUI 2026-08-26 (R16) — MB Recipe / MB Spin linkage. Renders nothing (no
+          empty card) for products whose source is not "MB_RECIPE"; see mb-recipe-link-card.tsx
+          for the honest handling of the "recipe not yet validated" ambiguous case. */}
+      {product && <MbRecipeLinkCard productSysId={product.productSysId} source={product.source} />}
 
       <Tabs defaultValue="parameters">
         <TabsList>
