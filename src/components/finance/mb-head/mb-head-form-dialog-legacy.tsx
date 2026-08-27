@@ -153,6 +153,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
             mbhLustureCode: values.mbhLustureCode || undefined,
             mbhMachineId: values.mbhMachineId || undefined,
             mbhIsActive: values.mbhIsActive,
+            additionalShades: [],
           },
         })
       } else {
@@ -175,6 +176,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
           mbhCrossSection: values.mbhCrossSection || undefined,
           mbhLustureCode: values.mbhLustureCode || undefined,
           mbhMachineId: values.mbhMachineId || undefined,
+          additionalShades: [],
         })
       }
       onOpenChange(false)

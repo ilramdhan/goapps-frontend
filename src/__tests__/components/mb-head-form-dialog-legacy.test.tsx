@@ -81,6 +81,7 @@ const EXISTING_ROW = {
   paramThroughputPerHour: "",
   paramNoOfProcess: "",
   machineId: "mc-1",
+  additionalShades: [],
 } satisfies MBHead
 
 function renderDialog(mbHead: MBHead | null = null) {
@@ -266,6 +267,7 @@ describe("MBHeadFormDialogLegacy — payload shape", () => {
       mbhCrossSection: undefined,
       mbhLustureCode: undefined,
       mbhMachineId: undefined,
+      additionalShades: [],
     })
   })
 
