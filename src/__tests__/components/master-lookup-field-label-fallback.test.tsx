@@ -61,6 +61,7 @@ const ENTRY: RequiredParamEntry = {
   valueMbSpinId: "",
   mbSpinCandidateCount: 0,
   hasMbSpinCandidateCount: false,
+  mbSpinCandidates: [],
   hasValue: true,
   valueNumeric: "",
   valueText: "CMB0000733",

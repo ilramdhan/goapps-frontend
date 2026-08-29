@@ -47,6 +47,7 @@ function baseEntry(overrides: Partial<RequiredParamEntry> = {}): RequiredParamEn
     valueMbSpinId: "",
     mbSpinCandidateCount: 0,
     hasMbSpinCandidateCount: false,
+  mbSpinCandidates: [],
     ...overrides,
   }
 }
