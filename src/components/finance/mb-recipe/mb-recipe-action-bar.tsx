@@ -157,24 +157,17 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col items-start gap-1">
+      <div className="flex flex-wrap items-center gap-2">
       {canSubmit && (
-        <div className="flex flex-col items-start gap-1">
-          <Button
-            size="sm"
-            disabled={submitM.isPending || submitBlockedByTotal}
-            onClick={() => submitM.mutate(mbHead.mbhId)}
-          >
-            {submitM.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit
-          </Button>
-          {submitBlockedByTotal && (
-            <span className="text-xs text-destructive font-medium">
-              Composition total is {(compositionTotalPct ?? 0).toFixed(3)}%, which exceeds 100%. Fix
-              the composition before submitting.
-            </span>
-          )}
-        </div>
+        <Button
+          size="sm"
+          disabled={submitM.isPending || submitBlockedByTotal}
+          onClick={() => submitM.mutate(mbHead.mbhId)}
+        >
+          {submitM.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Submit
+        </Button>
       )}
       {canApprove && (
         <Button size="sm" disabled={approveM.isPending} onClick={() => approveM.mutate(mbHead.mbhId)}>
@@ -216,6 +209,13 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
         <Button size="sm" variant="destructive" onClick={() => setReasonDialog("reject-unlock")}>
           Reject Unlock
         </Button>
+      )}
+    </div>
+      {submitBlockedByTotal && (
+        <span className="w-full max-w-full break-words text-xs text-destructive font-medium">
+          Composition total is {(compositionTotalPct ?? 0).toFixed(3)}%, which exceeds 100%. Fix
+          the composition before submitting.
+        </span>
       )}
 
       <ReasonDialog
