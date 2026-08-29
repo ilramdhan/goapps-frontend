@@ -1,20 +1,31 @@
 /**
- * P12B tri-state contract for the MB Spin fix/actual markers.
+ * P12B fix/actual markers — checkbox UI removed.
  *
- * mbsLdrIsFixed / mbsDozingIsFixed have THREE states, not two:
- *   undefined -> "belum ditandai" (DB NULL). The backend
- *                (mbspin/entity.go IsFixedLDR/IsFixedDozing) treats NULL as FIXED,
- *                so legacy rows are never recalculated.
- *   true      -> nilai FIX, dikunci
- *   false     -> nilai hasil hitung, boleh ditimpa recalc P13
+ * mbsLdrIsFixed / mbsDozingIsFixed used to be rendered as tri-state checkboxes
+ * in this form. Per user decision the checkboxes were removed from the UI
+ * entirely; the form now simply never sends these fields in the create/update
+ * payload. The backend (mbspin/entity.go IsFixedLDR/IsFixedDozing) treats an
+ * absent/nil value as FIXED=true by default, so omitting the fields keeps the
+ * exact same safe behavior the tri-state checkbox used to guarantee, without
+ * any backend change.
  *
- * Collapsing undefined -> false (a stray `?? false`, or `.default(false)` on the
- * zod field) silently flips a protected row to recalculable and lets P13 overwrite
- * a human-entered actual. These tests exist purely to make that regression red.
+ * These tests verify: (a) the checkboxes/labels are gone from the rendered
+ * form, and (b) mbsLdrIsFixed/mbsDozingIsFixed are never present in the
+ * create/update payload, regardless of whatever value the underlying record
+ * happens to carry.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+
+// jsdom doesn't implement these — Radix's Select relies on them for pointer
+// interactions during open/close.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
 
 const createMutateAsync = vi.fn().mockResolvedValue({})
 const updateMutateAsync = vi.fn().mockResolvedValue({})
@@ -45,8 +56,27 @@ vi.mock("@/hooks/finance/use-mb-spin", () => ({
   useUpdateMBSpin: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
 }))
 
+// R81/Task-1: mbsMgtName (and its head-derived siblings) is now read-only in the
+// create flow, filled only via selecting a Master Product Type MB option. The
+// "on create" test below needs a real head to pick from the dropdown instead of
+// typing into the (now disabled) Mgt Name input.
+const NEW_SPIN_HEAD = {
+  mbhId: "22222222-2222-2222-2222-222222222222",
+  mbhOracleSysId: "ORA-NEW",
+  mbhMbCosting: "MBH-NEW",
+  mbhMgtName: "New spin",
+  mbhDenier: 150,
+  mbhFilament: 48,
+  mbhIsActive: true,
+  mbhLdrPrsn: 1,
+  mbhRunLdrPct: 1,
+  mbhFinalProduct: "FP-NEW",
+  mbhStatus: "R and D",
+  costProductId: 0,
+}
+
 vi.mock("@/hooks/finance/use-mb-head", () => ({
-  useMBHeads: () => ({ data: undefined, isLoading: false }),
+  useMBHeads: () => ({ data: { data: [NEW_SPIN_HEAD], totalItems: "1" }, isLoading: false }),
 }))
 
 // R2: the form now also looks up cost-product-masters to label the head picker
@@ -75,9 +105,6 @@ const markedSpin = {
   mbsDozingIsFixed: false,
 } as never
 
-const ldrBox = () => screen.getByLabelText(/LDR nilai FIX/i)
-const dozingBox = () => screen.getByLabelText(/Dozing nilai FIX/i)
-
 async function submitUpdate(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /^Update$/i }))
   await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled())
@@ -89,71 +116,50 @@ beforeEach(() => {
   updateMutateAsync.mockClear()
 })
 
-describe("MBSpinFormDialog — fix/actual markers stay tri-state", () => {
-  // (a) absence survives the reset
-  it("renders an unmarked spin as indeterminate, not unchecked", () => {
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={unmarkedSpin} />)
-    // Radix maps the tri-state `indeterminate` to aria-checked="mixed".
-    // "false" here would mean the form collapsed undefined -> false.
-    expect(ldrBox()).toHaveAttribute("aria-checked", "mixed")
-    expect(dozingBox()).toHaveAttribute("aria-checked", "mixed")
-  })
-
-  it("renders an explicitly marked spin as true/false, never mixed", () => {
+describe("MBSpinFormDialog — LDR/Dozing fix markers checkbox removed", () => {
+  it("no longer renders the LDR/Dozing 'nilai FIX' checkboxes", () => {
     render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={markedSpin} />)
-    expect(ldrBox()).toHaveAttribute("aria-checked", "true")
-    expect(dozingBox()).toHaveAttribute("aria-checked", "false")
+    expect(screen.queryByLabelText(/LDR nilai FIX/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Dozing nilai FIX/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/LDR nilai FIX/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Dozing nilai FIX/i)).not.toBeInTheDocument()
   })
 
-  it("renders a brand-new spin as indeterminate", () => {
-    render(
-      <MBSpinFormDialog open onOpenChange={() => {}} headId="22222222-2222-2222-2222-222222222222" />
-    )
-    expect(ldrBox()).toHaveAttribute("aria-checked", "mixed")
-    expect(dozingBox()).toHaveAttribute("aria-checked", "mixed")
-  })
-
-  // (b) an untouched marker must not be sent, so the DB column stays NULL
-  it("submits undefined — not false — for markers the user never touched", async () => {
+  it("omits mbsLdrIsFixed/mbsDozingIsFixed on update even for a record that had them set", async () => {
     const user = userEvent.setup()
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={unmarkedSpin} />)
+    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={markedSpin} />)
 
     const payload = await submitUpdate(user)
 
     expect(payload.mbsLdrIsFixed).toBeUndefined()
     expect(payload.mbsDozingIsFixed).toBeUndefined()
-    // Explicitly reject the `false` collapse — toBeUndefined() alone would also
-    // pass for null, but `false` is the dangerous value.
-    expect(payload.mbsLdrIsFixed).not.toBe(false)
-    expect(payload.mbsDozingIsFixed).not.toBe(false)
-
     // The BFF serializes with JSON.stringify, which drops undefined keys entirely.
-    // This is the wire-level proof that the column is left NULL.
+    // This is the wire-level proof the backend never receives these fields, and
+    // therefore falls back to its own FIXED=true default (entity.go:148-156).
     const wire = JSON.parse(JSON.stringify(payload))
     expect(Object.keys(wire)).not.toContain("mbsLdrIsFixed")
     expect(Object.keys(wire)).not.toContain("mbsDozingIsFixed")
   })
 
-  it("leaves the untouched marker undefined even when another field is edited", async () => {
+  it("omits mbsLdrIsFixed/mbsDozingIsFixed on update for an unmarked (legacy NULL) record", async () => {
     const user = userEvent.setup()
     render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={unmarkedSpin} />)
 
-    const mgtName = screen.getByLabelText(/Mgt Name/i)
-    await user.clear(mgtName)
-    await user.type(mgtName, "Renamed spin")
-
     const payload = await submitUpdate(user)
-    expect(payload.mbsMgtName).toBe("Renamed spin")
+
     expect(payload.mbsLdrIsFixed).toBeUndefined()
     expect(payload.mbsDozingIsFixed).toBeUndefined()
   })
 
-  it("omits untouched markers on create too", async () => {
+  it("omits mbsLdrIsFixed/mbsDozingIsFixed on create", async () => {
     const user = userEvent.setup()
-    render(
-      <MBSpinFormDialog open onOpenChange={() => {}} headId="22222222-2222-2222-2222-222222222222" />
-    )
-    await user.type(screen.getByLabelText(/Mgt Name/i), "New spin")
+    // R81/Task-1: mbsMgtName is now read-only, populated only via selecting a
+    // Master Product Type MB — no headId prop here so the picker renders (it is
+    // hidden whenever `headId` is passed, per `!headId && !isEditing` in the
+    // component), then pick the one mocked head instead of typing into Mgt Name.
+    render(<MBSpinFormDialog open onOpenChange={() => {}} />)
+    await user.click(screen.getByRole("combobox", { name: /master product type mb/i }))
+    await user.click(await screen.findByRole("option", { name: /MBH-NEW.*New spin/ }))
     await user.click(screen.getByRole("button", { name: /^Create$/i }))
 
     await waitFor(() => expect(createMutateAsync).toHaveBeenCalled())
@@ -161,47 +167,6 @@ describe("MBSpinFormDialog — fix/actual markers stay tri-state", () => {
     expect(payload.mbsLdrIsFixed).toBeUndefined()
     expect(payload.mbsDozingIsFixed).toBeUndefined()
     expect(Object.keys(JSON.parse(JSON.stringify(payload)))).not.toContain("mbsLdrIsFixed")
-  })
-
-  // (c) clicking commits to an explicit boolean
-  it("sends true after the user checks an unmarked marker", async () => {
-    const user = userEvent.setup()
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={unmarkedSpin} />)
-
-    await user.click(ldrBox())
-    await waitFor(() => expect(ldrBox()).toHaveAttribute("aria-checked", "true"))
-
-    const payload = await submitUpdate(user)
-    expect(payload.mbsLdrIsFixed).toBe(true)
-    // The sibling marker was not touched — it must still be absent.
-    expect(payload.mbsDozingIsFixed).toBeUndefined()
-  })
-
-  it("sends an explicit false after the user unchecks a marker that was true", async () => {
-    const user = userEvent.setup()
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={markedSpin} />)
-
-    await user.click(ldrBox())
-    await waitFor(() => expect(ldrBox()).toHaveAttribute("aria-checked", "false"))
-
-    const payload = await submitUpdate(user)
-    expect(payload.mbsLdrIsFixed).toBe(false)
-    // false must survive serialization — it is a real value, not an absence.
-    expect(JSON.parse(JSON.stringify(payload)).mbsLdrIsFixed).toBe(false)
-    expect(payload.mbsDozingIsFixed).toBe(false)
-  })
-
-  it("moves from indeterminate to true then to explicit false on repeated clicks", async () => {
-    const user = userEvent.setup()
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={unmarkedSpin} />)
-
-    expect(dozingBox()).toHaveAttribute("aria-checked", "mixed")
-    await user.click(dozingBox())
-    await waitFor(() => expect(dozingBox()).toHaveAttribute("aria-checked", "true"))
-    await user.click(dozingBox())
-    await waitFor(() => expect(dozingBox()).toHaveAttribute("aria-checked", "false"))
-
-    const payload = await submitUpdate(user)
-    expect(payload.mbsDozingIsFixed).toBe(false)
+    expect(Object.keys(JSON.parse(JSON.stringify(payload)))).not.toContain("mbsDozingIsFixed")
   })
 })

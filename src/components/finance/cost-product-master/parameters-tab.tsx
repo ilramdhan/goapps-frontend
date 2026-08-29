@@ -6,7 +6,7 @@
 // single batch.
 
 import { useCallback, useMemo, useState } from "react"
-import { Loader2, Save, AlertCircle, Plus, Trash2, ArrowUp } from "lucide-react"
+import { Loader2, Save, AlertCircle, Plus, Trash2, ArrowUp, Check, ChevronsUpDown } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,9 @@ import {
   getMbSpinAmbiguityMessage,
   type RequiredParamEntry,
   type UpsertParamValuePayload,
+  type MBSpinCandidate,
 } from "@/types/finance/cost-product-parameter"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { LookupFillValuesResponse } from "@/types/finance/yarn-master"
 import type { RemoveApplicablePreview } from "@/types/finance/lookup-master"
 import { AddParameterDialog } from "./add-parameter-dialog"
@@ -48,6 +50,11 @@ export interface DraftValue {
   valueFlag: boolean
   hasValueFlag: boolean // BOOLEAN params explicitly opt in to send the value
   dirty: boolean
+  // Set only when the user picked a specific row from the MB_SPIN candidate
+  // picker for an ambiguous entry — the permanent mst_mb_spin.mbs_id to save
+  // as an explicit override, bypassing the ambiguity resolver on save. Never
+  // derived from the loaded entry (that's valueMbSpinId, already resolved).
+  mbSpinIdOverride?: string
 }
 
 function emptyDraft(entry: RequiredParamEntry): DraftValue {
@@ -190,6 +197,9 @@ export function ProductParametersTab({ productSysId, isLocked = false }: Paramet
       const d = drafts[entry.paramId]
       if (!d?.dirty) continue
       const v: UpsertParamValuePayload = { productSysId, paramId: entry.paramId }
+      if (d.mbSpinIdOverride) {
+        v.mbSpinIdOverride = d.mbSpinIdOverride
+      }
       switch (entry.dataType) {
         case "NUMBER":
           if (d.valueNumeric.trim() === "") continue
@@ -359,16 +369,30 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
               <span className="text-amber-600"> · LOOKUP({entry.lookupMasterCode})</span>
             )}
           </div>
-          {mbSpinState && (
+          {mbSpinState === "ambiguous" && entry.mbSpinCandidates.length > 0 ? (
             <div className="pt-0.5">
-              <Badge variant="destructive" className="gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {mbSpinState === "ambiguous" ? "Pilih varian" : "Kode tidak ditemukan"}
-              </Badge>
+              <MbSpinCandidatePicker
+                entry={entry}
+                draft={draft}
+                onChange={onChange}
+                disabled={disabled}
+              />
               <p className="mt-1 text-[11px] normal-case tracking-normal text-muted-foreground">
                 {getMbSpinAmbiguityMessage(mbSpinState, entry.mbSpinCandidateCount)}
               </p>
             </div>
+          ) : (
+            mbSpinState && (
+              <div className="pt-0.5">
+                <Badge variant="destructive" className="gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {mbSpinState === "ambiguous" ? "Pilih varian" : "Kode tidak ditemukan"}
+                </Badge>
+                <p className="mt-1 text-[11px] normal-case tracking-normal text-muted-foreground">
+                  {getMbSpinAmbiguityMessage(mbSpinState, entry.mbSpinCandidateCount)}
+                </p>
+              </div>
+            )
           )}
           {entry.ownerDepartment && (
             <div className="text-[10px] uppercase tracking-wide">
@@ -403,6 +427,93 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
         )}
       </div>
     </div>
+  )
+}
+
+// MbSpinCandidatePicker renders in place of the plain "Pilih varian" badge
+// when the backend has surfaced the full ambiguous-candidate list
+// (entry.mbSpinCandidates). Picking a row sets mbSpinIdOverride on the draft
+// — the permanent mst_mb_spin.mbs_id — which handleSave forwards verbatim so
+// the backend saves it directly, bypassing the ambiguity resolver entirely
+// for this save (see UpsertCommand.MBSpinIDOverride on the backend).
+// valueText is left untouched: it already carries the shared ORION code that
+// made this row ambiguous in the first place.
+function MbSpinCandidatePicker({
+  entry,
+  draft,
+  onChange,
+  disabled,
+}: {
+  entry: RequiredParamEntry
+  draft: DraftValue
+  onChange: (paramId: string, p: Partial<DraftValue>) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const picked = draft.mbSpinIdOverride
+    ? entry.mbSpinCandidates.find((c) => c.mbsId === draft.mbSpinIdOverride)
+    : undefined
+
+  function handlePick(candidate: MBSpinCandidate) {
+    setOpen(false)
+    onChange(entry.paramId, { mbSpinIdOverride: candidate.mbsId })
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant={picked ? "outline" : "destructive"}
+          size="sm"
+          className="h-6 gap-1 px-2 text-[11px] font-normal normal-case tracking-normal"
+          disabled={disabled}
+        >
+          {picked ? (
+            <Check className="h-3 w-3" />
+          ) : (
+            <AlertCircle className="h-3 w-3" />
+          )}
+          {picked ? `Varian dipilih: ${picked.orionItemCode || picked.mgtName}` : "Pilih varian"}
+          <ChevronsUpDown className="h-3 w-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[340px] p-0" align="start">
+        <div className="max-h-72 overflow-y-auto p-1">
+          {entry.mbSpinCandidates.map((c) => (
+            <button
+              key={c.mbsId}
+              type="button"
+              onClick={() => handlePick(c)}
+              className={cn(
+                "flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent",
+                draft.mbSpinIdOverride === c.mbsId && "bg-accent",
+              )}
+            >
+              <div className="flex w-full items-center gap-1.5">
+                <Check
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0",
+                    draft.mbSpinIdOverride === c.mbsId ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span className="truncate font-medium">{c.mgtName || c.orionItemCode || "—"}</span>
+              </div>
+              <div className="ml-5 flex w-full flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <span className="truncate">Kode: {c.orionItemCode || "—"}</span>
+                <span className="truncate">Denier: {c.denier || "—"}</span>
+                <span className="truncate">
+                  Filament: {c.hasFilament ? c.filament : "—"}
+                </span>
+                <span className="truncate">LDR Rencana (%): {c.ldrPrsn || "—"}</span>
+                <span className="truncate">LDR Aktual (%): {c.runLdrPct || "—"}</span>
+                {c.status && <span className="truncate">Status: {c.status}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

@@ -39,7 +39,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Checkbox } from "@/components/ui/checkbox"
 
 import { MBDozingImpactPanel } from "./mb-dozing-impact-panel"
 // R81/R1: the LDR/dozing calculator lives in components/finance/mb-recipe (built
@@ -70,12 +69,12 @@ const formSchema = z.object({
   mbsLdrPrsn: z.coerce.number().min(0).optional().nullable(),
   mbsRunLdrPct: z.coerce.number().min(0).optional().nullable(),
   mbsFinalProduct: z.string().max(200).optional(),
-  // P12B: tri-state fix/actual markers. undefined = "belum ditandai" (backend treats
-  // NULL as FIXED, recalc-safe). Never coerce to false — that would mark the row
-  // recalculable and silently let P13 overwrite a human-entered value.
-  mbsLdrIsFixed: z.boolean().optional(),
-  mbsDozingIsFixed: z.boolean().optional(),
   mbsIsActive: z.boolean(),
+  // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment write-side (Task E backend, sudah selesai).
+  // mbsLdrAdjustmentPct is a manual add-on on top of the system-calculated mbsLdrCalculatedPct
+  // (read-only, not in this schema — displayed via the read-only breakdown panel below).
+  mbsLdrAdjustmentPct: z.coerce.number().optional().nullable(),
+  mbsLdrLockActual: z.boolean().default(false),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -122,7 +121,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
   function headOptionLabel(head: (typeof mbHeads)[number]): string {
     const product = head.costProductId ? costProductById.get(head.costProductId) : undefined
     if (product) return `${product.productCode} — ${product.productName}`
-    return `${head.mbhMbCosting} — ${head.mbhMgtName} (belum ada product type)`
+    return `${head.mbhMbCosting} — ${head.mbhMgtName} (no product type yet)`
   }
 
   const form = useForm<FormValues>({
@@ -131,7 +130,9 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
       mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "",
       mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null,
       mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "",
-      mbsLdrIsFixed: undefined, mbsDozingIsFixed: undefined, mbsIsActive: true,
+      mbsIsActive: true,
+      // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment defaults for create flow (unlocked, no adjustment).
+      mbsLdrAdjustmentPct: null, mbsLdrLockActual: false,
     },
   })
 
@@ -153,12 +154,12 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               mbsLdrPrsn: mbSpin.mbsLdrPrsn ?? null,
               mbsRunLdrPct: mbSpin.mbsRunLdrPct ?? null,
               mbsFinalProduct: mbSpin.mbsFinalProduct || "",
-              // Absence-vs-zero (D13): keep undefined undefined; NO `?? false` here.
-              mbsLdrIsFixed: mbSpin.mbsLdrIsFixed,
-              mbsDozingIsFixed: mbSpin.mbsDozingIsFixed,
               mbsIsActive: mbSpin.mbsIsActive ?? true,
+              // ⭐ DITAMBAHKAN 2026-08-28 — seed the lock/adjustment fields from the existing spin.
+              mbsLdrAdjustmentPct: mbSpin.mbsLdrAdjustmentPct ?? null,
+              mbsLdrLockActual: mbSpin.mbsLdrIsActual ?? false,
             }
-          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsLdrIsFixed: undefined, mbsDozingIsFixed: undefined, mbsIsActive: true }
+          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsIsActive: true, mbsLdrAdjustmentPct: null, mbsLdrLockActual: false }
       )
     }
   }, [open, mbSpin, headId, form])
@@ -183,9 +184,12 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
             mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
             mbsFinalProduct: values.mbsFinalProduct || undefined,
-            mbsLdrIsFixed: values.mbsLdrIsFixed,
-            mbsDozingIsFixed: values.mbsDozingIsFixed,
             mbsIsActive: values.mbsIsActive,
+            // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment write-side. Edit-only: there is
+            // nothing to lock/adjust on a brand-new spin, so these are absent from the create
+            // payload below (confirmed CreateMBSpinRequest has no such fields on the generated type).
+            mbsLdrAdjustmentPct: values.mbsLdrAdjustmentPct ?? undefined,
+            mbsLdrLockActual: values.mbsLdrLockActual,
           },
         })
       } else {
@@ -203,8 +207,6 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
           mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
           mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
           mbsFinalProduct: values.mbsFinalProduct || undefined,
-          mbsLdrIsFixed: values.mbsLdrIsFixed,
-          mbsDozingIsFixed: values.mbsDozingIsFixed,
         })
       }
       onOpenChange(false)
@@ -221,7 +223,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
   // `!headId && !isEditing` — so it can never fire while editing an existing spin, and no
   // user-entered value in edit mode is ever at risk of being overwritten.
   // Only fields with an unambiguous 1:1 counterpart on MBHead (yarn_master.proto MBHead vs
-  // MBSpin) are copied. mbsCc, mbsCostRateMkt, mbsLdrIsFixed, mbsDozingIsFixed have no MBHead
+  // MBSpin) are copied. mbsCc, mbsCostRateMkt have no MBHead
   // ~~counterpart and mbsStatus's only near-namesake (mbh_status) is documented as a legacy/
   // frozen Oracle trace field, not a value meant to propagate — all five are deliberately left
   // untouched rather than guessed.~~
@@ -264,6 +266,19 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
   */
   const watchedDenier = useWatch({ control: form.control, name: "mbsDenier" })
   const watchedFilament = useWatch({ control: form.control, name: "mbsFilament" })
+  // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment. Watched so the adjustment input's disabled
+  // state updates live the moment the user flips the lock Switch, without needing a resubmit.
+  const watchedLdrLockActual = useWatch({ control: form.control, name: "mbsLdrLockActual" })
+  // Watched so "LDR Efektif" reflects what the user is typing into the adjustment input live,
+  // instead of staying frozen at mbSpin.mbsLdrAdjustmentPct (the last-saved server value) until
+  // the form is resubmitted and the dialog reopened.
+  const watchedLdrAdjustmentPct = useWatch({ control: form.control, name: "mbsLdrAdjustmentPct" })
+  // Judgment call (flagged in report): the backend only rejects an adjustment change while
+  // CURRENTLY locked AND the request doesn't also unlock/keep-value. The simplest UI that never
+  // fights that rule: disable the input only while the spin is currently locked server-side AND
+  // the user hasn't (yet) flipped the switch to unlock in this session. The instant they unlock,
+  // it's editable — matching what the backend will actually accept.
+  const ldrAdjustmentDisabled = isPending || (mbSpin?.mbsLdrIsActual === true && watchedLdrLockActual === true)
   const dozingFieldsTouched =
     isEditing &&
     !!mbSpin &&
@@ -323,16 +338,33 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               />
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            {/*
+              ⭐ DIPERBARUI 2026-08-28 — Task readonly-derived-fields: mbsMgtName,
+              mbsOracleSysId and mbsMbCosting are all populated by handleHeadSelect()
+              from the chosen MB Recipe (MB Head) above, or (when isEditing) by
+              form.reset() from an existing MBSpin record — including one produced
+              by the "Duplicate MB Spin" clone flow (see mb-spin-duplicate-dialog.tsx,
+              which clones server-side and then reopens this same dialog in edit
+              mode). None of these three are meant to be retyped by hand once a
+              source record exists, so they follow the same readOnly+disabled
+              pattern already used for mbsStatus below. mbsCc has no MBHead/clone
+              counterpart (see R3 comment above) and stays freely editable.
+              mbsDenier/mbsFilament are explicitly kept editable per product
+              decision even though they are also copied by handleHeadSelect.
+            */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="mbsMgtName"
                 render={({ field }) => (
-                  <FormItem className="col-span-2 flex h-full flex-col">
+                  <FormItem className="col-span-1 flex h-full flex-col sm:col-span-2">
                     <FormLabel>Mgt Name <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Management display name" disabled={isPending} />
+                      <Input {...field} placeholder="Management display name" readOnly disabled />
                     </FormControl>
+                    <FormDescription className="mt-auto">
+                      This value follows the selected Master Product Type MB (or the cloned MB Spin) and cannot be edited manually.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -344,8 +376,11 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   <FormItem className="flex h-full flex-col">
                     <FormLabel>Oracle SYS ID</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Optional" disabled={isEditing || isPending} />
+                      <Input {...field} placeholder="Optional" readOnly disabled />
                     </FormControl>
+                    <FormDescription className="mt-auto">
+                      Follows the selected Master Product Type MB (or the cloned MB Spin).
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -357,8 +392,11 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   <FormItem className="flex h-full flex-col">
                     <FormLabel>MB Costing</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Optional" disabled={isPending} />
+                      <Input {...field} placeholder="Optional" readOnly disabled />
                     </FormControl>
+                    <FormDescription className="mt-auto">
+                      Follows the selected Master Product Type MB (or the cloned MB Spin).
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -381,7 +419,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                 name="mbsDenier"
                 render={({ field }) => (
                   <FormItem className="flex h-full flex-col">
-                    <FormLabel>Denier (dtex)</FormLabel>
+                    <FormLabel>Denier</FormLabel>
                     <FormControl>
                       <Input {...field} type="number" step="0.01" min="0" placeholder="Optional" disabled={isPending} />
                     </FormControl>
@@ -427,12 +465,12 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             />
 
             {/*
-              ⭐ DIPERBARUI 2026-08-26 — permintaan user: "form status mb spin ikuti value yg ada
-              di mb recipe saja jadi tidak perlu isi manual". Field ini sekarang read-only:
-              nilainya diisi otomatis oleh handleHeadSelect() dari head.mbhStatus saat user memilih
-              Master Product Type MB di atas (create flow), atau dari mbSpin.mbsStatus yang sudah
-              tersimpan (edit flow, lihat form.reset di atas). User tidak bisa lagi mengetik nilai
-              status secara manual di sini.
+              ⭐ DIPERBARUI 2026-08-26 — user request: "MB Spin status form should follow the
+              value already in MB Recipe, no manual entry needed". This field is now read-only:
+              its value is auto-filled by handleHeadSelect() from head.mbhStatus when the user
+              picks a Master Product Type MB above (create flow), or from mbSpin.mbsStatus that
+              was already stored (edit flow, see form.reset above). The user can no longer type
+              a status value manually here.
             */}
             <FormField
               control={form.control}
@@ -441,28 +479,41 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                 <FormItem>
                   <FormLabel>Status</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Mengikuti MB Recipe" readOnly disabled />
+                    <Input {...field} placeholder="Follows MB Recipe" readOnly disabled />
                   </FormControl>
                   <FormDescription>
-                    Nilai ini mengikuti status MB Recipe (Master Product Type MB) yang dipilih dan tidak bisa diisi manual.
+                    This value follows the status of the selected MB Recipe (Master Product Type MB) and cannot be edited manually.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {/*
+              ⭐ DIPERBARUI 2026-08-28 — Task readonly-derived-fields: mbsFinalProduct is also
+              copied by handleHeadSelect()/form.reset() from the selected MB Recipe or the source
+              MBSpin being cloned, so it now follows the same readOnly+disabled pattern as
+              mbsMgtName/mbsOracleSysId/mbsMbCosting above and mbsStatus above it. mbsLdrPrsn and
+              mbsRunLdrPct are explicitly EXEMPT from readonly — LDR values are meant to be
+              reviewed/adjusted by the user every time, per the task scope for this change — so
+              they stay editable even though handleHeadSelect() also seeds them initially. The
+              `min-h-6` wrapper on both labels keeps the two header rows the same height (one has
+              a Calculator button, one doesn't) so their inputs stay aligned in the same grid row.
+            */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="mbsLdrPrsn"
                 render={({ field }) => (
                   <FormItem className="flex h-full flex-col">
-                    <FormLabel>LDR Rencana (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    <div className="flex min-h-6 items-center justify-between gap-2">
+                      <FormLabel>LDR Plan (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    </div>
                     <FormControl>
                       <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
-                    <FormDescription className="mt-auto">LDR awal saat produk baru, sebelum masuk mesin spinning.</FormDescription>
+                    <FormDescription className="mt-auto">Initial LDR for a new product, before entering the spinning machine.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -472,8 +523,8 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                 name="mbsRunLdrPct"
                 render={({ field }) => (
                   <FormItem className="flex h-full flex-col">
-                    <div className="flex items-center justify-between gap-2">
-                      <FormLabel>LDR Aktual (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    <div className="flex min-h-6 items-center justify-between gap-2">
+                      <FormLabel>LDR Actual (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                       <Button
                         type="button"
                         variant="ghost"
@@ -489,7 +540,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                       <Input {...field} type="number" step="0.000001" min="0" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
-                    <FormDescription className="mt-auto">LDR yang benar-benar dipakai saat produksi; nilai inilah yang dipakai perhitungan cost.</FormDescription>
+                    <FormDescription className="mt-auto">The LDR actually used in production; this is the value used in cost calculation.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -501,8 +552,11 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   <FormItem className="flex h-full flex-col">
                     <FormLabel>Final Product <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Optional" disabled={isPending} />
+                      <Input {...field} placeholder="Optional" readOnly disabled />
                     </FormControl>
+                    <FormDescription className="mt-auto">
+                      Follows the selected Master Product Type MB (or the cloned MB Spin).
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -510,67 +564,89 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             </div>
 
             {/*
-              P12B: fix/actual markers. THREE states, not two:
-                undefined -> "belum ditandai" (DB NULL). Backend IsFixedLDR/IsFixedDozing
-                            treat NULL as FIXED, so legacy rows are never recalculated.
-                true      -> nilai FIX (dikunci, tidak akan ditimpa recalc)
-                false     -> nilai hasil hitung (boleh ditimpa recalc P13)
-              The checkbox renders undefined as "indeterminate". Clicking it commits to
-              true/false; there is no way back to undefined, which is safe because
-              undefined and true mean the same thing to the backend.
-              Do NOT collapse undefined to false here — that flips a row from
-              protected to recalculable without the user asking.
+              ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment UI (write side "Task E" already
+              live on the backend). Provenance model: mbsLdrCalculatedPct is the read-only,
+              system-calculated LDR (recalc cascade); mbsLdrAdjustmentPct is a manual add-on;
+              effective LDR = calculated + adjustment. mbsLdrIsActual/mbsLdrType describe whether
+              the spin is currently "locked" to an actual value, in which case the recalc cascade
+              skips this spin and its calculated-LDR children until unlocked.
+              This whole block only makes sense for an existing record (nothing to show/lock on
+              a brand-new spin), so it is gated the same way as the dozing impact panel below.
             */}
-            <div className="grid grid-cols-2 gap-4 rounded-lg border p-4">
-              <FormField
-                control={form.control}
-                name="mbsLdrIsFixed"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start gap-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value === undefined ? "indeterminate" : field.value}
-                        onCheckedChange={(checked) =>
-                          field.onChange(checked === "indeterminate" ? undefined : checked === true)
-                        }
-                        disabled={isPending}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>LDR nilai FIX</FormLabel>
-                      <FormDescription>
-                        Centang bila LDR diisi manual dan tidak boleh ditimpa hitung ulang.
-                        Kotak abu-abu = belum ditandai (diperlakukan FIX).
+            {mbSpin && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <dt className="text-xs text-muted-foreground">LDR Terhitung (Sistem)</dt>
+                    <dd className="text-sm font-medium">
+                      {mbSpin.mbsLdrCalculatedPct != null ? `${mbSpin.mbsLdrCalculatedPct}%` : "Belum dihitung"}
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-xs text-muted-foreground">LDR Efektif</dt>
+                    <dd className="text-sm font-medium">
+                      {mbSpin.mbsLdrCalculatedPct != null || watchedLdrAdjustmentPct != null
+                        ? `${(mbSpin.mbsLdrCalculatedPct ?? 0) + (Number(watchedLdrAdjustmentPct) || 0)}%`
+                        : "Belum dihitung"}
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="text-xs text-muted-foreground">Status LDR</dt>
+                    <dd className="text-sm font-medium">
+                      {mbSpin.mbsLdrType === "ACTUAL"
+                        ? "Terkunci (Aktual)"
+                        : mbSpin.mbsLdrType === "CALCULATED"
+                          ? "Terhitung Otomatis"
+                          : "Belum Dihitung"}
+                    </dd>
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="mbsLdrLockActual"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel>Kunci LDR ke Nilai Aktual</FormLabel>
+                        <FormDescription>
+                          Mengunci menghentikan kalkulasi ulang otomatis dari spin ini ke turunannya, dan mewajibkan nilai LDR diisi manual/aktual sampai dibuka kuncinya.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isPending} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mbsLdrAdjustmentPct"
+                  render={({ field }) => (
+                    <FormItem className="flex h-full flex-col">
+                      <FormLabel>Penyesuaian LDR (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={ldrAdjustmentDisabled}
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
+                      </FormControl>
+                      <FormDescription className="mt-auto">
+                        Nilai tambahan manual di atas LDR terhitung sistem. Tidak dapat diubah selama LDR masih terkunci ke nilai aktual — buka kunci di atas terlebih dahulu.
                       </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mbsDozingIsFixed"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start gap-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value === undefined ? "indeterminate" : field.value}
-                        onCheckedChange={(checked) =>
-                          field.onChange(checked === "indeterminate" ? undefined : checked === true)
-                        }
-                        disabled={isPending}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Dozing nilai FIX</FormLabel>
-                      <FormDescription>
-                        Centang bila dozing diisi manual dan tidak boleh ditimpa hitung ulang.
-                        Kotak abu-abu = belum ditandai (diperlakukan FIX).
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/*
+              P12B checkbox UI (mbsLdrIsFixed / mbsDozingIsFixed) removed per user request.
+              The fields are simply no longer sent in the create/update payload — backend
+              (internal/domain/mbspin/entity.go:148-156) treats an absent/nil value as
+              FIXED=true by default, so omitting them keeps the same safe behavior as
+              before without needing any backend change.
+            */}
 
             {isEditing && (
               <FormField

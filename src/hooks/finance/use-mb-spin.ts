@@ -30,6 +30,7 @@ import {
   ImportMBSpinsResponseParser,
   DownloadMBSpinTemplateResponseParser,
 } from "@/types/finance/mb-spin"
+import { duplicateMBSpin, type DuplicateMBSpinInput } from "@/services/finance/mb-spin-api"
 
 // ============================================================================
 // Create CRUD hooks using factory
@@ -141,6 +142,28 @@ export function useImportMBSpins() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to import MB Spins")
+    },
+  })
+}
+
+// ============================================================================
+// Duplicate Hook (P8)
+// ============================================================================
+
+// Clones one MB Spin into a fresh "R and D" (draft) child (RPC DuplicateMBSpin).
+// Requires permission finance.yarnmaster.mbspin.create — same permission the
+// backend already gates the RPC behind, since this produces a brand-new record.
+// Invalidates the list so the new draft shows up without a manual refresh.
+export function useDuplicateMBSpin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: DuplicateMBSpinInput) => duplicateMBSpin(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mbSpinKeys.lists() })
+      toast.success("MB Spin duplicated successfully")
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to duplicate MB Spin")
     },
   })
 }

@@ -8,6 +8,11 @@ interface UpsertValueInput {
   valueText?: string
   valueFlag?: boolean
   hasValueFlag?: boolean
+  // Set when the user picked a specific row from the MB_SPIN candidate
+  // picker for an ambiguous entry — forwarded to the backend as-is so it can
+  // save this permanent mst_mb_spin.mbs_id directly, bypassing the
+  // ambiguity resolver for this save.
+  mbSpinIdOverride?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -23,6 +28,7 @@ export async function POST(request: NextRequest) {
       valueText: v.valueText ?? "",
       valueFlag: v.valueFlag ?? false,
       hasValueFlag: v.hasValueFlag ?? false,
+      mbSpinIdOverride: v.mbSpinIdOverride,
     }))
     const response = await client.upsertProductParamValuesBatch(
       { productSysId, values },

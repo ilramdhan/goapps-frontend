@@ -28,12 +28,65 @@ export interface RequiredParamEntry {
   valueMbSpinId: string
   mbSpinCandidateCount: number
   hasMbSpinCandidateCount: boolean
+  // Full candidate rows backing mbSpinCandidateCount — populated by the
+  // backend ONLY when the row is actually ambiguous (count > 1). Empty array
+  // in every other case (already resolved, zero matches, or not applicable).
+  // See MBSpinCandidate in cost_product_parameter.proto.
+  mbSpinCandidates: MBSpinCandidate[]
   hasValue: boolean
   valueNumeric: string
   valueText: string
   valueFlag: boolean
   filledAt: string
   filledBy: string
+}
+
+// MBSpinCandidate is one possible mst_mb_spin match behind an ambiguous
+// MB_SPIN lookup value — just enough disambiguating detail for a picker UI to
+// tell candidates apart before the user commits to one via mbSpinIdOverride.
+// Mirrors finance.v1.MBSpinCandidate.
+export interface MBSpinCandidate {
+  mbsId: string
+  orionItemCode: string
+  mgtName: string
+  denier: string
+  hasFilament: boolean
+  filament: number
+  ldrPrsn: string
+  runLdrPct: string
+  status: string
+}
+
+interface RawMBSpinCandidate {
+  mbsId?: string
+  mbs_id?: string
+  orionItemCode?: string
+  orion_item_code?: string
+  mgtName?: string
+  mgt_name?: string
+  denier?: string
+  filament?: number | string
+  hasFilament?: boolean | string
+  has_filament?: boolean | string
+  ldrPrsn?: string
+  ldr_prsn?: string
+  runLdrPct?: string
+  run_ldr_pct?: string
+  status?: string
+}
+
+function normalizeMBSpinCandidate(raw: RawMBSpinCandidate): MBSpinCandidate {
+  return {
+    mbsId: raw.mbsId ?? raw.mbs_id ?? "",
+    orionItemCode: raw.orionItemCode ?? raw.orion_item_code ?? "",
+    mgtName: raw.mgtName ?? raw.mgt_name ?? "",
+    denier: raw.denier ?? "",
+    hasFilament: parseBoolField(raw.hasFilament ?? raw.has_filament),
+    filament: parseIntField(raw.filament),
+    ldrPrsn: raw.ldrPrsn ?? raw.ldr_prsn ?? "",
+    runLdrPct: raw.runLdrPct ?? raw.run_ldr_pct ?? "",
+    status: raw.status ?? "",
+  }
 }
 
 export interface MissingParam {
@@ -81,6 +134,8 @@ interface RawRequiredParamEntry {
   mb_spin_candidate_count?: number | string
   hasMbSpinCandidateCount?: boolean | string
   has_mb_spin_candidate_count?: boolean | string
+  mbSpinCandidates?: RawMBSpinCandidate[]
+  mb_spin_candidates?: RawMBSpinCandidate[]
   hasValue?: boolean
   has_value?: boolean
   valueNumeric?: string
@@ -137,6 +192,9 @@ export function normalizeRequiredEntry(raw: RawRequiredParamEntry): RequiredPara
     mbSpinCandidateCount: parseIntField(raw.mbSpinCandidateCount ?? raw.mb_spin_candidate_count),
     hasMbSpinCandidateCount: parseBoolField(
       raw.hasMbSpinCandidateCount ?? raw.has_mb_spin_candidate_count,
+    ),
+    mbSpinCandidates: (raw.mbSpinCandidates ?? raw.mb_spin_candidates ?? []).map(
+      normalizeMBSpinCandidate,
     ),
     hasValue: raw.hasValue ?? raw.has_value ?? false,
     valueNumeric: raw.valueNumeric ?? raw.value_numeric ?? "",
@@ -199,6 +257,11 @@ export interface UpsertParamValuePayload {
   valueText?: string
   valueFlag?: boolean
   hasValueFlag?: boolean
+  // Set when the user picked a specific row from the MB_SPIN candidate
+  // picker for an ambiguous entry. When present, the backend saves this
+  // permanent mst_mb_spin.mbs_id directly as an explicit override,
+  // bypassing the ambiguity resolver entirely for this save.
+  mbSpinIdOverride?: string
 }
 
 // AvailableParamEntry — params NOT yet applicable for a product (Add Parameter picker).

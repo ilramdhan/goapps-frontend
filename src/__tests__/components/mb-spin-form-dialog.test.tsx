@@ -10,9 +10,9 @@
  *
  * R3: picking an option auto-fills the fields below from that head's own data.
  * Only fields with an unambiguous 1:1 MBHead counterpart are copied — mbsCc,
- * mbsCostRateMkt, mbsLdrIsFixed, mbsDozingIsFixed have none and must stay
- * untouched. The handler runs from the Select's onValueChange, not a
- * useEffect (sync setState-in-effect trips this repo's react-hooks lint rule).
+ * mbsCostRateMkt have none and must stay untouched. The handler runs from the
+ * Select's onValueChange, not a useEffect (sync setState-in-effect trips this
+ * repo's react-hooks lint rule).
  *
  * ⭐ DIPERBARUI 2026-08-26 — mbsStatus is no longer in the "no counterpart" list:
  * per user decision, MB Spin status now follows the selected MB Recipe's (MB
@@ -152,8 +152,8 @@ describe("MBSpinFormDialog — R3: selecting a head auto-fills the fields below"
     expect(screen.getByLabelText(/mb costing/i)).toHaveValue("MBH-2024-001")
     expect(screen.getByLabelText(/^denier/i)).toHaveValue(150.5)
     expect(screen.getByLabelText(/filaments/i)).toHaveValue(48)
-    expect(screen.getByLabelText(/ldr rencana/i)).toHaveValue(1.25)
-    expect(screen.getByLabelText(/ldr aktual/i)).toHaveValue(3.55)
+    expect(screen.getByLabelText(/ldr plan/i)).toHaveValue(1.25)
+    expect(screen.getByLabelText(/ldr actual/i)).toHaveValue(3.55)
     expect(screen.getByLabelText(/final product/i)).toHaveValue("FP-1")
   })
 

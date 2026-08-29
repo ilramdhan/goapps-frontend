@@ -35,6 +35,11 @@ export interface Shade {
   sourceUpdatedBy: string;
   /** Timestamp of the last successful Oracle sync (ISO 8601), empty if never synced. */
   syncedAt: string;
+  /**
+   * Count of rows referencing this shade's code across mst_mb_head, mst_mb_head_shade,
+   * and mst_mb_spin (soft-delete excluded). Read-only, derived — not settable.
+   */
+  usageCount: number;
   /** Audit metadata. */
   audit: AuditInfo | undefined;
 }
@@ -169,6 +174,7 @@ function createBaseShade(): Shade {
     sourceCreatedBy: "",
     sourceUpdatedBy: "",
     syncedAt: "",
+    usageCount: 0,
     audit: undefined,
   };
 }
@@ -207,6 +213,9 @@ export const Shade: MessageFns<Shade> = {
     }
     if (message.syncedAt !== "") {
       writer.uint32(90).string(message.syncedAt);
+    }
+    if (message.usageCount !== 0) {
+      writer.uint32(96).int32(message.usageCount);
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
@@ -309,6 +318,14 @@ export const Shade: MessageFns<Shade> = {
           message.syncedAt = reader.string();
           continue;
         }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.usageCount = reader.int32();
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -383,6 +400,11 @@ export const Shade: MessageFns<Shade> = {
         : isSet(object.synced_at)
         ? globalThis.String(object.synced_at)
         : "",
+      usageCount: isSet(object.usageCount)
+        ? globalThis.Number(object.usageCount)
+        : isSet(object.usage_count)
+        ? globalThis.Number(object.usage_count)
+        : 0,
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
     };
   },
@@ -422,6 +444,9 @@ export const Shade: MessageFns<Shade> = {
     if (message.syncedAt !== "") {
       obj.syncedAt = message.syncedAt;
     }
+    if (message.usageCount !== 0) {
+      obj.usageCount = Math.round(message.usageCount);
+    }
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
@@ -444,6 +469,7 @@ export const Shade: MessageFns<Shade> = {
     message.sourceCreatedBy = object.sourceCreatedBy ?? "";
     message.sourceUpdatedBy = object.sourceUpdatedBy ?? "";
     message.syncedAt = object.syncedAt ?? "";
+    message.usageCount = object.usageCount ?? 0;
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;

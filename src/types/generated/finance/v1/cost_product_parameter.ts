@@ -43,6 +43,36 @@ export interface CostProductParameterValue {
 }
 
 /**
+ * MBSpinCandidate is one possible mst_mb_spin match behind an ambiguous
+ * MB_SPIN lookup value_text (an ORION item code shared by more than one
+ * mst_mb_spin row). Carries just enough disambiguating detail — mirrors the
+ * columns already shown in the MB_SPIN combobox extra-detail row — for the
+ * user to tell the candidates apart before picking one.
+ */
+export interface MBSpinCandidate {
+  /**
+   * Permanent mst_mb_spin.mbs_id UUID — this is what gets saved as
+   * mb_spin_id_override when the user picks this candidate, never the
+   * (possibly ambiguous) ORION item code.
+   */
+  mbsId: string;
+  orionItemCode: string;
+  mgtName: string;
+  /** Denier as a decimal string; empty = not set. */
+  denier: string;
+  filament: number;
+  hasFilament: boolean;
+  /** "LDR Rencana" — planned LDR, as a decimal string; empty = not set. */
+  ldrPrsn: string;
+  /**
+   * "LDR Aktual" — authoritative actual LDR (see mbs_run_ldr_pct), as a
+   * decimal string; empty = not set.
+   */
+  runLdrPct: string;
+  status: string;
+}
+
+/**
  * RequiredParamEntry surfaces a required mst_parameter row that may or may not
  * yet have a value bound for the product (used by ListProductRequiredParams).
  */
@@ -83,6 +113,14 @@ export interface RequiredParamEntry {
    * count is not applicable — do not interpret 0 as "not applicable".
    */
   hasMbSpinCandidateCount: boolean;
+  /**
+   * Full candidate list backing mb_spin_candidate_count, populated ONLY when
+   * the row is actually ambiguous (has_mb_spin_candidate_count is true and
+   * mb_spin_candidate_count > 1). Empty in every other case — including the
+   * "already resolved" and "zero matches" states — so callers should gate on
+   * the count fields above rather than on this list's emptiness alone.
+   */
+  mbSpinCandidates: MBSpinCandidate[];
   /** Existing value (zero/empty when not yet bound). */
   hasValue: boolean;
   valueNumeric: string;
@@ -115,6 +153,16 @@ export interface UpsertProductParamValueRequest {
    */
   valueFlag: boolean;
   hasValueFlag: boolean;
+  /**
+   * Explicit mst_mb_spin.mbs_id UUID chosen by the user from the
+   * MBSpinCandidate list for an ambiguous MB_SPIN lookup value. When set,
+   * this is written directly to cpp_value_mb_spin_id and the normal
+   * ORION-code ambiguity resolver (which requires an exact single match) is
+   * skipped entirely — the user's explicit pick always wins. value_text is
+   * still saved as-is alongside it (companion column, see
+   * cpp_value_mb_spin_id / migration 000494).
+   */
+  mbSpinIdOverride?: string | undefined;
 }
 
 export interface UpsertProductParamValueResponse {
@@ -761,6 +809,228 @@ export const CostProductParameterValue: MessageFns<CostProductParameterValue> = 
   },
 };
 
+function createBaseMBSpinCandidate(): MBSpinCandidate {
+  return {
+    mbsId: "",
+    orionItemCode: "",
+    mgtName: "",
+    denier: "",
+    filament: 0,
+    hasFilament: false,
+    ldrPrsn: "",
+    runLdrPct: "",
+    status: "",
+  };
+}
+
+export const MBSpinCandidate: MessageFns<MBSpinCandidate> = {
+  encode(message: MBSpinCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbsId !== "") {
+      writer.uint32(10).string(message.mbsId);
+    }
+    if (message.orionItemCode !== "") {
+      writer.uint32(18).string(message.orionItemCode);
+    }
+    if (message.mgtName !== "") {
+      writer.uint32(26).string(message.mgtName);
+    }
+    if (message.denier !== "") {
+      writer.uint32(34).string(message.denier);
+    }
+    if (message.filament !== 0) {
+      writer.uint32(40).int32(message.filament);
+    }
+    if (message.hasFilament !== false) {
+      writer.uint32(48).bool(message.hasFilament);
+    }
+    if (message.ldrPrsn !== "") {
+      writer.uint32(58).string(message.ldrPrsn);
+    }
+    if (message.runLdrPct !== "") {
+      writer.uint32(66).string(message.runLdrPct);
+    }
+    if (message.status !== "") {
+      writer.uint32(74).string(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MBSpinCandidate {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMBSpinCandidate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbsId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.orionItemCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mgtName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.denier = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.filament = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.hasFilament = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.ldrPrsn = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.runLdrPct = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MBSpinCandidate {
+    return {
+      mbsId: isSet(object.mbsId)
+        ? globalThis.String(object.mbsId)
+        : isSet(object.mbs_id)
+        ? globalThis.String(object.mbs_id)
+        : "",
+      orionItemCode: isSet(object.orionItemCode)
+        ? globalThis.String(object.orionItemCode)
+        : isSet(object.orion_item_code)
+        ? globalThis.String(object.orion_item_code)
+        : "",
+      mgtName: isSet(object.mgtName)
+        ? globalThis.String(object.mgtName)
+        : isSet(object.mgt_name)
+        ? globalThis.String(object.mgt_name)
+        : "",
+      denier: isSet(object.denier) ? globalThis.String(object.denier) : "",
+      filament: isSet(object.filament) ? globalThis.Number(object.filament) : 0,
+      hasFilament: isSet(object.hasFilament)
+        ? globalThis.Boolean(object.hasFilament)
+        : isSet(object.has_filament)
+        ? globalThis.Boolean(object.has_filament)
+        : false,
+      ldrPrsn: isSet(object.ldrPrsn)
+        ? globalThis.String(object.ldrPrsn)
+        : isSet(object.ldr_prsn)
+        ? globalThis.String(object.ldr_prsn)
+        : "",
+      runLdrPct: isSet(object.runLdrPct)
+        ? globalThis.String(object.runLdrPct)
+        : isSet(object.run_ldr_pct)
+        ? globalThis.String(object.run_ldr_pct)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+    };
+  },
+
+  toJSON(message: MBSpinCandidate): unknown {
+    const obj: any = {};
+    if (message.mbsId !== "") {
+      obj.mbsId = message.mbsId;
+    }
+    if (message.orionItemCode !== "") {
+      obj.orionItemCode = message.orionItemCode;
+    }
+    if (message.mgtName !== "") {
+      obj.mgtName = message.mgtName;
+    }
+    if (message.denier !== "") {
+      obj.denier = message.denier;
+    }
+    if (message.filament !== 0) {
+      obj.filament = Math.round(message.filament);
+    }
+    if (message.hasFilament !== false) {
+      obj.hasFilament = message.hasFilament;
+    }
+    if (message.ldrPrsn !== "") {
+      obj.ldrPrsn = message.ldrPrsn;
+    }
+    if (message.runLdrPct !== "") {
+      obj.runLdrPct = message.runLdrPct;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MBSpinCandidate>): MBSpinCandidate {
+    return MBSpinCandidate.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MBSpinCandidate>): MBSpinCandidate {
+    const message = createBaseMBSpinCandidate();
+    message.mbsId = object.mbsId ?? "";
+    message.orionItemCode = object.orionItemCode ?? "";
+    message.mgtName = object.mgtName ?? "";
+    message.denier = object.denier ?? "";
+    message.filament = object.filament ?? 0;
+    message.hasFilament = object.hasFilament ?? false;
+    message.ldrPrsn = object.ldrPrsn ?? "";
+    message.runLdrPct = object.runLdrPct ?? "";
+    message.status = object.status ?? "";
+    return message;
+  },
+};
+
 function createBaseRequiredParamEntry(): RequiredParamEntry {
   return {
     paramId: "",
@@ -779,6 +1049,7 @@ function createBaseRequiredParamEntry(): RequiredParamEntry {
     valueMbSpinId: "",
     mbSpinCandidateCount: 0,
     hasMbSpinCandidateCount: false,
+    mbSpinCandidates: [],
     hasValue: false,
     valueNumeric: "",
     valueText: "",
@@ -837,6 +1108,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     }
     if (message.hasMbSpinCandidateCount !== false) {
       writer.uint32(128).bool(message.hasMbSpinCandidateCount);
+    }
+    for (const v of message.mbSpinCandidates) {
+      MBSpinCandidate.encode(v!, writer.uint32(138).fork()).join();
     }
     if (message.hasValue !== false) {
       writer.uint32(160).bool(message.hasValue);
@@ -994,6 +1268,14 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
           message.hasMbSpinCandidateCount = reader.bool();
           continue;
         }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.mbSpinCandidates.push(MBSpinCandidate.decode(reader, reader.uint32()));
+          continue;
+        }
         case 20: {
           if (tag !== 160) {
             break;
@@ -1133,6 +1415,11 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
         : isSet(object.has_mb_spin_candidate_count)
         ? globalThis.Boolean(object.has_mb_spin_candidate_count)
         : false,
+      mbSpinCandidates: globalThis.Array.isArray(object?.mbSpinCandidates)
+        ? object.mbSpinCandidates.map((e: any) => MBSpinCandidate.fromJSON(e))
+        : globalThis.Array.isArray(object?.mb_spin_candidates)
+        ? object.mb_spin_candidates.map((e: any) => MBSpinCandidate.fromJSON(e))
+        : [],
       hasValue: isSet(object.hasValue)
         ? globalThis.Boolean(object.hasValue)
         : isSet(object.has_value)
@@ -1216,6 +1503,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     if (message.hasMbSpinCandidateCount !== false) {
       obj.hasMbSpinCandidateCount = message.hasMbSpinCandidateCount;
     }
+    if (message.mbSpinCandidates?.length) {
+      obj.mbSpinCandidates = message.mbSpinCandidates.map((e) => MBSpinCandidate.toJSON(e));
+    }
     if (message.hasValue !== false) {
       obj.hasValue = message.hasValue;
     }
@@ -1258,6 +1548,7 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     message.valueMbSpinId = object.valueMbSpinId ?? "";
     message.mbSpinCandidateCount = object.mbSpinCandidateCount ?? 0;
     message.hasMbSpinCandidateCount = object.hasMbSpinCandidateCount ?? false;
+    message.mbSpinCandidates = object.mbSpinCandidates?.map((e) => MBSpinCandidate.fromPartial(e)) || [];
     message.hasValue = object.hasValue ?? false;
     message.valueNumeric = object.valueNumeric ?? "";
     message.valueText = object.valueText ?? "";
@@ -1431,7 +1722,15 @@ export const ListProductRequiredParamsResponse: MessageFns<ListProductRequiredPa
 };
 
 function createBaseUpsertProductParamValueRequest(): UpsertProductParamValueRequest {
-  return { productSysId: 0, paramId: "", valueNumeric: "", valueText: "", valueFlag: false, hasValueFlag: false };
+  return {
+    productSysId: 0,
+    paramId: "",
+    valueNumeric: "",
+    valueText: "",
+    valueFlag: false,
+    hasValueFlag: false,
+    mbSpinIdOverride: undefined,
+  };
 }
 
 export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueRequest> = {
@@ -1453,6 +1752,9 @@ export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueR
     }
     if (message.hasValueFlag !== false) {
       writer.uint32(48).bool(message.hasValueFlag);
+    }
+    if (message.mbSpinIdOverride !== undefined) {
+      writer.uint32(58).string(message.mbSpinIdOverride);
     }
     return writer;
   },
@@ -1512,6 +1814,14 @@ export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueR
           message.hasValueFlag = reader.bool();
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.mbSpinIdOverride = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1553,6 +1863,11 @@ export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueR
         : isSet(object.has_value_flag)
         ? globalThis.Boolean(object.has_value_flag)
         : false,
+      mbSpinIdOverride: isSet(object.mbSpinIdOverride)
+        ? globalThis.String(object.mbSpinIdOverride)
+        : isSet(object.mb_spin_id_override)
+        ? globalThis.String(object.mb_spin_id_override)
+        : undefined,
     };
   },
 
@@ -1576,6 +1891,9 @@ export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueR
     if (message.hasValueFlag !== false) {
       obj.hasValueFlag = message.hasValueFlag;
     }
+    if (message.mbSpinIdOverride !== undefined) {
+      obj.mbSpinIdOverride = message.mbSpinIdOverride;
+    }
     return obj;
   },
 
@@ -1590,6 +1908,7 @@ export const UpsertProductParamValueRequest: MessageFns<UpsertProductParamValueR
     message.valueText = object.valueText ?? "";
     message.valueFlag = object.valueFlag ?? false;
     message.hasValueFlag = object.hasValueFlag ?? false;
+    message.mbSpinIdOverride = object.mbSpinIdOverride ?? undefined;
     return message;
   },
 };

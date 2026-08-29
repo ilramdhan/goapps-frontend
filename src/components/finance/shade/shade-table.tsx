@@ -60,6 +60,13 @@ export function ShadeTable({ data, isLoading, onView }: ShadeTableProps) {
       hideOnMobile: true,
       cell: (row) => (row.syncedAt ? new Date(row.syncedAt).toLocaleString() : <span className="text-muted-foreground">—</span>),
     },
+    {
+      id: "usageCount",
+      header: "Usage Count",
+      width: "w-[110px]",
+      hideOnMobile: true,
+      cell: (row) => <span className="tabular-nums">{row.usageCount ?? 0}</span>,
+    },
   ]
 
   const actions: RowAction<Shade>[] = [

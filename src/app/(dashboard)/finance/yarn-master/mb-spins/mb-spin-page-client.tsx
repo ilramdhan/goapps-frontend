@@ -21,6 +21,7 @@ import {
 import { DataTablePagination } from "@/components/shared"
 import {
   MBSpinDeleteDialog,
+  MBSpinDuplicateDialog,
   MBSpinFilters,
   MBSpinFormDialog,
   MBSpinTable,
@@ -49,6 +50,7 @@ function MBSpinPageContent() {
   const [selectedItem, setSelectedItem] = useState<MBSpin | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
   function openCreate() {
@@ -64,6 +66,11 @@ function MBSpinPageContent() {
   function openDelete(mbSpin: MBSpin) {
     setSelectedItem(mbSpin)
     setDeleteDialogOpen(true)
+  }
+
+  function openDuplicate(mbSpin: MBSpin) {
+    setSelectedItem(mbSpin)
+    setDuplicateDialogOpen(true)
   }
 
   const items = data?.data ?? []
@@ -123,6 +130,7 @@ function MBSpinPageContent() {
             isLoading={isLoading}
             onEdit={openEdit}
             onDelete={openDelete}
+            onDuplicate={openDuplicate}
           />
           <DataTablePagination
             currentPage={Number(pagination?.currentPage ?? 1)}
@@ -143,6 +151,11 @@ function MBSpinPageContent() {
       <MBSpinDeleteDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
+        mbSpin={selectedItem}
+      />
+      <MBSpinDuplicateDialog
+        open={duplicateDialogOpen}
+        onOpenChange={setDuplicateDialogOpen}
         mbSpin={selectedItem}
       />
       <MBSpinImportDialog
