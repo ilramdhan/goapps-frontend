@@ -2140,7 +2140,21 @@ export interface MBSpin {
    * Fix/actual marker for the dozing value. Absent means "unknown", which the
    * domain treats as FIXED (recalc-safe). true = fixed, false = computed.
    */
-  mbsDozingIsFixed?: boolean | undefined;
+  mbsDozingIsFixed?:
+    | boolean
+    | undefined;
+  /** Current LDR provenance: NOT_CALCULATED, CALCULATED, or ACTUAL. Mirrors mbs_ldr_type. */
+  mbsLdrType: string;
+  /** System-calculated LDR percentage, before any manual adjustment. Mirrors mbs_ldr_calculated_pct. */
+  mbsLdrCalculatedPct?:
+    | number
+    | undefined;
+  /** Manual adjustment added on top of the calculated LDR. Mirrors mbs_ldr_adjustment_pct. */
+  mbsLdrAdjustmentPct?:
+    | number
+    | undefined;
+  /** True when the LDR is locked to an actual/manual value (mbs_ldr_type is then ACTUAL). Mirrors mbs_ldr_is_actual. */
+  mbsLdrIsActual: boolean;
 }
 
 /** CreateMBSpinRequest is the request for creating an MB Spin record. */
@@ -2288,7 +2302,21 @@ export interface UpdateMBSpinRequest {
     | boolean
     | undefined;
   /** Optional fix/actual marker for dozing. Absent = leave unchanged. */
-  mbsDozingIsFixed?: boolean | undefined;
+  mbsDozingIsFixed?:
+    | boolean
+    | undefined;
+  /**
+   * Optional new LDR adjustment percentage. Absent = leave unchanged. Rejected by
+   * the domain if the spin's LDR is currently locked as Actual — unlock first.
+   */
+  mbsLdrAdjustmentPct?:
+    | number
+    | undefined;
+  /**
+   * Optional lock/unlock instruction for LDR Actual status. true = lock as
+   * Actual, false = unlock. Absent = no-op (leave the lock state untouched).
+   */
+  mbsLdrLockActual?: boolean | undefined;
 }
 
 /** UpdateMBSpinResponse is the response for updating an MB Spin record. */
@@ -19213,6 +19241,10 @@ function createBaseMBSpin(): MBSpin {
     audit: undefined,
     mbsLdrIsFixed: undefined,
     mbsDozingIsFixed: undefined,
+    mbsLdrType: "",
+    mbsLdrCalculatedPct: undefined,
+    mbsLdrAdjustmentPct: undefined,
+    mbsLdrIsActual: false,
   };
 }
 
@@ -19271,6 +19303,18 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.mbsDozingIsFixed !== undefined) {
       writer.uint32(144).bool(message.mbsDozingIsFixed);
+    }
+    if (message.mbsLdrType !== "") {
+      writer.uint32(154).string(message.mbsLdrType);
+    }
+    if (message.mbsLdrCalculatedPct !== undefined) {
+      writer.uint32(161).double(message.mbsLdrCalculatedPct);
+    }
+    if (message.mbsLdrAdjustmentPct !== undefined) {
+      writer.uint32(169).double(message.mbsLdrAdjustmentPct);
+    }
+    if (message.mbsLdrIsActual !== false) {
+      writer.uint32(176).bool(message.mbsLdrIsActual);
     }
     return writer;
   },
@@ -19426,6 +19470,38 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.mbsDozingIsFixed = reader.bool();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.mbsLdrType = reader.string();
+          continue;
+        }
+        case 20: {
+          if (tag !== 161) {
+            break;
+          }
+
+          message.mbsLdrCalculatedPct = reader.double();
+          continue;
+        }
+        case 21: {
+          if (tag !== 169) {
+            break;
+          }
+
+          message.mbsLdrAdjustmentPct = reader.double();
+          continue;
+        }
+        case 22: {
+          if (tag !== 176) {
+            break;
+          }
+
+          message.mbsLdrIsActual = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -19523,6 +19599,26 @@ export const MBSpin: MessageFns<MBSpin> = {
         : isSet(object.mbs_dozing_is_fixed)
         ? globalThis.Boolean(object.mbs_dozing_is_fixed)
         : undefined,
+      mbsLdrType: isSet(object.mbsLdrType)
+        ? globalThis.String(object.mbsLdrType)
+        : isSet(object.mbs_ldr_type)
+        ? globalThis.String(object.mbs_ldr_type)
+        : "",
+      mbsLdrCalculatedPct: isSet(object.mbsLdrCalculatedPct)
+        ? globalThis.Number(object.mbsLdrCalculatedPct)
+        : isSet(object.mbs_ldr_calculated_pct)
+        ? globalThis.Number(object.mbs_ldr_calculated_pct)
+        : undefined,
+      mbsLdrAdjustmentPct: isSet(object.mbsLdrAdjustmentPct)
+        ? globalThis.Number(object.mbsLdrAdjustmentPct)
+        : isSet(object.mbs_ldr_adjustment_pct)
+        ? globalThis.Number(object.mbs_ldr_adjustment_pct)
+        : undefined,
+      mbsLdrIsActual: isSet(object.mbsLdrIsActual)
+        ? globalThis.Boolean(object.mbsLdrIsActual)
+        : isSet(object.mbs_ldr_is_actual)
+        ? globalThis.Boolean(object.mbs_ldr_is_actual)
+        : false,
     };
   },
 
@@ -19582,6 +19678,18 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.mbsDozingIsFixed !== undefined) {
       obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
     }
+    if (message.mbsLdrType !== "") {
+      obj.mbsLdrType = message.mbsLdrType;
+    }
+    if (message.mbsLdrCalculatedPct !== undefined) {
+      obj.mbsLdrCalculatedPct = message.mbsLdrCalculatedPct;
+    }
+    if (message.mbsLdrAdjustmentPct !== undefined) {
+      obj.mbsLdrAdjustmentPct = message.mbsLdrAdjustmentPct;
+    }
+    if (message.mbsLdrIsActual !== false) {
+      obj.mbsLdrIsActual = message.mbsLdrIsActual;
+    }
     return obj;
   },
 
@@ -19610,6 +19718,10 @@ export const MBSpin: MessageFns<MBSpin> = {
       : undefined;
     message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
     message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
+    message.mbsLdrType = object.mbsLdrType ?? "";
+    message.mbsLdrCalculatedPct = object.mbsLdrCalculatedPct ?? undefined;
+    message.mbsLdrAdjustmentPct = object.mbsLdrAdjustmentPct ?? undefined;
+    message.mbsLdrIsActual = object.mbsLdrIsActual ?? false;
     return message;
   },
 };
@@ -20232,6 +20344,8 @@ function createBaseUpdateMBSpinRequest(): UpdateMBSpinRequest {
     mbsRunLdrPct: undefined,
     mbsLdrIsFixed: undefined,
     mbsDozingIsFixed: undefined,
+    mbsLdrAdjustmentPct: undefined,
+    mbsLdrLockActual: undefined,
   };
 }
 
@@ -20284,6 +20398,12 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     }
     if (message.mbsDozingIsFixed !== undefined) {
       writer.uint32(128).bool(message.mbsDozingIsFixed);
+    }
+    if (message.mbsLdrAdjustmentPct !== undefined) {
+      writer.uint32(137).double(message.mbsLdrAdjustmentPct);
+    }
+    if (message.mbsLdrLockActual !== undefined) {
+      writer.uint32(144).bool(message.mbsLdrLockActual);
     }
     return writer;
   },
@@ -20423,6 +20543,22 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
           message.mbsDozingIsFixed = reader.bool();
           continue;
         }
+        case 17: {
+          if (tag !== 137) {
+            break;
+          }
+
+          message.mbsLdrAdjustmentPct = reader.double();
+          continue;
+        }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.mbsLdrLockActual = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -20514,6 +20650,16 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
         : isSet(object.mbs_dozing_is_fixed)
         ? globalThis.Boolean(object.mbs_dozing_is_fixed)
         : undefined,
+      mbsLdrAdjustmentPct: isSet(object.mbsLdrAdjustmentPct)
+        ? globalThis.Number(object.mbsLdrAdjustmentPct)
+        : isSet(object.mbs_ldr_adjustment_pct)
+        ? globalThis.Number(object.mbs_ldr_adjustment_pct)
+        : undefined,
+      mbsLdrLockActual: isSet(object.mbsLdrLockActual)
+        ? globalThis.Boolean(object.mbsLdrLockActual)
+        : isSet(object.mbs_ldr_lock_actual)
+        ? globalThis.Boolean(object.mbs_ldr_lock_actual)
+        : undefined,
     };
   },
 
@@ -20567,6 +20713,12 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     if (message.mbsDozingIsFixed !== undefined) {
       obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
     }
+    if (message.mbsLdrAdjustmentPct !== undefined) {
+      obj.mbsLdrAdjustmentPct = message.mbsLdrAdjustmentPct;
+    }
+    if (message.mbsLdrLockActual !== undefined) {
+      obj.mbsLdrLockActual = message.mbsLdrLockActual;
+    }
     return obj;
   },
 
@@ -20591,6 +20743,8 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
     message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
+    message.mbsLdrAdjustmentPct = object.mbsLdrAdjustmentPct ?? undefined;
+    message.mbsLdrLockActual = object.mbsLdrLockActual ?? undefined;
     return message;
   },
 };

@@ -1,9 +1,10 @@
 "use client"
 
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2, Copy } from "lucide-react"
 
 import { DataTable, type ColumnDef, type RowAction } from "@/components/shared"
 import { StatusBadge } from "@/components/common"
+import { usePermissionContext } from "@/providers/permission-provider"
 
 import type { MBSpin } from "@/types/finance/mb-spin"
 
@@ -12,9 +13,15 @@ interface MBSpinTableProps {
   isLoading?: boolean
   onEdit: (mbSpin: MBSpin) => void
   onDelete: (mbSpin: MBSpin) => void
+  onDuplicate?: (mbSpin: MBSpin) => void
 }
 
-export function MBSpinTable({ data, isLoading, onEdit, onDelete }: MBSpinTableProps) {
+export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: MBSpinTableProps) {
+  const { hasPermission } = usePermissionContext()
+  // Same permission the backend already gates RPC DuplicateMBSpin behind — the
+  // clone is a brand-new "R and D" record, so this reuses the "create" code
+  // rather than introducing a new permission code.
+  const canDuplicate = onDuplicate != null && hasPermission("finance.yarnmaster.mbspin.create")
   const columns: ColumnDef<MBSpin>[] = [
     {
       id: "mbsMgtName",
@@ -88,14 +95,22 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete }: MBSpinTablePr
       icon: <Pencil className="h-4 w-4" />,
       onClick: onEdit,
     },
-    {
-      id: "delete",
-      label: "Delete",
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: onDelete,
-      variant: "destructive",
-    },
   ]
+  if (canDuplicate) {
+    actions.push({
+      id: "duplicate",
+      label: "Duplicate",
+      icon: <Copy className="h-4 w-4" />,
+      onClick: onDuplicate!,
+    })
+  }
+  actions.push({
+    id: "delete",
+    label: "Delete",
+    icon: <Trash2 className="h-4 w-4" />,
+    onClick: onDelete,
+    variant: "destructive",
+  })
 
   return (
     <DataTable
