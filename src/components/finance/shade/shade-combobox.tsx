@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useShades } from "@/hooks/finance/use-shade"
+import { ActiveFilter } from "@/types/finance/shade"
 import { cn } from "@/lib/utils"
 
 interface ShadeComboboxProps {
@@ -49,7 +50,11 @@ export function ShadeCombobox({ code, name, onSelect, placeholder = "Select shad
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   // page/pageSize sent explicitly — proto validation requires page >= 1, pageSize >= 1.
-  const { data, isLoading } = useShades({ page: 1, pageSize: 20, search })
+  // activeFilter restricts the pick list to active shades only (a new pick must
+  // always be a currently-usable master row); this does not affect the
+  // already-selected code/name shown on the trigger for legacy data — see the
+  // file header.
+  const { data, isLoading } = useShades({ page: 1, pageSize: 20, search, activeFilter: ActiveFilter.ACTIVE_FILTER_ACTIVE })
   const shades = data?.data ?? []
 
   const hasValue = Boolean(code || name)

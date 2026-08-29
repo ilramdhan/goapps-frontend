@@ -653,34 +653,32 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="mbhRunLdrPct"
-                      render={({ field }) => (
-                        <FormItem className="col-span-2 flex h-full flex-col">
-                          <FormLabel>
-                            LDR Aktual (%) <span className="text-muted-foreground text-xs">(optional)</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.000001"
-                              min="0"
-                              value={field.value ?? ""}
-                              placeholder="Optional"
-                              disabled={isPending}
-                              onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormDescription className="mt-auto">
-                            LDR yang benar-benar dipakai saat produksi; nilai inilah yang dipakai perhitungan cost.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
+
+                  {/*
+                    ~~"LDR Aktual (%)" (mbhRunLdrPct) lived here: an optional
+                    input below LDR %, letting the user record the actual/
+                    production LDR value alongside the planned one.~~
+
+                    ⭐ DIPERBARUI 2026-08-28 — product has moved to the new "1 MB
+                    Spin = 1 LDR" architecture: the actual/production LDR now
+                    lives entirely at the MB Spin level (calculated +
+                    adjustment + actual-lock, migration 000496, mst_mb_spin),
+                    superseding this Head-level field. User confirmed zero
+                    mst_parameter rows reference mbh_run_ldr_pct as a formula
+                    lookup source, and confirmed this field was implemented
+                    shortly before the decision and never actually used in
+                    production. The input is NO LONGER RENDERED.
+                    ⛔ DISPLAY-ONLY, exactly like mbhDozing/mbhShadeCode and the
+                    additionalShades editor above: mbhRunLdrPct stays in the
+                    zod schema, in EMPTY_VALUES, in the form.reset seed and in
+                    BOTH create/update payloads, so a stored recipe's value
+                    round-trips byte-for-byte on save instead of being silently
+                    wiped. The Oracle-synced column, the proto field, and the
+                    mst_lookup_master_column registration are all untouched —
+                    only this modal's editable input is gone. Do not "clean
+                    this up".
+                  */}
 
                   {/*
                     TODO(G5): the "Dozing" field belongs on this tab, but its LABEL
