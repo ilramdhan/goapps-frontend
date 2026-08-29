@@ -86,6 +86,9 @@ export function ShadeDetailDialog({ open, onOpenChange, shade, onEdit }: ShadeDe
               <Field label="Last Synced">
                 {shade.syncedAt ? new Date(shade.syncedAt).toLocaleString() : <span className="text-muted-foreground">Never</span>}
               </Field>
+              <Field label="Usage Count">
+                <span className="tabular-nums">{shade.usageCount ?? 0}</span>
+              </Field>
             </div>
 
             {!isManual && (
