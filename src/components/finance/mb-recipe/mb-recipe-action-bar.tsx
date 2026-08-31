@@ -46,6 +46,7 @@
 import { useState } from "react"
 import { Loader2, Unlock } from "lucide-react"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { usePermissionContext } from "@/providers/permission-provider"
 import { ReasonDialog } from "@/components/finance/cost-product-request/transition-dialogs"
@@ -157,7 +158,7 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-start gap-2">
       <div className="flex flex-wrap items-center gap-2">
       {canSubmit && (
         <Button
@@ -212,10 +213,23 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
       )}
     </div>
       {submitBlockedByTotal && (
-        <span className="w-full max-w-full break-words text-xs text-destructive font-medium">
-          Composition total is {(compositionTotalPct ?? 0).toFixed(3)}%, which exceeds 100%. Fix
-          the composition before submitting.
-        </span>
+        // [P8-T1] Rendered as its own row below the button group (a sibling of the
+        // flex-wrap button row above, not a child of it) so the button group's width
+        // never constrains it. `min-w-[…]` uses absolute units on purpose — a plain
+        // `w-full` alone resolves against an auto-sized ancestor's shrink-to-fit width,
+        // which (per CSS intrinsic-sizing rules) ignores percentage-width descendants
+        // and would just collapse back to the button row's width. The min-width floor
+        // forces the ancestor to actually reserve that much space, so this genuinely
+        // spans rather than getting squeezed on narrow/medium screens.
+        <Alert
+          variant="destructive"
+          className="w-full min-w-[240px] sm:min-w-[380px] md:min-w-[460px]"
+        >
+          <AlertDescription className="text-xs sm:text-sm break-words">
+            Composition total is {(compositionTotalPct ?? 0).toFixed(3)}%, which exceeds 100%. Fix
+            the composition before submitting.
+          </AlertDescription>
+        </Alert>
       )}
 
       <ReasonDialog
