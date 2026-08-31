@@ -2155,6 +2155,16 @@ export interface MBSpin {
     | undefined;
   /** True when the LDR is locked to an actual/manual value (mbs_ldr_type is then ACTUAL). Mirrors mbs_ldr_is_actual. */
   mbsLdrIsActual: boolean;
+  /** Optional Oracle CMBS_VS_NUMBER — VS reference number, copied from the parent MB Head's mbh_vs_number. */
+  mbsVsNumber?:
+    | string
+    | undefined;
+  /** Shade code, copied down from MB Head at auto-gen. Read-only lineage field. */
+  mbsShadeCode: string;
+  /** Shade name, copied down from MB Head at auto-gen. Read-only lineage field. */
+  mbsShadeName: string;
+  /** Cross section, copied down from MB Head at auto-gen. Read-only lineage field. */
+  mbsCrossSection: string;
 }
 
 /** CreateMBSpinRequest is the request for creating an MB Spin record. */
@@ -2212,7 +2222,11 @@ export interface CreateMBSpinRequest {
     | boolean
     | undefined;
   /** Optional fix/actual marker for dozing. Absent = unknown (treated as fixed). */
-  mbsDozingIsFixed?: boolean | undefined;
+  mbsDozingIsFixed?:
+    | boolean
+    | undefined;
+  /** Optional VS reference number (free text, e.g. "NA"). */
+  mbsVsNumber?: string | undefined;
 }
 
 /** CreateMBSpinResponse is the response for creating an MB Spin record. */
@@ -2316,7 +2330,11 @@ export interface UpdateMBSpinRequest {
    * Optional lock/unlock instruction for LDR Actual status. true = lock as
    * Actual, false = unlock. Absent = no-op (leave the lock state untouched).
    */
-  mbsLdrLockActual?: boolean | undefined;
+  mbsLdrLockActual?:
+    | boolean
+    | undefined;
+  /** Optional VS reference number. Absent = leave unchanged. */
+  mbsVsNumber?: string | undefined;
 }
 
 /** UpdateMBSpinResponse is the response for updating an MB Spin record. */
@@ -2326,7 +2344,31 @@ export interface UpdateMBSpinResponse {
     | BaseResponse
     | undefined;
   /** Updated MB Spin data. */
-  data: MBSpin | undefined;
+  data:
+    | MBSpin
+    | undefined;
+  /**
+   * Child spins deliberately left untouched by the recalc pass (rule A7).
+   * Empty when every candidate child was recalculated.
+   */
+  skipped: MBSpinRecalcSkipped[];
+  /**
+   * Number of skipped child spins. Equals len(skipped) — sent explicitly so a
+   * caller that ignores the detail rows still gets the count.
+   */
+  skippedCount: number;
+  /**
+   * Products that WOULD be affected, Top-N. ⛔ NOT a recalculation result (D24).
+   * Reuses DozingImpactRow, the same row type PreviewDozingImpact returns, so
+   * the UI can render both with one component.
+   */
+  impactPreview: DozingImpactRow[];
+  /** Total number of affected products, before truncation. */
+  impactTotalAffected: number;
+  /** Number of affected products whose costing is locked. */
+  impactTotalLocked: number;
+  /** True when impact_preview was truncated by the server's row cap. */
+  impactTruncated: boolean;
 }
 
 /** DeleteMBSpinRequest is the request for soft-deleting an MB Spin record. */
@@ -19245,6 +19287,10 @@ function createBaseMBSpin(): MBSpin {
     mbsLdrCalculatedPct: undefined,
     mbsLdrAdjustmentPct: undefined,
     mbsLdrIsActual: false,
+    mbsVsNumber: undefined,
+    mbsShadeCode: "",
+    mbsShadeName: "",
+    mbsCrossSection: "",
   };
 }
 
@@ -19315,6 +19361,18 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.mbsLdrIsActual !== false) {
       writer.uint32(176).bool(message.mbsLdrIsActual);
+    }
+    if (message.mbsVsNumber !== undefined) {
+      writer.uint32(186).string(message.mbsVsNumber);
+    }
+    if (message.mbsShadeCode !== "") {
+      writer.uint32(194).string(message.mbsShadeCode);
+    }
+    if (message.mbsShadeName !== "") {
+      writer.uint32(202).string(message.mbsShadeName);
+    }
+    if (message.mbsCrossSection !== "") {
+      writer.uint32(210).string(message.mbsCrossSection);
     }
     return writer;
   },
@@ -19502,6 +19560,38 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.mbsLdrIsActual = reader.bool();
           continue;
         }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.mbsVsNumber = reader.string();
+          continue;
+        }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.mbsShadeCode = reader.string();
+          continue;
+        }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.mbsShadeName = reader.string();
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.mbsCrossSection = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -19619,6 +19709,26 @@ export const MBSpin: MessageFns<MBSpin> = {
         : isSet(object.mbs_ldr_is_actual)
         ? globalThis.Boolean(object.mbs_ldr_is_actual)
         : false,
+      mbsVsNumber: isSet(object.mbsVsNumber)
+        ? globalThis.String(object.mbsVsNumber)
+        : isSet(object.mbs_vs_number)
+        ? globalThis.String(object.mbs_vs_number)
+        : undefined,
+      mbsShadeCode: isSet(object.mbsShadeCode)
+        ? globalThis.String(object.mbsShadeCode)
+        : isSet(object.mbs_shade_code)
+        ? globalThis.String(object.mbs_shade_code)
+        : "",
+      mbsShadeName: isSet(object.mbsShadeName)
+        ? globalThis.String(object.mbsShadeName)
+        : isSet(object.mbs_shade_name)
+        ? globalThis.String(object.mbs_shade_name)
+        : "",
+      mbsCrossSection: isSet(object.mbsCrossSection)
+        ? globalThis.String(object.mbsCrossSection)
+        : isSet(object.mbs_cross_section)
+        ? globalThis.String(object.mbs_cross_section)
+        : "",
     };
   },
 
@@ -19690,6 +19800,18 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.mbsLdrIsActual !== false) {
       obj.mbsLdrIsActual = message.mbsLdrIsActual;
     }
+    if (message.mbsVsNumber !== undefined) {
+      obj.mbsVsNumber = message.mbsVsNumber;
+    }
+    if (message.mbsShadeCode !== "") {
+      obj.mbsShadeCode = message.mbsShadeCode;
+    }
+    if (message.mbsShadeName !== "") {
+      obj.mbsShadeName = message.mbsShadeName;
+    }
+    if (message.mbsCrossSection !== "") {
+      obj.mbsCrossSection = message.mbsCrossSection;
+    }
     return obj;
   },
 
@@ -19722,6 +19844,10 @@ export const MBSpin: MessageFns<MBSpin> = {
     message.mbsLdrCalculatedPct = object.mbsLdrCalculatedPct ?? undefined;
     message.mbsLdrAdjustmentPct = object.mbsLdrAdjustmentPct ?? undefined;
     message.mbsLdrIsActual = object.mbsLdrIsActual ?? false;
+    message.mbsVsNumber = object.mbsVsNumber ?? undefined;
+    message.mbsShadeCode = object.mbsShadeCode ?? "";
+    message.mbsShadeName = object.mbsShadeName ?? "";
+    message.mbsCrossSection = object.mbsCrossSection ?? "";
     return message;
   },
 };
@@ -19743,6 +19869,7 @@ function createBaseCreateMBSpinRequest(): CreateMBSpinRequest {
     mbsRunLdrPct: undefined,
     mbsLdrIsFixed: undefined,
     mbsDozingIsFixed: undefined,
+    mbsVsNumber: undefined,
   };
 }
 
@@ -19792,6 +19919,9 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     }
     if (message.mbsDozingIsFixed !== undefined) {
       writer.uint32(120).bool(message.mbsDozingIsFixed);
+    }
+    if (message.mbsVsNumber !== undefined) {
+      writer.uint32(130).string(message.mbsVsNumber);
     }
     return writer;
   },
@@ -19923,6 +20053,14 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
           message.mbsDozingIsFixed = reader.bool();
           continue;
         }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.mbsVsNumber = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -20009,6 +20147,11 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
         : isSet(object.mbs_dozing_is_fixed)
         ? globalThis.Boolean(object.mbs_dozing_is_fixed)
         : undefined,
+      mbsVsNumber: isSet(object.mbsVsNumber)
+        ? globalThis.String(object.mbsVsNumber)
+        : isSet(object.mbs_vs_number)
+        ? globalThis.String(object.mbs_vs_number)
+        : undefined,
     };
   },
 
@@ -20059,6 +20202,9 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     if (message.mbsDozingIsFixed !== undefined) {
       obj.mbsDozingIsFixed = message.mbsDozingIsFixed;
     }
+    if (message.mbsVsNumber !== undefined) {
+      obj.mbsVsNumber = message.mbsVsNumber;
+    }
     return obj;
   },
 
@@ -20082,6 +20228,7 @@ export const CreateMBSpinRequest: MessageFns<CreateMBSpinRequest> = {
     message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     message.mbsLdrIsFixed = object.mbsLdrIsFixed ?? undefined;
     message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
+    message.mbsVsNumber = object.mbsVsNumber ?? undefined;
     return message;
   },
 };
@@ -20346,6 +20493,7 @@ function createBaseUpdateMBSpinRequest(): UpdateMBSpinRequest {
     mbsDozingIsFixed: undefined,
     mbsLdrAdjustmentPct: undefined,
     mbsLdrLockActual: undefined,
+    mbsVsNumber: undefined,
   };
 }
 
@@ -20404,6 +20552,9 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     }
     if (message.mbsLdrLockActual !== undefined) {
       writer.uint32(144).bool(message.mbsLdrLockActual);
+    }
+    if (message.mbsVsNumber !== undefined) {
+      writer.uint32(154).string(message.mbsVsNumber);
     }
     return writer;
   },
@@ -20559,6 +20710,14 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
           message.mbsLdrLockActual = reader.bool();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.mbsVsNumber = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -20660,6 +20819,11 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
         : isSet(object.mbs_ldr_lock_actual)
         ? globalThis.Boolean(object.mbs_ldr_lock_actual)
         : undefined,
+      mbsVsNumber: isSet(object.mbsVsNumber)
+        ? globalThis.String(object.mbsVsNumber)
+        : isSet(object.mbs_vs_number)
+        ? globalThis.String(object.mbs_vs_number)
+        : undefined,
     };
   },
 
@@ -20719,6 +20883,9 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     if (message.mbsLdrLockActual !== undefined) {
       obj.mbsLdrLockActual = message.mbsLdrLockActual;
     }
+    if (message.mbsVsNumber !== undefined) {
+      obj.mbsVsNumber = message.mbsVsNumber;
+    }
     return obj;
   },
 
@@ -20745,12 +20912,22 @@ export const UpdateMBSpinRequest: MessageFns<UpdateMBSpinRequest> = {
     message.mbsDozingIsFixed = object.mbsDozingIsFixed ?? undefined;
     message.mbsLdrAdjustmentPct = object.mbsLdrAdjustmentPct ?? undefined;
     message.mbsLdrLockActual = object.mbsLdrLockActual ?? undefined;
+    message.mbsVsNumber = object.mbsVsNumber ?? undefined;
     return message;
   },
 };
 
 function createBaseUpdateMBSpinResponse(): UpdateMBSpinResponse {
-  return { base: undefined, data: undefined };
+  return {
+    base: undefined,
+    data: undefined,
+    skipped: [],
+    skippedCount: 0,
+    impactPreview: [],
+    impactTotalAffected: 0,
+    impactTotalLocked: 0,
+    impactTruncated: false,
+  };
 }
 
 export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
@@ -20760,6 +20937,24 @@ export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
     }
     if (message.data !== undefined) {
       MBSpin.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.skipped) {
+      MBSpinRecalcSkipped.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.skippedCount !== 0) {
+      writer.uint32(32).int32(message.skippedCount);
+    }
+    for (const v of message.impactPreview) {
+      DozingImpactRow.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.impactTotalAffected !== 0) {
+      writer.uint32(48).int32(message.impactTotalAffected);
+    }
+    if (message.impactTotalLocked !== 0) {
+      writer.uint32(56).int32(message.impactTotalLocked);
+    }
+    if (message.impactTruncated !== false) {
+      writer.uint32(64).bool(message.impactTruncated);
     }
     return writer;
   },
@@ -20787,6 +20982,54 @@ export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
           message.data = MBSpin.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.skipped.push(MBSpinRecalcSkipped.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.skippedCount = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.impactPreview.push(DozingImpactRow.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.impactTotalAffected = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.impactTotalLocked = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.impactTruncated = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -20800,6 +21043,34 @@ export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
     return {
       base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
       data: isSet(object.data) ? MBSpin.fromJSON(object.data) : undefined,
+      skipped: globalThis.Array.isArray(object?.skipped)
+        ? object.skipped.map((e: any) => MBSpinRecalcSkipped.fromJSON(e))
+        : [],
+      skippedCount: isSet(object.skippedCount)
+        ? globalThis.Number(object.skippedCount)
+        : isSet(object.skipped_count)
+        ? globalThis.Number(object.skipped_count)
+        : 0,
+      impactPreview: globalThis.Array.isArray(object?.impactPreview)
+        ? object.impactPreview.map((e: any) => DozingImpactRow.fromJSON(e))
+        : globalThis.Array.isArray(object?.impact_preview)
+        ? object.impact_preview.map((e: any) => DozingImpactRow.fromJSON(e))
+        : [],
+      impactTotalAffected: isSet(object.impactTotalAffected)
+        ? globalThis.Number(object.impactTotalAffected)
+        : isSet(object.impact_total_affected)
+        ? globalThis.Number(object.impact_total_affected)
+        : 0,
+      impactTotalLocked: isSet(object.impactTotalLocked)
+        ? globalThis.Number(object.impactTotalLocked)
+        : isSet(object.impact_total_locked)
+        ? globalThis.Number(object.impact_total_locked)
+        : 0,
+      impactTruncated: isSet(object.impactTruncated)
+        ? globalThis.Boolean(object.impactTruncated)
+        : isSet(object.impact_truncated)
+        ? globalThis.Boolean(object.impact_truncated)
+        : false,
     };
   },
 
@@ -20810,6 +21081,24 @@ export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
     }
     if (message.data !== undefined) {
       obj.data = MBSpin.toJSON(message.data);
+    }
+    if (message.skipped?.length) {
+      obj.skipped = message.skipped.map((e) => MBSpinRecalcSkipped.toJSON(e));
+    }
+    if (message.skippedCount !== 0) {
+      obj.skippedCount = Math.round(message.skippedCount);
+    }
+    if (message.impactPreview?.length) {
+      obj.impactPreview = message.impactPreview.map((e) => DozingImpactRow.toJSON(e));
+    }
+    if (message.impactTotalAffected !== 0) {
+      obj.impactTotalAffected = Math.round(message.impactTotalAffected);
+    }
+    if (message.impactTotalLocked !== 0) {
+      obj.impactTotalLocked = Math.round(message.impactTotalLocked);
+    }
+    if (message.impactTruncated !== false) {
+      obj.impactTruncated = message.impactTruncated;
     }
     return obj;
   },
@@ -20823,6 +21112,12 @@ export const UpdateMBSpinResponse: MessageFns<UpdateMBSpinResponse> = {
       ? BaseResponse.fromPartial(object.base)
       : undefined;
     message.data = (object.data !== undefined && object.data !== null) ? MBSpin.fromPartial(object.data) : undefined;
+    message.skipped = object.skipped?.map((e) => MBSpinRecalcSkipped.fromPartial(e)) || [];
+    message.skippedCount = object.skippedCount ?? 0;
+    message.impactPreview = object.impactPreview?.map((e) => DozingImpactRow.fromPartial(e)) || [];
+    message.impactTotalAffected = object.impactTotalAffected ?? 0;
+    message.impactTotalLocked = object.impactTotalLocked ?? 0;
+    message.impactTruncated = object.impactTruncated ?? false;
     return message;
   },
 };
