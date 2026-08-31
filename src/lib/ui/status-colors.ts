@@ -145,7 +145,15 @@ export const statusRegistry: Record<StatusType, Record<string, StatusDisplay>> =
     REJECTED: { variant: "destructive", label: "Rejected" },
     CANCELLED: { variant: "outline", label: "Cancelled" },
   },
-  generic: {},
+  // ⭐ DITAMBAHKAN 2026-08-31 (P7-T2) — MB Spin's LDR tri-state (mbs_ldr_type),
+  // used by StatusBadge in mb-spin-form-dialog.tsx's "Status LDR" badge. Kept
+  // under "generic" rather than a new StatusType since this is the only
+  // consumer today; promote to a dedicated type if a second one appears.
+  generic: {
+    NOT_CALCULATED: { variant: "secondary", label: "Belum Dihitung" },
+    CALCULATED: { variant: "default", label: "Terhitung Otomatis" },
+    ACTUAL: { variant: "success", label: "Terkunci (Aktual)" },
+  },
 };
 
 // getStatusDisplay normalizes the status (uppercase, trim) and returns the
