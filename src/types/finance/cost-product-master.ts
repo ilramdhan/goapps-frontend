@@ -7,6 +7,7 @@ export interface CostProductMaster {
   productTypeName?: string
   productName: string
   shadeCode: string
+  shadeName?: string
   gradeCode: string
   description: string
   flex01: string
@@ -76,7 +77,8 @@ export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
     productTypeName: str(raw.productTypeName ?? raw.product_type_name) || undefined,
     productName: str(raw.productName ?? raw.product_name),
     shadeCode: str(raw.shadeCode ?? raw.shade_code),
-    gradeCode: str(raw.gradeCode ?? raw.grade_code) || "AX",
+    shadeName: str(raw.shadeName ?? raw.shade_name) || undefined,
+    gradeCode: str(raw.gradeCode ?? raw.grade_code),
     description: str(raw.description),
     flex01: str(raw.flex01 ?? raw.flex_01),
     flex02: str(raw.flex02 ?? raw.flex_02),

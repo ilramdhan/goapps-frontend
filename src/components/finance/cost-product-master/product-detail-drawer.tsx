@@ -102,10 +102,10 @@ function DetailsSection({
               )}
             </Field>
             <Field label="Shade">{product.shadeCode || "—"}</Field>
+            <Field label="Shade Name">{product.shadeName || "—"}</Field>
             <Field label="Grade">{product.gradeCode || "—"}</Field>
             <Field label="ERP Compound Key" mono>{product.flex01 || "—"}</Field>
             <Field label="Oracle Sys ID" mono>{product.flex02 || "—"}</Field>
-            <Field label="Type Label">{product.flex03 || "—"}</Field>
             {product.description && (
               <div className="col-span-2">
                 <Field label="Description">

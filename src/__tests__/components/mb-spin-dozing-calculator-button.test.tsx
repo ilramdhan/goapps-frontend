@@ -1,16 +1,21 @@
 /**
- * R81/R1: "letakkan calculator dozing di halaman mb spin, karena di halaman mb
- * spin lah ldr atau dozing actual biasanya di inputkan."
+ * ⭐ DIPERBARUI 2026-08-31 (P4-T2) — R81/R1's Calculator button (previously shown next
+ * to "LDR Aktual (%)"/mbsRunLdrPct on the MB Spin form) was removed together with the
+ * two legacy LDR field blocks it lived beside. Audit conclusion (see task report):
+ * the button's output was always an ABSOLUTE target LDR%, which mapped 1:1 onto the
+ * now-removed "LDR Actual (%)" input; the newer LDR mechanism further down the form
+ * (mbsLdrCalculatedPct / mbsLdrAdjustmentPct) is a DELTA on top of a system-calculated
+ * value, not an absolute LDR%, so there is no like-for-like landing spot for the
+ * calculator today. Inventing one is out of scope for P4-T2 (that's P7's job), so the
+ * button and its MBDozingCalculatorDialog import were deleted rather than moved.
  *
- * The LDR/dozing calculator (previously only reachable from the MB Recipe
- * detail page) must also be reachable from the MB Spin form, right next to
- * "LDR Aktual (%)" (mbsRunLdrPct) — the field that field actually receives.
- * This pins: (1) the button exists and opens the calculator dialog, (2) the
- * calculator never writes back into the form (it stays a read-only tool).
+ * This test file now pins the negative: the Calculator button must NOT be present on
+ * the MB Spin form. The calculator dialog itself (mb-dozing-calculator-dialog.tsx) is
+ * untouched and still reachable from the MB Recipe detail page — this file only
+ * covered its MB Spin form entry point, which no longer exists.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 
 vi.mock("@/hooks/finance/use-mb-dozing", () => ({
   usePreviewDozingImpact: () => ({
@@ -32,7 +37,7 @@ vi.mock("@/hooks/finance/use-mb-dozing", () => ({
 
 vi.mock("@/hooks/finance/use-mb-spin", () => ({
   useCreateMBSpin: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateMBSpin: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateMBSpinWithCascade: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock("@/hooks/finance/use-mb-head", () => ({
@@ -55,29 +60,14 @@ const spin = {
   mbsIsActive: true,
 } as never
 
-describe("MBSpinFormDialog — LDR/dozing calculator", () => {
-  it("shows a Calculator button next to LDR Aktual (%)", () => {
+describe("MBSpinFormDialog — LDR/dozing calculator (removed, P4-T2)", () => {
+  it("no longer shows a Calculator button on the MB Spin form", () => {
     render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={spin} />)
-    expect(screen.getByRole("button", { name: /Calculator/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Calculator/i })).not.toBeInTheDocument()
   })
 
-  it("opens the read-only Dozing (LDR) Calculator dialog on click", async () => {
-    const user = userEvent.setup()
+  it("no longer renders the Dozing (LDR) Calculator dialog from this form", () => {
     render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={spin} />)
-
-    await user.click(screen.getByRole("button", { name: /Calculator/i }))
-
-    expect(screen.getByText("Dozing (LDR) Calculator")).toBeInTheDocument()
-    expect(screen.getByText(/Calculates a target LDR for reference only\. Nothing is saved\./i)).toBeInTheDocument()
-  })
-
-  it("does not seed the calculator from the MB Spin's own LDR Aktual value (D30/D13)", async () => {
-    const user = userEvent.setup()
-    render(<MBSpinFormDialog open onOpenChange={() => {}} mbSpin={spin} />)
-
-    await user.click(screen.getByRole("button", { name: /Calculator/i }))
-
-    const refLdrInput = screen.getByLabelText(/Reference LDR/i) as HTMLInputElement
-    expect(refLdrInput.value).toBe("")
+    expect(screen.queryByText("Dozing (LDR) Calculator")).not.toBeInTheDocument()
   })
 })

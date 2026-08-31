@@ -4,9 +4,11 @@ import { useEffect, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Calculator, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogDescription,
@@ -39,16 +41,22 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { StatusBadge } from "@/components/common/status-badge"
 
 import { MBDozingImpactPanel } from "./mb-dozing-impact-panel"
-// R81/R1: the LDR/dozing calculator lives in components/finance/mb-recipe (built
-// there first). It is reused here via a cross-folder import rather than moved —
-// moving it would require touching mb-recipe/index.ts and mb-recipe's own
-// detail-client.tsx import, which is unnecessary risk for a read-only, stateless
-// dialog that has zero mb-recipe-specific dependencies (see its own file header).
-import { MBDozingCalculatorDialog } from "@/components/finance/mb-recipe"
+// ⭐ DIPERBARUI 2026-08-31 (P4-T2) — the R81/R1 Calculator button (which lived next
+// to "LDR Actual (%)"/mbsRunLdrPct, imported from mb-recipe) was removed together
+// with the two legacy LDR field blocks below. Its output was always an ABSOLUTE
+// target LDR% (see mb-dozing-calculator-dialog.tsx "Result LDR"), which mapped
+// 1:1 onto the now-removed "LDR Actual (%)" input. The newer LDR mechanism further
+// down this form (mbsLdrCalculatedPct / mbsLdrAdjustmentPct) is a DELTA on top of a
+// system-calculated value, not an absolute LDR%, so the calculator's result does not
+// map onto it — there is no like-for-like landing spot in this form today. Per task
+// scope (P4-T2), inventing a new absolute-LDR input to host it is out of scope (that
+// is P7's job), so the button and its dialog import were removed rather than moved.
 import type { MBSpin } from "@/types/finance/mb-spin"
-import { useCreateMBSpin, useUpdateMBSpin } from "@/hooks/finance/use-mb-spin"
+import type { NormalizedMBSpinDuplicateImpact } from "@/types/finance/mb-spin"
+import { useCreateMBSpin, useUpdateMBSpinWithCascade } from "@/hooks/finance/use-mb-spin"
 import { useMBHeads } from "@/hooks/finance/use-mb-head"
 import { ActiveFilter } from "@/types/finance/mb-head"
 import { useCostProductMasters } from "@/hooks/finance/use-cost-product-master"
@@ -64,6 +72,13 @@ const formSchema = z.object({
   mbsDozing: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
   mbsMbCosting: z.string().max(50).optional(),
   mbsCc: z.string().max(100).optional(),
+  // ⭐ DITAMBAHKAN 2026-08-31 (P4-T1) — display-only, inherited from the MB Recipe.
+  // MBSpin.mbsShadeName has no counterpart on CreateMBSpinRequest/UpdateMBSpinRequest
+  // (checked in gen/finance/v1/yarn_master.pb.go — no MbsShadeName field on either
+  // request type), so this never goes into the create/update payload; it exists in
+  // the schema only so the readonly Input can bind to it via react-hook-form, same as
+  // mbsMgtName/mbsFinalProduct below.
+  mbsShadeName: z.string().max(200).optional(),
   mbsCostRateMkt: z.coerce.number().min(0).optional().nullable(),
   mbsStatus: z.string().max(100).optional(),
   mbsLdrPrsn: z.coerce.number().min(0).optional().nullable(),
@@ -90,14 +105,35 @@ interface MBSpinFormDialogProps {
 export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess }: MBSpinFormDialogProps) {
   const isEditing = !!mbSpin
   const createMutation = useCreateMBSpin()
-  const updateMutation = useUpdateMBSpin()
-  // R81/R1: "letakkan calculator dozing di halaman mb spin, karena di halaman mb
-  // spin lah ldr atau dozing actual biasanya di inputkan" — placed right next to
-  // the "LDR Aktual (%)" (mbsRunLdrPct) field below, since that is the exact
-  // input the calculator's result is meant to feed. Read-only (K-18): it never
-  // writes into the form itself, matching the mb-recipe usage it was copied
-  // from — user reads the number and types it in manually.
-  const [dozingCalcOpen, setDozingCalcOpen] = useState(false)
+  const updateMutation = useUpdateMBSpinWithCascade()
+
+  // ⭐ DITAMBAHKAN 2026-08-31 (P7-T5) — mirrors mb-spin-duplicate-dialog.tsx's
+  // impactSummary state: the update RPC's response now also carries a child-
+  // recalc cascade result (skipped/impactPreview) when a denier/filament/
+  // dozing change cascades to this spin's direct children (A6/A7). Holding it
+  // here lets the dialog show a brief summary instead of closing immediately
+  // and discarding it. Empty/absent (the common case) keeps today's behavior
+  // — dialog just closes.
+  const [cascadeSummary, setCascadeSummary] = useState<NormalizedMBSpinDuplicateImpact | null>(null)
+
+  // ⭐ DITAMBAHKAN 2026-08-31 (P7-T5) — clears cascadeSummary on open using the
+  // "adjusting state during render" pattern (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
+  // instead of inside the form-reset useEffect below. Unlike
+  // mb-spin-duplicate-dialog.tsx's simpler `if (open && mbSpin)` guard, this
+  // dialog's effect guard is just `if (open)` (it also handles the create
+  // flow, no mbSpin) with a large ternary passed to form.reset — that shape
+  // trips the react-hooks "set-state-in-effect" lint rule (confirmed via
+  // `npx eslint`) even though the sibling file's structurally-similar effect
+  // does not. Resetting during render sidesteps the rule entirely (it only
+  // flags setState calls that execute inside an effect body) and needs no
+  // eslint-disable.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setCascadeSummary(null)
+    }
+  }
 
   const { data: mbHeadsData, isLoading: isLoadingMBHeads } = useMBHeads({
     pageSize: 200,
@@ -128,7 +164,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
     resolver: zodResolver(formSchema) as never,
     defaultValues: {
       mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "",
-      mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null,
+      mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsShadeName: "", mbsCostRateMkt: null,
       mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "",
       mbsIsActive: true,
       // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment defaults for create flow (unlocked, no adjustment).
@@ -149,6 +185,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               mbsDozing: mbSpin.mbsDozing ?? "",
               mbsMbCosting: mbSpin.mbsMbCosting || "",
               mbsCc: mbSpin.mbsCc ?? "",
+              mbsShadeName: mbSpin.mbsShadeName || "",
               mbsCostRateMkt: mbSpin.mbsCostRateMkt ?? null,
               mbsStatus: mbSpin.mbsStatus || "",
               mbsLdrPrsn: mbSpin.mbsLdrPrsn ?? null,
@@ -159,7 +196,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
               mbsLdrAdjustmentPct: mbSpin.mbsLdrAdjustmentPct ?? null,
               mbsLdrLockActual: mbSpin.mbsLdrIsActual ?? false,
             }
-          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsIsActive: true, mbsLdrAdjustmentPct: null, mbsLdrLockActual: false }
+          : { mbhId: headId || "", mbsMgtName: "", mbsOracleSysId: "", mbsDenier: "", mbsFilament: "", mbsDozing: "", mbsMbCosting: "", mbsCc: "", mbsShadeName: "", mbsCostRateMkt: null, mbsStatus: "", mbsLdrPrsn: null, mbsRunLdrPct: null, mbsFinalProduct: "", mbsIsActive: true, mbsLdrAdjustmentPct: null, mbsLdrLockActual: false }
       )
     }
   }, [open, mbSpin, headId, form])
@@ -168,30 +205,38 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
     try {
       const toOptNum = (v: unknown) => (v === "" || v === undefined ? undefined : Number(v))
       if (isEditing && mbSpin) {
-        await updateMutation.mutateAsync({
-          id: mbSpin.mbsId,
-          data: {
-            mbhId: mbSpin.mbsMbhId,
-            mbsId: mbSpin.mbsId,
-            mbsMgtName: values.mbsMgtName,
-            mbsDenier: toOptNum(values.mbsDenier),
-            mbsFilament: toOptNum(values.mbsFilament),
-            mbsDozing: toOptNum(values.mbsDozing),
-            mbsMbCosting: values.mbsMbCosting || undefined,
-            mbsCc: values.mbsCc || undefined,
-            mbsCostRateMkt: values.mbsCostRateMkt ?? undefined,
-            mbsStatus: values.mbsStatus || undefined,
-            mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
-            mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
-            mbsFinalProduct: values.mbsFinalProduct || undefined,
-            mbsIsActive: values.mbsIsActive,
-            // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment write-side. Edit-only: there is
-            // nothing to lock/adjust on a brand-new spin, so these are absent from the create
-            // payload below (confirmed CreateMBSpinRequest has no such fields on the generated type).
-            mbsLdrAdjustmentPct: values.mbsLdrAdjustmentPct ?? undefined,
-            mbsLdrLockActual: values.mbsLdrLockActual,
-          },
+        const result = await updateMutation.mutateAsync({
+          mbhId: mbSpin.mbsMbhId,
+          mbsId: mbSpin.mbsId,
+          mbsMgtName: values.mbsMgtName,
+          mbsDenier: toOptNum(values.mbsDenier),
+          mbsFilament: toOptNum(values.mbsFilament),
+          mbsDozing: toOptNum(values.mbsDozing),
+          mbsMbCosting: values.mbsMbCosting || undefined,
+          mbsCc: values.mbsCc || undefined,
+          mbsCostRateMkt: values.mbsCostRateMkt ?? undefined,
+          mbsStatus: values.mbsStatus || undefined,
+          mbsLdrPrsn: values.mbsLdrPrsn ?? undefined,
+          mbsRunLdrPct: values.mbsRunLdrPct ?? undefined,
+          mbsFinalProduct: values.mbsFinalProduct || undefined,
+          mbsIsActive: values.mbsIsActive,
+          // ⭐ DITAMBAHKAN 2026-08-28 — LDR lock/adjustment write-side. Edit-only: there is
+          // nothing to lock/adjust on a brand-new spin, so these are absent from the create
+          // payload below (confirmed CreateMBSpinRequest has no such fields on the generated type).
+          mbsLdrAdjustmentPct: values.mbsLdrAdjustmentPct ?? undefined,
+          mbsLdrLockActual: values.mbsLdrLockActual,
         })
+
+        // ⭐ DITAMBAHKAN 2026-08-31 (P7-T5) — same "only stick around if there's
+        // something to say" rule as mb-spin-duplicate-dialog.tsx: the common
+        // case (nothing skipped, nothing affected) closes right away.
+        const impact = result?.impact
+        const hasCascadeSummary = !!impact && (impact.skippedCount > 0 || impact.impactTotalAffected > 0)
+        if (hasCascadeSummary) {
+          setCascadeSummary(impact)
+          onSuccess?.()
+          return
+        }
       } else {
         await createMutation.mutateAsync({
           mbhId: values.mbhId || headId || "",
@@ -295,6 +340,7 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
           </DialogDescription>
         </ScrollableDialogHeader>
 
+        {!cascadeSummary && (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <ScrollableDialogBody className="space-y-4">
@@ -406,10 +452,32 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                 name="mbsCc"
                 render={({ field }) => (
                   <FormItem className="flex h-full flex-col">
-                    <FormLabel>CC Code</FormLabel>
+                    {/* ⭐ DIPERBARUI 2026-08-31 (P4-T1) — relabeled from "CC Code" to "Shade
+                        Code": confirmed business decision that mbs_cc genuinely holds the
+                        shade code, not a cost code. The bound field (mbsCc) is unchanged. */}
+                    <FormLabel>Shade Code</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="e.g. CC-001" disabled={isPending} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* ⭐ DITAMBAHKAN 2026-08-31 (P4-T1) — Shade Name, readonly+disabled, sourced
+                  from MBSpin.mbsShadeName. Populated server-side, inherited from the MB
+                  Recipe — same readOnly+disabled pattern as mbsMgtName/mbsFinalProduct. */}
+              <FormField
+                control={form.control}
+                name="mbsShadeName"
+                render={({ field }) => (
+                  <FormItem className="flex h-full flex-col">
+                    <FormLabel>Shade Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Optional" readOnly disabled />
+                    </FormControl>
+                    <FormDescription className="mt-auto">
+                      Inherited from the MB Recipe (Master Product Type MB) and cannot be edited manually.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -490,61 +558,25 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             />
 
             {/*
-              ⭐ DIPERBARUI 2026-08-28 — Task readonly-derived-fields: mbsFinalProduct is also
-              copied by handleHeadSelect()/form.reset() from the selected MB Recipe or the source
-              MBSpin being cloned, so it now follows the same readOnly+disabled pattern as
-              mbsMgtName/mbsOracleSysId/mbsMbCosting above and mbsStatus above it. mbsLdrPrsn and
-              mbsRunLdrPct are explicitly EXEMPT from readonly — LDR values are meant to be
-              reviewed/adjusted by the user every time, per the task scope for this change — so
-              they stay editable even though handleHeadSelect() also seeds them initially. The
-              `min-h-6` wrapper on both labels keeps the two header rows the same height (one has
-              a Calculator button, one doesn't) so their inputs stay aligned in the same grid row.
+              ⭐ DIPERBARUI 2026-08-31 (P4-T2) — the two legacy LDR input blocks that used to
+              live here ("LDR Plan (%)" bound to mbsLdrPrsn, "LDR Actual (%)" bound to
+              mbsRunLdrPct, plus the Calculator button attached to the latter) were removed
+              from the render per the P4-T2 audit. UI-ONLY change:
+                - The mbsLdrPrsn/mbsRunLdrPct fields stay in the Zod schema, defaultValues,
+                  form.reset() (from mbSpin), and handleHeadSelect() untouched — so RHF still
+                  carries whatever value the record already had, and onSubmit still resends
+                  that same unchanged value on every save. No value is ever set to undefined/
+                  null/omitted by this change, so there is no NULL-out risk irrespective of how
+                  the backend treats an absent optional field.
+                - DB columns (mst_mb_spin.mbs_ldr_prsn / mbs_run_ldr_pct) and proto fields are
+                  untouched — confirmed read-only by yarn_lookup_fill_handler.go:191-193 ("D30:
+                  mbs_run_ldr_pct is the actual LDR used in production — the correct value for
+                  costing") and lookup_master_repository.go:300-406, both of which read the
+                  persisted column value directly from the entity, never from this form.
+              Task readonly-derived-fields' EXEMPT-from-readonly rationale for these two fields
+              (see prior version of this comment) is now moot since they no longer render.
             */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="mbsLdrPrsn"
-                render={({ field }) => (
-                  <FormItem className="flex h-full flex-col">
-                    <div className="flex min-h-6 items-center justify-between gap-2">
-                      <FormLabel>LDR Plan (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
-                    </div>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
-                    </FormControl>
-                    <FormDescription className="mt-auto">Initial LDR for a new product, before entering the spinning machine.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mbsRunLdrPct"
-                render={({ field }) => (
-                  <FormItem className="flex h-full flex-col">
-                    <div className="flex min-h-6 items-center justify-between gap-2">
-                      <FormLabel>LDR Actual (%) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => setDozingCalcOpen(true)}
-                      >
-                        <Calculator className="h-3 w-3 mr-1" />
-                        Calculator
-                      </Button>
-                    </div>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.000001" min="0" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
-                    </FormControl>
-                    <FormDescription className="mt-auto">The LDR actually used in production; this is the value used in cost calculation.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="mbsFinalProduct"
@@ -592,12 +624,12 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   </div>
                   <div className="space-y-1">
                     <dt className="text-xs text-muted-foreground">Status LDR</dt>
-                    <dd className="text-sm font-medium">
-                      {mbSpin.mbsLdrType === "ACTUAL"
-                        ? "Terkunci (Aktual)"
-                        : mbSpin.mbsLdrType === "CALCULATED"
-                          ? "Terhitung Otomatis"
-                          : "Belum Dihitung"}
+                    <dd>
+                      {/* ⭐ DIPERBARUI 2026-08-31 (P7-T2) — was plain text; the design
+                          system's Cardinal Rule #2 (CLAUDE.md) requires StatusBadge for
+                          any entity status, and the plan explicitly calls for a "Badge
+                          tipe LDR". Registry entries added to status-colors.ts (generic). */}
+                      <StatusBadge status={mbSpin.mbsLdrType} type="generic" size="sm" />
                     </dd>
                   </div>
                 </div>
@@ -685,8 +717,64 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
             </ScrollableDialogFooter>
           </form>
         </Form>
+        )}
+
+        {/* ⭐ DITAMBAHKAN 2026-08-31 (P7-T5) — cascade/impact summary, same
+            lightweight Alert/Badge pattern as mb-spin-duplicate-dialog.tsx's
+            impactSummary block (P7-T6). Only shown when the update actually
+            skipped a child or would affect a product; the common "nothing to
+            report" case never renders this and the dialog just closes. */}
+        {cascadeSummary && (
+          <>
+            <ScrollableDialogBody className="space-y-3" data-testid="update-cascade-summary">
+              <Alert>
+                <AlertTitle>MB Spin updated</AlertTitle>
+                <AlertDescription>
+                  &quot;{mbSpin?.mbsMgtName}&quot; was saved. Preview only — nothing below was recalculated.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {cascadeSummary.impactTotalAffected > 0 && (
+                  <Badge variant="secondary">{cascadeSummary.impactTotalAffected} product(s) affected</Badge>
+                )}
+                {cascadeSummary.impactTotalLocked > 0 && (
+                  <Badge variant="secondary">{cascadeSummary.impactTotalLocked} locked</Badge>
+                )}
+                {cascadeSummary.skippedCount > 0 && (
+                  <Badge variant="outline">{cascadeSummary.skippedCount} child spin(s) skipped</Badge>
+                )}
+                {cascadeSummary.impactTruncated && <Badge variant="outline">List truncated</Badge>}
+              </div>
+
+              {cascadeSummary.skipped.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs">
+                    Skipped because they&apos;re not editable (e.g. locked as Actual):
+                  </p>
+                  <ul className="list-disc space-y-0.5 pl-5 text-sm">
+                    {cascadeSummary.skipped.map((row) => (
+                      <li key={row.mbsId}>
+                        {row.mbsMgtName} <span className="text-muted-foreground text-xs">({row.reason})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </ScrollableDialogBody>
+
+            <ScrollableDialogFooter>
+              <Button
+                onClick={() => {
+                  onOpenChange(false)
+                }}
+              >
+                Done
+              </Button>
+            </ScrollableDialogFooter>
+          </>
+        )}
       </ScrollableDialogContent>
-      <MBDozingCalculatorDialog open={dozingCalcOpen} onOpenChange={setDozingCalcOpen} />
     </Dialog>
   )
 }

@@ -2,7 +2,7 @@
 
 // MBSpin Hooks - TanStack Query hooks for MBSpin operations
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createCrudHooks } from "@/lib/hooks"
@@ -30,7 +30,12 @@ import {
   ImportMBSpinsResponseParser,
   DownloadMBSpinTemplateResponseParser,
 } from "@/types/finance/mb-spin"
-import { duplicateMBSpin, type DuplicateMBSpinInput } from "@/services/finance/mb-spin-api"
+import {
+  duplicateMBSpin,
+  type DuplicateMBSpinInput,
+  updateMBSpin,
+  type UpdateMBSpinInput,
+} from "@/services/finance/mb-spin-api"
 
 // ============================================================================
 // Create CRUD hooks using factory
@@ -80,6 +85,91 @@ export {
   useUpdateMBSpin,
   useDeleteMBSpin,
   mbSpinKeys,
+}
+
+// ============================================================================
+// Detail Hook (P5-T1)
+// ============================================================================
+
+// ⭐ DITAMBAHKAN 2026-08-31 (P5-T1) — `useMBSpin` above (the generic factory's
+// `useGet`) calls `apiClient.get(`${apiBasePath}/${id}`)` with NO query-string
+// support at all (create-crud-hooks.ts useGet, ~line 157-175), so it cannot pass
+// `mbhId`. The BFF route this hooks hits (src/app/api/v1/finance/mb-spins/[id]/route.ts:9-15)
+// reads `mbhId` from `?mbhId=` and forwards `{ mbhId, mbsId: id }` to
+// `client.getMBSpin`. Proto `GetMBSpinRequest.mbh_id` (goapps-shared-proto
+// finance/v1/yarn_master.proto ~L1950-1955) is `buf.validate` `string.uuid = true`
+// — it only demands a SYNTACTICALLY valid UUID, not the real parent. Verified
+// independently in goapps-backend: the gRPC handler
+// (internal/delivery/grpc/mb_spin_handler.go GetMBSpin, ~L141-164) calls
+// `getHandler.Handle(ctx, appmbspin.GetQuery{ID: id})` using ONLY `req.MbsId` —
+// `req.MbhId` is never read again after validation passes — and the repository
+// lookup (internal/infrastructure/postgres/mb_spin_repository.go GetByID,
+// ~L95-97) filters purely by `mbs_id`. So `mbh_id` on this RPC is
+// validated-but-unused: which row comes back is determined solely by `mbsId`.
+//
+// Rather than teaching the generic factory hook to accept query params just for
+// this one caller, this is a small dedicated hook that calls the same BFF route
+// directly with a fixed placeholder UUID (all-zeros nil UUID) as `mbhId`. It is
+// self-documenting and satisfies `buf.validate`'s syntax check without pretending
+// to know the real parent — which this route has no way to supply anyway (the
+// page only receives the spin id from the URL, not its parent head id).
+// Do NOT "fix" this by wiring in a real mbhId — there isn't one available here,
+// and the backend ignores the value regardless (see evidence above).
+const MBH_ID_PLACEHOLDER_NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
+export function useMBSpinDetail(id: string) {
+  return useQuery({
+    queryKey: mbSpinKeys.detail(id),
+    queryFn: async () => {
+      const rawResponse = await apiClient.get<unknown>(
+        `/api/v1/finance/mb-spins/${id}?mbhId=${MBH_ID_PLACEHOLDER_NIL_UUID}`
+      )
+      const response = GetMBSpinResponseParser.fromJSON(rawResponse)
+      return {
+        data: response.data || null,
+        isSuccess: response.base?.isSuccess ?? true,
+        message: response.base?.message || "",
+      }
+    },
+    enabled: !!id,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+}
+
+// ============================================================================
+// Sibling Spins Hook (P5-T2 — Lineage section on the detail page)
+// ============================================================================
+
+// ⭐ DITAMBAHKAN 2026-08-31 (P5-T2) — MBSpin has NO parent-spin field at all.
+// Verified directly against the generated type (types/generated/finance/v1/
+// yarn_master.ts, MBSpin message ~L2081-2167): the only "parent" reference is
+// mbsMbhId (parent MB Head UUID) — there is no mbsParentSpinId or equivalent
+// recording which spin a `DuplicateMBSpin` clone came from. So a true
+// parent/child spin lineage section cannot be built; the backend `ListFilter`
+// also has no `ParentSpinID` (goapps-backend mbspin/repository.go ~L143),
+// confirming there's no server-side path to "children of spin X" either.
+//
+// As the closest available substitute, this hook fetches every OTHER spin
+// that shares the same parent MB Head (mbsMbhId) — i.e. "siblings" — since
+// that's the family a duplicated spin actually lands in, even though the
+// schema doesn't record the specific source spin. Uses a dedicated `useQuery`
+// (not the generic `useMBSpins` factory hook) because the factory's `useList`
+// has no `enabled` option, and this fetch must stay off until the detail
+// query has resolved `mbsMbhId`.
+export function useMBSpinSiblings(mbhId: string | undefined) {
+  return useQuery({
+    queryKey: ["finance", "mb-spin", "siblings", mbhId],
+    queryFn: async () => {
+      const queryString = buildQueryString({ mbhId, pageSize: 100 })
+      const rawResponse = await apiClient.get<unknown>(`/api/v1/finance/mb-spins${queryString}`)
+      const response = ListMBSpinsResponseParser.fromJSON(rawResponse)
+      return response.data || []
+    },
+    enabled: !!mbhId,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
 }
 
 // ============================================================================
@@ -164,6 +254,33 @@ export function useDuplicateMBSpin() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to duplicate MB Spin")
+    },
+  })
+}
+
+// ============================================================================
+// Update-with-cascade Hook (P7-T5)
+// ============================================================================
+
+// ⭐ DITAMBAHKAN 2026-08-31 (P7-T5) — the generic useUpdateMBSpin() (from
+// createCrudHooks above) discards everything except `data` (see
+// create-crud-hooks.ts useUpdate(): `return response.data`), so it cannot
+// surface the skipped/impactPreview cascade fields the PUT route now forwards.
+// This dedicated hook mirrors useDuplicateMBSpin() above — same invalidation +
+// toast pattern — but returns the full `{ spin, impact }` shape via
+// updateMBSpin() so a caller (mb-spin-form-dialog.tsx) can show a cascade
+// summary instead of it being silently thrown away.
+export function useUpdateMBSpinWithCascade() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateMBSpinInput) => updateMBSpin(input),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: mbSpinKeys.detail(variables.mbsId) })
+      queryClient.invalidateQueries({ queryKey: mbSpinKeys.lists() })
+      toast.success("MB Spin updated successfully")
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to update MB Spin")
     },
   })
 }

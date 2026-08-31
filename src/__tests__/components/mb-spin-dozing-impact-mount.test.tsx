@@ -38,7 +38,7 @@ vi.mock("@/hooks/finance/use-mb-dozing", () => ({
 
 vi.mock("@/hooks/finance/use-mb-spin", () => ({
   useCreateMBSpin: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateMBSpin: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateMBSpinWithCascade: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock("@/hooks/finance/use-mb-head", () => ({

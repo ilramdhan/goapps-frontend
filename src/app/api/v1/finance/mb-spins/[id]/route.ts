@@ -36,6 +36,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 // PUT /api/v1/finance/mb-spins/[id]
+//
+// ⭐ DIPERBARUI 2026-08-31 (P7-T5) — the response also carries a child-recalc
+// cascade result (skipped/impactPreview/etc.) when a denier/filament/dozing
+// change triggers the parent's direct children to be recalculated (A6/A7).
+// Same shape as DuplicateMBSpinResponse's PREVIEW-only fields (see that
+// route's own comment) except this one reflects an ACTUAL recalc that ran,
+// not a preview — forwarded verbatim for the UI to display, never
+// interpreted here.
 export async function PUT(request: NextRequest, context: RouteContext) {
     try {
         const { id } = await context.params
@@ -47,6 +55,12 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         return NextResponse.json({
             base: response.base,
             data: response.data,
+            skipped: response.skipped,
+            skippedCount: response.skippedCount,
+            impactPreview: response.impactPreview,
+            impactTotalAffected: response.impactTotalAffected,
+            impactTotalLocked: response.impactTotalLocked,
+            impactTruncated: response.impactTruncated,
         })
     } catch (error) {
         if (isGrpcError(error)) return handleGrpcError(error)
