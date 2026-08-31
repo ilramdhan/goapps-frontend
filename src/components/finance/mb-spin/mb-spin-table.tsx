@@ -1,6 +1,7 @@
 "use client"
 
-import { Pencil, Trash2, Copy } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Pencil, Trash2, Copy, Eye } from "lucide-react"
 
 import { DataTable, type ColumnDef, type RowAction } from "@/components/shared"
 import { StatusBadge } from "@/components/common"
@@ -17,6 +18,7 @@ interface MBSpinTableProps {
 }
 
 export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: MBSpinTableProps) {
+  const router = useRouter()
   const { hasPermission } = usePermissionContext()
   // Same permission the backend already gates RPC DuplicateMBSpin behind — the
   // clone is a brand-new "R and D" record, so this reuses the "create" code
@@ -50,10 +52,17 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
     },
     {
       id: "mbsCc",
-      header: "Cost Code",
+      header: "Shade Code",
       width: "w-[110px]",
       hideOnMobile: true,
       cell: (row) => row.mbsCc || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      id: "mbsShadeName",
+      header: "Shade Name",
+      width: "w-[140px]",
+      hideOnMobile: true,
+      cell: (row) => row.mbsShadeName || <span className="text-muted-foreground">—</span>,
     },
     {
       id: "mbsDenier",
@@ -70,15 +79,6 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
       cell: (row) => row.mbsFilament ?? "-",
     },
     {
-      id: "mbsCostRateMkt",
-      header: "Rate MKT",
-      width: "w-[120px]",
-      hideOnMobile: true,
-      cell: (row) => row.mbsCostRateMkt != null
-        ? `$${row.mbsCostRateMkt.toFixed(4)}`
-        : <span className="text-muted-foreground">—</span>,
-    },
-    {
       id: "mbsIsActive",
       header: "Status",
       width: "w-[100px]",
@@ -89,6 +89,17 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
   ]
 
   const actions: RowAction<MBSpin>[] = [
+    {
+      // ⭐ DITAMBAHKAN 2026-08-31 (P5-T3 follow-up) — no row action linked to the
+      // MB Spin detail page at all previously. RowAction (data-table/types.ts)
+      // has no `href` field, only `onClick`, so this navigates via `useRouter()`
+      // rather than wrapping the action in a `Link`. Placed first, before Edit,
+      // matching the View → Edit → Duplicate → Delete convention.
+      id: "view",
+      label: "View",
+      icon: <Eye className="h-4 w-4" />,
+      onClick: (row) => router.push(`/finance/yarn-master/mb-spins/${row.mbsId}`),
+    },
     {
       id: "edit",
       label: "Edit",
