@@ -20,11 +20,8 @@
 // component renders nothing at all).
 //
 // MB Spin: resolved transitively from the found MB Head via the existing `mbhId` filter on
-// ListMBSpinsRequest — no new proto field needed for spins. No deep link is rendered for
-// individual spins: there is no MB Spin detail route (only a list page at
-// /finance/yarn-master/mb-spins), and that list page's own useUrlState defaultFilters do
-// NOT track `mbhId` in the URL — linking to `?mbhId=...` there would silently do nothing,
-// so per the "never create a dead link" rule this renders as plain text instead.
+// ListMBSpinsRequest — no new proto field needed for spins. Each spin name links to its
+// MB Spin detail page (/finance/yarn-master/mb-spins/[id]), added once that route existed.
 
 import Link from "next/link"
 import { Beaker, ExternalLink, HelpCircle } from "lucide-react"
@@ -127,7 +124,12 @@ function MbSpinsSection({ mbhId }: { mbhId: string }) {
           {spinsData!.data.map((spin) => (
             <li key={spin.mbsId} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
               <span className="font-mono">{spin.mbsMbCosting || "—"}</span>
-              <span>{spin.mbsMgtName || "—"}</span>
+              <Link
+                href={`/finance/yarn-master/mb-spins/${spin.mbsId}`}
+                className="text-primary hover:underline"
+              >
+                {spin.mbsMgtName || "—"}
+              </Link>
               {(spin.mbsDenier != null || spin.mbsFilament != null) && (
                 <span className="text-xs text-muted-foreground">
                   {spin.mbsDenier != null ? `${spin.mbsDenier}D` : ""}

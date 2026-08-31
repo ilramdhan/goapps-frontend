@@ -24,11 +24,15 @@ export const PRODUCT_MASTER_COLUMNS: ColumnDef<CostProductMaster>[] = [
   { id: "product_code",      header: "Product code",     canHide: false },
   { id: "product_name",      header: "Name" },
   { id: "product_type_code", header: "Type" },
-  { id: "shade_code",        header: "Shade" },
+  { id: "shade_code",        header: "Shade Code" },
+  // Not sortable: the backend's cpmSortColumn map (cost_product_master_repository.go)
+  // has no "shade_name" case, so a sort_by=shade_name would silently fall through
+  // to sorting by product_code instead. Keep this column display-only until the
+  // backend adds support.
+  { id: "shade_name",        header: "Shade Name" },
   { id: "grade_code",        header: "Grade" },
   { id: "oracle_sys_id",     header: "Oracle Sys ID" },
   { id: "erp_compound_key",  header: "ERP Compound Key" },
-  { id: "type_label",        header: "Type Label" },
   { id: "status",            header: "Status" },
 ]
 
@@ -83,7 +87,10 @@ export function ProductMasterTable({
                 <SortableHeader label="Type" sortKey="product_type_code" className="w-32" {...sortProps} />
               )}
               {show("shade_code") && (
-                <SortableHeader label="Shade" sortKey="shade_code" className="w-24" {...sortProps} />
+                <SortableHeader label="Shade Code" sortKey="shade_code" className="w-24" {...sortProps} />
+              )}
+              {show("shade_name") && (
+                <TableHead className="w-32 text-xs font-medium text-muted-foreground">Shade Name</TableHead>
               )}
               {show("grade_code") && (
                 <SortableHeader label="Grade" sortKey="grade_code" className="w-20" {...sortProps} />
@@ -93,9 +100,6 @@ export function ProductMasterTable({
               )}
               {show("erp_compound_key") && (
                 <SortableHeader label="ERP Compound Key" sortKey="erp_compound_key" className="w-36" {...sortProps} />
-              )}
-              {show("type_label") && (
-                <SortableHeader label="Type Label" sortKey="type_label" className="w-24" {...sortProps} />
               )}
               {show("status") && (
                 <SortableHeader label="Status" sortKey="status" className="w-24" {...sortProps} />
@@ -111,10 +115,10 @@ export function ProductMasterTable({
                   {show("product_name") && <TableCell><Skeleton className="h-4 w-48" /></TableCell>}
                   {show("product_type_code") && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                   {show("shade_code") && <TableCell><Skeleton className="h-4 w-14" /></TableCell>}
+                  {show("shade_name") && <TableCell><Skeleton className="h-4 w-20" /></TableCell>}
                   {show("grade_code") && <TableCell><Skeleton className="h-4 w-10" /></TableCell>}
                   {show("oracle_sys_id") && <TableCell><Skeleton className="h-4 w-20" /></TableCell>}
                   {show("erp_compound_key") && <TableCell><Skeleton className="h-4 w-28" /></TableCell>}
-                  {show("type_label") && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                   {show("status") && <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>}
                   <TableCell className="pr-4" />
                 </TableRow>
@@ -152,6 +156,7 @@ export function ProductMasterTable({
                   </TableCell>
                 )}
                 {show("shade_code") && <TableCell>{p.shadeCode || "—"}</TableCell>}
+                {show("shade_name") && <TableCell>{p.shadeName || "—"}</TableCell>}
                 {show("grade_code") && <TableCell>{p.gradeCode}</TableCell>}
                 {show("oracle_sys_id") && (
                   <TableCell className="font-mono text-xs">{p.flex02 || "—"}</TableCell>
@@ -159,7 +164,6 @@ export function ProductMasterTable({
                 {show("erp_compound_key") && (
                   <TableCell className="font-mono text-xs">{p.flex01 || "—"}</TableCell>
                 )}
-                {show("type_label") && <TableCell className="text-xs">{p.flex03 || "—"}</TableCell>}
                 {show("status") && (
                   <TableCell>
                     <StatusBadge status={p.isActive ? "ACTIVE" : "INACTIVE"} type="product" size="sm" />

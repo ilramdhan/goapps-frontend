@@ -23,6 +23,7 @@ import { ProductTypeName } from "@/components/common/product-type-name"
 import { UnlockProductMasterDialog } from "@/components/finance/cost-product-master/unlock-dialog"
 import { MbRecipeLinkCard } from "@/components/finance/cost-product-master/mb-recipe-link-card"
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
+import type { CostProductMaster } from "@/types/finance/cost-product-master"
 
 interface Props {
   productSysId: number
@@ -75,11 +76,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
                 ? `${product.productCode} — ${product.productName}`
                 : "Product not found"
           }
-          subtitle={
-            product
-              ? `${product.productTypeName || product.productTypeCode || ""} · ${product.shadeCode || "—"} / ${product.gradeCode || "—"}`
-              : undefined
-          }
+          subtitle={product ? buildProductSubtitle(product) : undefined}
         />
         <div className="flex flex-wrap gap-2">
           {product && <CalculateButton productSysId={productSysId} label="Calculate cost" />}
@@ -142,10 +139,10 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
               </div>
             </div>
             <Field label="Shade" value={product.shadeCode || "—"} />
+            <Field label="Shade Name" value={product.shadeName || "—"} />
             <Field label="Grade" value={product.gradeCode || "—"} />
             <Field label="Oracle Sys ID" value={product.flex02 || "—"} mono />
             <Field label="ERP Compound Key" value={product.flex01 || "—"} mono />
-            <Field label="Type Label" value={product.flex03 || "—"} />
             {product.description && (
               <div className="col-span-full">
                 <Field label="Description" value={product.description} />
@@ -193,4 +190,26 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <div className={mono ? "font-mono text-sm" : "text-sm"}>{value}</div>
     </div>
   )
+}
+
+/**
+ * Builds the header subtitle from non-empty parts only, so a missing shade or
+ * grade never leaves a dangling separator (e.g. "· — / AX"). Shade renders as
+ * "code — name" when both are present, or just whichever one is present.
+ */
+function buildProductSubtitle(product: CostProductMaster): string {
+  const parts: string[] = []
+
+  const typeLabel = product.productTypeName || product.productTypeCode
+  if (typeLabel) parts.push(typeLabel)
+
+  const shadeLabel =
+    product.shadeCode && product.shadeName
+      ? `${product.shadeCode} — ${product.shadeName}`
+      : product.shadeCode || product.shadeName
+  if (shadeLabel) parts.push(shadeLabel)
+
+  if (product.gradeCode) parts.push(product.gradeCode)
+
+  return parts.join(" · ")
 }
