@@ -53,7 +53,7 @@ vi.mock("@/hooks/finance/use-mb-dozing", () => ({
 
 vi.mock("@/hooks/finance/use-mb-spin", () => ({
   useCreateMBSpin: () => ({ mutateAsync: createMutateAsync, isPending: false }),
-  useUpdateMBSpin: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
+  useUpdateMBSpinWithCascade: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
 }))
 
 // R81/Task-1: mbsMgtName (and its head-derived siblings) is now read-only in the
@@ -108,7 +108,7 @@ const markedSpin = {
 async function submitUpdate(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /^Update$/i }))
   await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled())
-  return updateMutateAsync.mock.calls[0][0].data as Record<string, unknown>
+  return updateMutateAsync.mock.calls[0][0] as Record<string, unknown>
 }
 
 beforeEach(() => {
