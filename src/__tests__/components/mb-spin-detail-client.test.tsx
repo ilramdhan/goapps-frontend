@@ -145,6 +145,13 @@ describe("MbSpinDetailClient", () => {
     expect(screen.queryByText(/lusture/i)).not.toBeInTheDocument()
   })
 
+  it("omits Dozing — mbsDozing is retired from display (duplicate of LDR), per 2026-08-31 decision", () => {
+    mbSpinState.value = BASE_SPIN
+    render(<MbSpinDetailClient id={SPIN_ID} />)
+
+    expect(screen.queryByText(/dozing/i)).not.toBeInTheDocument()
+  })
+
   describe("Lineage section (P5-T2)", () => {
     it("shows an empty-siblings message when no other spins share the same MB Head", () => {
       mbSpinState.value = BASE_SPIN
