@@ -31,6 +31,7 @@ vi.mock("@/hooks/finance/use-mb-head", () => {
     useRevokeMBHead:        stub,
     useRejectMBHead:        stub,
     useReturnMBHeadToDraft: () => ({ mutate: returnToDraftMutate, isPending: false }),
+    useUnrevokeMBHead: stub,
     // P10 unlock hooks are rendered by the same bar; stub them so this suite keeps
     // exercising only its own path.
     useRequestUnlockMBHead: stub,

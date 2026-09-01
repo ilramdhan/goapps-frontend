@@ -36,6 +36,7 @@ vi.mock("@/hooks/finance/use-mb-head", () => {
     useRevokeMBHead: stub,
     useRejectMBHead: stub,
     useReturnMBHeadToDraft: stub,
+    useUnrevokeMBHead: stub,
     useRequestUnlockMBHead: () => ({ mutate: requestUnlockMutate, isPending: false }),
     useGrantUnlockMBHead: () => ({ mutate: grantUnlockMutate, isPending: false }),
     useRejectUnlockMBHead: () => ({ mutate: rejectUnlockMutate, isPending: false }),
