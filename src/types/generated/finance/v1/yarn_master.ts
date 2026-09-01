@@ -2093,6 +2093,157 @@ export interface RejectUnlockMBHeadResponse {
   data: MBHead | undefined;
 }
 
+/**
+ * BulkForceUnvalidateMBHeadRequest is the request for force-transitioning a batch
+ * of MB Heads from VALIDATED directly back to DRAFT in one step, bypassing the
+ * normal RequestUnlockMBHead/GrantUnlockMBHead two-step flow. Intended for Super
+ * Admin bulk re-triggering of the validate lifecycle.
+ */
+export interface BulkForceUnvalidateMBHeadRequest {
+  /** MB Head UUIDs to force-unvalidate. 1-500 items, each a valid UUID. */
+  mbhIds: string[];
+  /** Reason for force-unvalidating. Optional. */
+  reason: string;
+}
+
+/**
+ * BulkForceUnvalidateMBHeadResponse is the response for queuing a bulk
+ * force-unvalidate job. The job runs asynchronously; poll GetBulkMBHeadJobStatus
+ * for progress.
+ */
+export interface BulkForceUnvalidateMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Queued job summary (job_id, job_code, status, progress counters). */
+  data: BulkMBHeadJobInfo | undefined;
+}
+
+/**
+ * BulkSubmitMBHeadRequest is the request for submitting a batch of MB Heads for
+ * approval in one call.
+ */
+export interface BulkSubmitMBHeadRequest {
+  /** MB Head UUIDs to submit. 1-500 items, each a valid UUID. */
+  mbhIds: string[];
+}
+
+/**
+ * BulkSubmitMBHeadResponse is the response for queuing a bulk submit job. The job
+ * runs asynchronously; poll GetBulkMBHeadJobStatus for progress.
+ */
+export interface BulkSubmitMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Queued job summary (job_id, job_code, status, progress counters). */
+  data: BulkMBHeadJobInfo | undefined;
+}
+
+/**
+ * BulkValidateMBHeadRequest is the request for validating a batch of approved MB
+ * Heads in one call, freezing each one's cost and param snapshot.
+ */
+export interface BulkValidateMBHeadRequest {
+  /** MB Head UUIDs to validate. 1-500 items, each a valid UUID. */
+  mbhIds: string[];
+}
+
+/**
+ * BulkValidateMBHeadResponse is the response for queuing a bulk validate job. The
+ * job runs asynchronously; poll GetBulkMBHeadJobStatus for progress.
+ */
+export interface BulkValidateMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Queued job summary (job_id, job_code, status, progress counters). */
+  data: BulkMBHeadJobInfo | undefined;
+}
+
+/** BulkMBHeadJobInfo summarizes a freshly-queued bulk MB Head lifecycle job. */
+export interface BulkMBHeadJobInfo {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "MBH_BULK-202609-001"). */
+  jobCode: string;
+  /** Initial status, typically "QUEUED". */
+  status: string;
+  /** Total MB Heads expected to be processed by this job. */
+  totalChildren: number;
+  /** MB Heads processed successfully so far. */
+  completedChildren: number;
+  /** MB Heads that failed so far. */
+  failedChildren: number;
+}
+
+/**
+ * GetBulkMBHeadJobStatusRequest identifies the bulk MB Head lifecycle job whose
+ * live status/progress should be polled while it is still running.
+ */
+export interface GetBulkMBHeadJobStatusRequest {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+}
+
+/**
+ * GetBulkMBHeadJobStatusResponse reports the bulk job's current status and live
+ * child-completion counters.
+ */
+export interface GetBulkMBHeadJobStatusResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+  /** Human-readable code (e.g. "MBH_BULK-202609-001"). */
+  jobCode: string;
+  /** Current status (e.g. "QUEUED", "PROCESSING", "DONE", "FAILED", "PARTIAL"). */
+  status: string;
+  /** Total MB Heads expected to be processed by this job. */
+  totalChildren: number;
+  /** MB Heads processed successfully so far. */
+  completedChildren: number;
+  /** MB Heads that failed so far. */
+  failedChildren: number;
+}
+
+/**
+ * ListBulkMBHeadJobFailuresRequest identifies the bulk MB Head lifecycle job
+ * whose per-item failures should be listed.
+ */
+export interface ListBulkMBHeadJobFailuresRequest {
+  /** job_execution.job_id (UUID). */
+  jobId: string;
+}
+
+/**
+ * ListBulkMBHeadJobFailuresResponse lists every MB Head that failed within a
+ * bulk job, with its error message.
+ */
+export interface ListBulkMBHeadJobFailuresResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Failed items, in the order the worker processed them. */
+  failures: BulkMBHeadJobFailure[];
+}
+
+/** BulkMBHeadJobFailure describes one MB Head that failed within a bulk job. */
+export interface BulkMBHeadJobFailure {
+  /** MB Head UUID that failed. */
+  mbhId: string;
+  /** MB Head's cost code / identifier, for display without a follow-up lookup. */
+  mbCosting: string;
+  /** Human-readable error message explaining the failure. */
+  errorMessage: string;
+}
+
 /** MBSpin represents a Melange Batch spin detail record (child of MBHead). */
 export interface MBSpin {
   /** UUID primary key. */
@@ -19435,6 +19586,1112 @@ export const RejectUnlockMBHeadResponse: MessageFns<RejectUnlockMBHeadResponse> 
       ? BaseResponse.fromPartial(object.base)
       : undefined;
     message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkForceUnvalidateMBHeadRequest(): BulkForceUnvalidateMBHeadRequest {
+  return { mbhIds: [], reason: "" };
+}
+
+export const BulkForceUnvalidateMBHeadRequest: MessageFns<BulkForceUnvalidateMBHeadRequest> = {
+  encode(message: BulkForceUnvalidateMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.mbhIds) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkForceUnvalidateMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkForceUnvalidateMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkForceUnvalidateMBHeadRequest {
+    return {
+      mbhIds: globalThis.Array.isArray(object?.mbhIds)
+        ? object.mbhIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.mbh_ids)
+        ? object.mbh_ids.map((e: any) => globalThis.String(e))
+        : [],
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: BulkForceUnvalidateMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhIds?.length) {
+      obj.mbhIds = message.mbhIds;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkForceUnvalidateMBHeadRequest>): BulkForceUnvalidateMBHeadRequest {
+    return BulkForceUnvalidateMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkForceUnvalidateMBHeadRequest>): BulkForceUnvalidateMBHeadRequest {
+    const message = createBaseBulkForceUnvalidateMBHeadRequest();
+    message.mbhIds = object.mbhIds?.map((e) => e) || [];
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseBulkForceUnvalidateMBHeadResponse(): BulkForceUnvalidateMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const BulkForceUnvalidateMBHeadResponse: MessageFns<BulkForceUnvalidateMBHeadResponse> = {
+  encode(message: BulkForceUnvalidateMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      BulkMBHeadJobInfo.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkForceUnvalidateMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkForceUnvalidateMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = BulkMBHeadJobInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkForceUnvalidateMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? BulkMBHeadJobInfo.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: BulkForceUnvalidateMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = BulkMBHeadJobInfo.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkForceUnvalidateMBHeadResponse>): BulkForceUnvalidateMBHeadResponse {
+    return BulkForceUnvalidateMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkForceUnvalidateMBHeadResponse>): BulkForceUnvalidateMBHeadResponse {
+    const message = createBaseBulkForceUnvalidateMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? BulkMBHeadJobInfo.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkSubmitMBHeadRequest(): BulkSubmitMBHeadRequest {
+  return { mbhIds: [] };
+}
+
+export const BulkSubmitMBHeadRequest: MessageFns<BulkSubmitMBHeadRequest> = {
+  encode(message: BulkSubmitMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.mbhIds) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkSubmitMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkSubmitMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhIds.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkSubmitMBHeadRequest {
+    return {
+      mbhIds: globalThis.Array.isArray(object?.mbhIds)
+        ? object.mbhIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.mbh_ids)
+        ? object.mbh_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BulkSubmitMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhIds?.length) {
+      obj.mbhIds = message.mbhIds;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkSubmitMBHeadRequest>): BulkSubmitMBHeadRequest {
+    return BulkSubmitMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkSubmitMBHeadRequest>): BulkSubmitMBHeadRequest {
+    const message = createBaseBulkSubmitMBHeadRequest();
+    message.mbhIds = object.mbhIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseBulkSubmitMBHeadResponse(): BulkSubmitMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const BulkSubmitMBHeadResponse: MessageFns<BulkSubmitMBHeadResponse> = {
+  encode(message: BulkSubmitMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      BulkMBHeadJobInfo.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkSubmitMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkSubmitMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = BulkMBHeadJobInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkSubmitMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? BulkMBHeadJobInfo.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: BulkSubmitMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = BulkMBHeadJobInfo.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkSubmitMBHeadResponse>): BulkSubmitMBHeadResponse {
+    return BulkSubmitMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkSubmitMBHeadResponse>): BulkSubmitMBHeadResponse {
+    const message = createBaseBulkSubmitMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? BulkMBHeadJobInfo.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkValidateMBHeadRequest(): BulkValidateMBHeadRequest {
+  return { mbhIds: [] };
+}
+
+export const BulkValidateMBHeadRequest: MessageFns<BulkValidateMBHeadRequest> = {
+  encode(message: BulkValidateMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.mbhIds) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkValidateMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkValidateMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhIds.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkValidateMBHeadRequest {
+    return {
+      mbhIds: globalThis.Array.isArray(object?.mbhIds)
+        ? object.mbhIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.mbh_ids)
+        ? object.mbh_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BulkValidateMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhIds?.length) {
+      obj.mbhIds = message.mbhIds;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkValidateMBHeadRequest>): BulkValidateMBHeadRequest {
+    return BulkValidateMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkValidateMBHeadRequest>): BulkValidateMBHeadRequest {
+    const message = createBaseBulkValidateMBHeadRequest();
+    message.mbhIds = object.mbhIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseBulkValidateMBHeadResponse(): BulkValidateMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const BulkValidateMBHeadResponse: MessageFns<BulkValidateMBHeadResponse> = {
+  encode(message: BulkValidateMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      BulkMBHeadJobInfo.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkValidateMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkValidateMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = BulkMBHeadJobInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkValidateMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? BulkMBHeadJobInfo.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: BulkValidateMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = BulkMBHeadJobInfo.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkValidateMBHeadResponse>): BulkValidateMBHeadResponse {
+    return BulkValidateMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkValidateMBHeadResponse>): BulkValidateMBHeadResponse {
+    const message = createBaseBulkValidateMBHeadResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? BulkMBHeadJobInfo.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkMBHeadJobInfo(): BulkMBHeadJobInfo {
+  return { jobId: "", jobCode: "", status: "", totalChildren: 0, completedChildren: 0, failedChildren: 0 };
+}
+
+export const BulkMBHeadJobInfo: MessageFns<BulkMBHeadJobInfo> = {
+  encode(message: BulkMBHeadJobInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(18).string(message.jobCode);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    if (message.totalChildren !== 0) {
+      writer.uint32(32).int32(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      writer.uint32(40).int32(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      writer.uint32(48).int32(message.failedChildren);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkMBHeadJobInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkMBHeadJobInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.totalChildren = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.completedChildren = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.failedChildren = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkMBHeadJobInfo {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      totalChildren: isSet(object.totalChildren)
+        ? globalThis.Number(object.totalChildren)
+        : isSet(object.total_children)
+        ? globalThis.Number(object.total_children)
+        : 0,
+      completedChildren: isSet(object.completedChildren)
+        ? globalThis.Number(object.completedChildren)
+        : isSet(object.completed_children)
+        ? globalThis.Number(object.completed_children)
+        : 0,
+      failedChildren: isSet(object.failedChildren)
+        ? globalThis.Number(object.failedChildren)
+        : isSet(object.failed_children)
+        ? globalThis.Number(object.failed_children)
+        : 0,
+    };
+  },
+
+  toJSON(message: BulkMBHeadJobInfo): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.totalChildren !== 0) {
+      obj.totalChildren = Math.round(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      obj.completedChildren = Math.round(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      obj.failedChildren = Math.round(message.failedChildren);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkMBHeadJobInfo>): BulkMBHeadJobInfo {
+    return BulkMBHeadJobInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkMBHeadJobInfo>): BulkMBHeadJobInfo {
+    const message = createBaseBulkMBHeadJobInfo();
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.status = object.status ?? "";
+    message.totalChildren = object.totalChildren ?? 0;
+    message.completedChildren = object.completedChildren ?? 0;
+    message.failedChildren = object.failedChildren ?? 0;
+    return message;
+  },
+};
+
+function createBaseGetBulkMBHeadJobStatusRequest(): GetBulkMBHeadJobStatusRequest {
+  return { jobId: "" };
+}
+
+export const GetBulkMBHeadJobStatusRequest: MessageFns<GetBulkMBHeadJobStatusRequest> = {
+  encode(message: GetBulkMBHeadJobStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBulkMBHeadJobStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetBulkMBHeadJobStatusRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetBulkMBHeadJobStatusRequest {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetBulkMBHeadJobStatusRequest): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetBulkMBHeadJobStatusRequest>): GetBulkMBHeadJobStatusRequest {
+    return GetBulkMBHeadJobStatusRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetBulkMBHeadJobStatusRequest>): GetBulkMBHeadJobStatusRequest {
+    const message = createBaseGetBulkMBHeadJobStatusRequest();
+    message.jobId = object.jobId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetBulkMBHeadJobStatusResponse(): GetBulkMBHeadJobStatusResponse {
+  return {
+    base: undefined,
+    jobId: "",
+    jobCode: "",
+    status: "",
+    totalChildren: 0,
+    completedChildren: 0,
+    failedChildren: 0,
+  };
+}
+
+export const GetBulkMBHeadJobStatusResponse: MessageFns<GetBulkMBHeadJobStatusResponse> = {
+  encode(message: GetBulkMBHeadJobStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.jobId !== "") {
+      writer.uint32(18).string(message.jobId);
+    }
+    if (message.jobCode !== "") {
+      writer.uint32(26).string(message.jobCode);
+    }
+    if (message.status !== "") {
+      writer.uint32(34).string(message.status);
+    }
+    if (message.totalChildren !== 0) {
+      writer.uint32(40).int32(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      writer.uint32(48).int32(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      writer.uint32(56).int32(message.failedChildren);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBulkMBHeadJobStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetBulkMBHeadJobStatusResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.jobCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.totalChildren = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.completedChildren = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.failedChildren = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetBulkMBHeadJobStatusResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+      jobCode: isSet(object.jobCode)
+        ? globalThis.String(object.jobCode)
+        : isSet(object.job_code)
+        ? globalThis.String(object.job_code)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      totalChildren: isSet(object.totalChildren)
+        ? globalThis.Number(object.totalChildren)
+        : isSet(object.total_children)
+        ? globalThis.Number(object.total_children)
+        : 0,
+      completedChildren: isSet(object.completedChildren)
+        ? globalThis.Number(object.completedChildren)
+        : isSet(object.completed_children)
+        ? globalThis.Number(object.completed_children)
+        : 0,
+      failedChildren: isSet(object.failedChildren)
+        ? globalThis.Number(object.failedChildren)
+        : isSet(object.failed_children)
+        ? globalThis.Number(object.failed_children)
+        : 0,
+    };
+  },
+
+  toJSON(message: GetBulkMBHeadJobStatusResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    if (message.jobCode !== "") {
+      obj.jobCode = message.jobCode;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.totalChildren !== 0) {
+      obj.totalChildren = Math.round(message.totalChildren);
+    }
+    if (message.completedChildren !== 0) {
+      obj.completedChildren = Math.round(message.completedChildren);
+    }
+    if (message.failedChildren !== 0) {
+      obj.failedChildren = Math.round(message.failedChildren);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetBulkMBHeadJobStatusResponse>): GetBulkMBHeadJobStatusResponse {
+    return GetBulkMBHeadJobStatusResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetBulkMBHeadJobStatusResponse>): GetBulkMBHeadJobStatusResponse {
+    const message = createBaseGetBulkMBHeadJobStatusResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.jobId = object.jobId ?? "";
+    message.jobCode = object.jobCode ?? "";
+    message.status = object.status ?? "";
+    message.totalChildren = object.totalChildren ?? 0;
+    message.completedChildren = object.completedChildren ?? 0;
+    message.failedChildren = object.failedChildren ?? 0;
+    return message;
+  },
+};
+
+function createBaseListBulkMBHeadJobFailuresRequest(): ListBulkMBHeadJobFailuresRequest {
+  return { jobId: "" };
+}
+
+export const ListBulkMBHeadJobFailuresRequest: MessageFns<ListBulkMBHeadJobFailuresRequest> = {
+  encode(message: ListBulkMBHeadJobFailuresRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobId !== "") {
+      writer.uint32(10).string(message.jobId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListBulkMBHeadJobFailuresRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListBulkMBHeadJobFailuresRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListBulkMBHeadJobFailuresRequest {
+    return {
+      jobId: isSet(object.jobId)
+        ? globalThis.String(object.jobId)
+        : isSet(object.job_id)
+        ? globalThis.String(object.job_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ListBulkMBHeadJobFailuresRequest): unknown {
+    const obj: any = {};
+    if (message.jobId !== "") {
+      obj.jobId = message.jobId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListBulkMBHeadJobFailuresRequest>): ListBulkMBHeadJobFailuresRequest {
+    return ListBulkMBHeadJobFailuresRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListBulkMBHeadJobFailuresRequest>): ListBulkMBHeadJobFailuresRequest {
+    const message = createBaseListBulkMBHeadJobFailuresRequest();
+    message.jobId = object.jobId ?? "";
+    return message;
+  },
+};
+
+function createBaseListBulkMBHeadJobFailuresResponse(): ListBulkMBHeadJobFailuresResponse {
+  return { base: undefined, failures: [] };
+}
+
+export const ListBulkMBHeadJobFailuresResponse: MessageFns<ListBulkMBHeadJobFailuresResponse> = {
+  encode(message: ListBulkMBHeadJobFailuresResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.failures) {
+      BulkMBHeadJobFailure.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListBulkMBHeadJobFailuresResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListBulkMBHeadJobFailuresResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.failures.push(BulkMBHeadJobFailure.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListBulkMBHeadJobFailuresResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      failures: globalThis.Array.isArray(object?.failures)
+        ? object.failures.map((e: any) => BulkMBHeadJobFailure.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListBulkMBHeadJobFailuresResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.failures?.length) {
+      obj.failures = message.failures.map((e) => BulkMBHeadJobFailure.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListBulkMBHeadJobFailuresResponse>): ListBulkMBHeadJobFailuresResponse {
+    return ListBulkMBHeadJobFailuresResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListBulkMBHeadJobFailuresResponse>): ListBulkMBHeadJobFailuresResponse {
+    const message = createBaseListBulkMBHeadJobFailuresResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.failures = object.failures?.map((e) => BulkMBHeadJobFailure.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBulkMBHeadJobFailure(): BulkMBHeadJobFailure {
+  return { mbhId: "", mbCosting: "", errorMessage: "" };
+}
+
+export const BulkMBHeadJobFailure: MessageFns<BulkMBHeadJobFailure> = {
+  encode(message: BulkMBHeadJobFailure, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.mbCosting !== "") {
+      writer.uint32(18).string(message.mbCosting);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(26).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkMBHeadJobFailure {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkMBHeadJobFailure();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mbCosting = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkMBHeadJobFailure {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      mbCosting: isSet(object.mbCosting)
+        ? globalThis.String(object.mbCosting)
+        : isSet(object.mb_costing)
+        ? globalThis.String(object.mb_costing)
+        : "",
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : "",
+    };
+  },
+
+  toJSON(message: BulkMBHeadJobFailure): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.mbCosting !== "") {
+      obj.mbCosting = message.mbCosting;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkMBHeadJobFailure>): BulkMBHeadJobFailure {
+    return BulkMBHeadJobFailure.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkMBHeadJobFailure>): BulkMBHeadJobFailure {
+    const message = createBaseBulkMBHeadJobFailure();
+    message.mbhId = object.mbhId ?? "";
+    message.mbCosting = object.mbCosting ?? "";
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };
@@ -37038,6 +38295,76 @@ export const MBHeadServiceDefinition = {
       requestType: RejectUnlockMBHeadRequest,
       requestStream: false,
       responseType: RejectUnlockMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * BulkForceUnvalidateMBHead force-transitions up to 500 MB Heads from VALIDATED
+     * directly back to DRAFT in one step, bypassing the normal two-step
+     * RequestUnlockMBHead/GrantUnlockMBHead flow. Intended for Super Admin bulk
+     * re-triggering of the validate lifecycle. Runs asynchronously via a job: the
+     * response returns immediately with job info while the per-item work happens in
+     * a background worker — poll GetBulkMBHeadJobStatus for progress.
+     */
+    bulkForceUnvalidateMBHead: {
+      name: "BulkForceUnvalidateMBHead",
+      requestType: BulkForceUnvalidateMBHeadRequest,
+      requestStream: false,
+      responseType: BulkForceUnvalidateMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * BulkSubmitMBHead submits up to 500 MB Heads for approval in one request. Runs
+     * asynchronously via a job: the response returns immediately with job info while
+     * the per-item work happens in a background worker — poll GetBulkMBHeadJobStatus
+     * for progress.
+     */
+    bulkSubmitMBHead: {
+      name: "BulkSubmitMBHead",
+      requestType: BulkSubmitMBHeadRequest,
+      requestStream: false,
+      responseType: BulkSubmitMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * BulkValidateMBHead validates up to 500 approved MB Heads in one request,
+     * freezing each one's cost and param snapshot. Runs asynchronously via a job: the
+     * response returns immediately with job info while the per-item work happens in
+     * a background worker — poll GetBulkMBHeadJobStatus for progress.
+     */
+    bulkValidateMBHead: {
+      name: "BulkValidateMBHead",
+      requestType: BulkValidateMBHeadRequest,
+      requestStream: false,
+      responseType: BulkValidateMBHeadResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * GetBulkMBHeadJobStatus polls the live status and progress counters of a bulk
+     * MB Head lifecycle job (BulkForceUnvalidateMBHead, BulkSubmitMBHead, or
+     * BulkValidateMBHead) while it is still running.
+     */
+    getBulkMBHeadJobStatus: {
+      name: "GetBulkMBHeadJobStatus",
+      requestType: GetBulkMBHeadJobStatusRequest,
+      requestStream: false,
+      responseType: GetBulkMBHeadJobStatusResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ListBulkMBHeadJobFailures lists the per-item failures recorded by a finished
+     * (or in-progress) bulk MB Head lifecycle job, so the caller can see which MB
+     * Heads failed and why.
+     */
+    listBulkMBHeadJobFailures: {
+      name: "ListBulkMBHeadJobFailures",
+      requestType: ListBulkMBHeadJobFailuresRequest,
+      requestStream: false,
+      responseType: ListBulkMBHeadJobFailuresResponse,
       responseStream: false,
       options: {},
     },
