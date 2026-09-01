@@ -17,7 +17,7 @@ export function MBSpinDeleteDialog({ open, onOpenChange, mbSpin, onSuccess }: MB
   const handleDelete = async () => {
     if (!mbSpin) return
     try {
-      await deleteMutation.mutateAsync(mbSpin.mbsId)
+      await deleteMutation.mutateAsync({ mbsId: mbSpin.mbsId, mbhId: mbSpin.mbsMbhId })
       onOpenChange(false)
       onSuccess?.()
     } catch {

@@ -46,7 +46,6 @@ const {
   useGet: useMBSpin,
   useCreate: useCreateMBSpin,
   useUpdate: useUpdateMBSpin,
-  useDelete: useDeleteMBSpin,
   queryKeys: mbSpinKeys,
 } = createCrudHooks<
   MBSpin,
@@ -83,7 +82,6 @@ export {
   useMBSpin,
   useCreateMBSpin,
   useUpdateMBSpin,
-  useDeleteMBSpin,
   mbSpinKeys,
 }
 
@@ -134,6 +132,50 @@ export function useMBSpinDetail(id: string) {
     enabled: !!id,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+  })
+}
+
+// ============================================================================
+// Delete Hook (dedicated — bypasses generic factory delete)
+// ============================================================================
+
+// ⭐ DITAMBAHKAN 2026-09-01 — the generic factory's `useDelete` (from
+// createCrudHooks above) takes a bare `id: string` and calls
+// `apiClient.delete(`${apiBasePath}/${id}`)` with no query string at all
+// (create-crud-hooks.ts useDelete, ~L249-254). The BFF route this hits
+// (src/app/api/v1/finance/mb-spins/[id]/route.ts DELETE, ~L78-84) reads
+// `mbhId` from `?mbhId=` and forwards `{ mbhId, mbsId: id }` to
+// `client.deleteMBSpin`. Proto `DeleteMBSpinRequest.mbh_id`
+// (goapps-shared-proto finance/v1/yarn_master.proto ~L2037-2042) is
+// `buf.validate` `string.uuid = true` with no `ignore: IGNORE_IF_ZERO_VALUE`,
+// so an empty/missing `mbhId` fails validation before the delete logic ever
+// runs, surfacing as a generic "Validation failed" toast. Verified in
+// goapps-backend: `DeleteHandler.Handle` (internal/application/mbspin/
+// delete_handler.go) only uses `cmd.ID` (the spin id) — `mbh_id` is validated
+// but never actually used to scope the query.
+//
+// Unlike the GET case above (`useMBSpinDetail`), the delete dialog DOES have
+// the real parent id in scope — the `MBSpin` row being deleted already
+// carries `mbsMbhId` — so this hook passes the REAL value instead of a
+// placeholder. It's still a small dedicated hook (not a fix to the generic
+// factory) because the factory's `useDelete` has no way to accept extra
+// query params for just this one resource.
+export function useDeleteMBSpin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ mbsId, mbhId }: { mbsId: string; mbhId: string }) => {
+      const rawResponse = await apiClient.delete<unknown>(
+        `/api/v1/finance/mb-spins/${mbsId}?mbhId=${mbhId}`
+      )
+      return DeleteMBSpinResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mbSpinKeys.lists() })
+      toast.success("MB Spin deleted successfully")
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete MB Spin")
+    },
   })
 }
 
