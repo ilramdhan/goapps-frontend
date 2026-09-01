@@ -138,7 +138,16 @@ export default function MbSpinDetailClient({ id }: Props) {
           */}
           <Field label="Denier" value={mbSpin.mbsDenier != null ? String(mbSpin.mbsDenier) : "—"} mono />
           <Field label="Filament" value={mbSpin.mbsFilament != null ? String(mbSpin.mbsFilament) : "—"} mono />
-          <Field label="Dozing" value={mbSpin.mbsDozing != null ? String(mbSpin.mbsDozing) : "—"} mono />
+          {/*
+            "Dozing" (mbsDozing) intentionally removed from this detail view per
+            user decision on 2026-08-31 — it is a duplicate concept of LDR
+            (see the LDR block below: mbsLdrType/mbsLdrCalculatedPct/
+            mbsLdrAdjustmentPct). The mbsDozing field itself, the DB column
+            `mbs_dozing`, the MBSpinFormDialog form field, and the whole
+            mb-dozing/LDR calculator mechanism are all intentionally KEPT —
+            only this render line was deleted. Do not re-add a "Dozing" Field
+            here; if LDR display changes are needed, change the LDR block.
+          */}
           <Field label="VS Number" value={mbSpin.mbsVsNumber || "—"} />
           <Field label="Final Product" value={mbSpin.mbsFinalProduct || "—"} />
         </CardContent>
