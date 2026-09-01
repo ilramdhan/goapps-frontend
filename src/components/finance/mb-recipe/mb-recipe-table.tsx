@@ -6,6 +6,7 @@ import { Beaker } from "lucide-react"
 
 import { EmptyState } from "@/components/common/empty-state"
 import { StatusBadge } from "@/components/common/status-badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -53,13 +54,54 @@ interface Props {
   sortOrder?: "asc" | "desc"
   onSort: (sortKey: string) => void
   visibility: Record<string, boolean>
+  /**
+   * Bulk-selection state, keyed by `mbhId`. Both props are optional — omitting
+   * them (e.g. any other future caller of this table) simply hides the
+   * checkbox column entirely, so this is additive and does not change the
+   * table's behavior for callers that don't opt in.
+   */
+  selectedIds?: Set<string>
+  onSelectionChange?: (ids: Set<string>) => void
 }
 
-export function MbRecipeTable({ items, isLoading, sortBy, sortOrder, onSort, visibility }: Props) {
+export function MbRecipeTable({
+  items,
+  isLoading,
+  sortBy,
+  sortOrder,
+  onSort,
+  visibility,
+  selectedIds,
+  onSelectionChange,
+}: Props) {
   const show = (id: string) => visibility[id] !== false
-  const visibleCount = MB_RECIPE_COLUMNS.filter((c) => show(c.id)).length
+  const selectable = selectedIds !== undefined && onSelectionChange !== undefined
+  const visibleCount = MB_RECIPE_COLUMNS.filter((c) => show(c.id)).length + (selectable ? 1 : 0)
 
   const sortProps = { currentSortBy: sortBy, currentSortOrder: sortOrder, onSort }
+
+  const selectedCount = items.filter((mb) => selectedIds?.has(mb.mbhId)).length
+  const allSelected = items.length > 0 && selectedCount === items.length
+  const someSelected = selectedCount > 0 && !allSelected
+
+  function toggleAll(checked: boolean) {
+    if (!onSelectionChange || !selectedIds) return
+    const next = new Set(selectedIds)
+    if (checked) {
+      items.forEach((mb) => next.add(mb.mbhId))
+    } else {
+      items.forEach((mb) => next.delete(mb.mbhId))
+    }
+    onSelectionChange(next)
+  }
+
+  function toggleRow(mbhId: string, checked: boolean) {
+    if (!onSelectionChange || !selectedIds) return
+    const next = new Set(selectedIds)
+    if (checked) next.add(mbhId)
+    else next.delete(mbhId)
+    onSelectionChange(next)
+  }
 
   function renderHeader(col: ColumnDef<MBHead>, className?: string) {
     if (BACKEND_SORTABLE_KEYS.has(col.id)) {
@@ -78,7 +120,17 @@ export function MbRecipeTable({ items, isLoading, sortBy, sortOrder, onSort, vis
         <Table>
           <TableHeader>
             <TableRow>
-              {show("dev_code") && renderHeader(MB_RECIPE_COLUMNS[0], "w-32 pl-4")}
+              {selectable && (
+                <TableHead className="w-10 pl-4">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={(checked) => toggleAll(checked === true)}
+                    disabled={items.length === 0}
+                    aria-label="Select all rows"
+                  />
+                </TableHead>
+              )}
+              {show("dev_code") && renderHeader(MB_RECIPE_COLUMNS[0], selectable ? "w-32" : "w-32 pl-4")}
               {show("shade_code") && renderHeader(MB_RECIPE_COLUMNS[1], "w-28")}
               {show("shade_name") && renderHeader(MB_RECIPE_COLUMNS[2])}
               {show("mbh_mgt_name") && renderHeader(MB_RECIPE_COLUMNS[3])}
@@ -96,7 +148,12 @@ export function MbRecipeTable({ items, isLoading, sortBy, sortOrder, onSort, vis
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {show("dev_code") && <TableCell className="pl-4"><Skeleton className="h-4 w-24" /></TableCell>}
+                  {selectable && <TableCell className="pl-4"><Skeleton className="h-4 w-4" /></TableCell>}
+                  {show("dev_code") && (
+                    <TableCell className={selectable ? undefined : "pl-4"}>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                  )}
                   {show("shade_code") && <TableCell><Skeleton className="h-4 w-20" /></TableCell>}
                   {show("shade_name") && <TableCell><Skeleton className="h-4 w-40" /></TableCell>}
                   {show("mbh_mgt_name") && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
@@ -124,8 +181,24 @@ export function MbRecipeTable({ items, isLoading, sortBy, sortOrder, onSort, vis
             )}
             {items.map((mb) => (
               <TableRow key={mb.mbhId} className="relative cursor-pointer hover:bg-muted/50">
+                {selectable && (
+                  // ⚠ The row-navigation Link below lives inside the dev_code cell but is
+                  // `absolute inset-0` against the TableRow's `relative` (the row is the
+                  // positioned ancestor, not the cell) — so it visually covers the WHOLE
+                  // row, not just that one cell, and (being later in DOM order) paints on
+                  // top of any other z-index:auto sibling. `relative z-10` here lifts this
+                  // cell into its own stacking context above that overlay so the checkbox
+                  // stays clickable instead of triggering navigation.
+                  <TableCell className="relative z-10 pl-4">
+                    <Checkbox
+                      checked={selectedIds?.has(mb.mbhId) ?? false}
+                      onCheckedChange={(checked) => toggleRow(mb.mbhId, checked === true)}
+                      aria-label={`Select ${mb.devCode || mb.mbhId}`}
+                    />
+                  </TableCell>
+                )}
                 {show("dev_code") && (
-                  <TableCell className="pl-4 font-mono text-xs">
+                  <TableCell className={selectable ? "font-mono text-xs" : "pl-4 font-mono text-xs"}>
                     <Link href={`/finance/mb-recipe/${mb.mbhId}`} className="absolute inset-0">
                       <span className="sr-only">View {mb.devCode}</span>
                     </Link>

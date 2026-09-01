@@ -9,3 +9,6 @@ export { MBDozingCalculatorDialog } from "./mb-dozing-calculator-dialog"
 export { MbCostTab, resolveCostProductId } from "./mb-cost-tab"
 export { MbTraceabilityTab } from "./mb-traceability-tab"
 export * from "./fields"
+// Bulk MB Head lifecycle regenerate (Super Admin) — Phase F.
+export { MbRecipeBulkToolbar } from "./mb-recipe-bulk-toolbar"
+export { MbRecipeBulkJobProgressDialog } from "./mb-recipe-bulk-job-progress-dialog"

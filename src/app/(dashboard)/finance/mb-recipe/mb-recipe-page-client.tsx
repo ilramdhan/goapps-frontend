@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Download, Upload, Loader2, FileSpreadsheet } from "lucide-react"
 
 import { PageHeader } from "@/components/common/page-header"
@@ -19,10 +20,16 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MbRecipeTable, useMbRecipeTableColumns, MBRecipeFormDialog } from "@/components/finance/mb-recipe"
+import {
+  MbRecipeTable,
+  useMbRecipeTableColumns,
+  MBRecipeFormDialog,
+  MbRecipeBulkToolbar,
+  MbRecipeBulkJobProgressDialog,
+} from "@/components/finance/mb-recipe"
 import { MBHeadImportDialog } from "@/components/finance/mb-head"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
-import { useMBHeads, useExportMBHeads, useExportMBRecipeFull } from "@/hooks/finance/use-mb-head"
+import { useMBHeads, useExportMBHeads, useExportMBRecipeFull, mbHeadKeys } from "@/hooks/finance/use-mb-head"
 import { useUrlState } from "@/lib/hooks"
 import {
   ActiveFilter,
@@ -69,6 +76,13 @@ export default function MbRecipePageClient() {
   const [importOpen, setImportOpen] = useState(false)
   const exportMutation = useExportMBHeads()
   const exportFullMutation = useExportMBRecipeFull()
+  const queryClient = useQueryClient()
+
+  // Bulk MB Head lifecycle regenerate (Super Admin, Phase F) — selection lives here
+  // (not inside MbRecipeTable) so both the table's checkboxes and the toolbar/dialog
+  // below share the same state.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProgressOpen, setBulkProgressOpen] = useState(false)
 
   function handleSort(sortKey: string) {
     const nextOrder = filters.sortBy === sortKey && filters.sortOrder === "asc" ? "desc" : "asc"
@@ -219,6 +233,11 @@ export default function MbRecipePageClient() {
         </div>
       </div>
 
+      <MbRecipeBulkToolbar
+        selectedCount={selectedIds.size}
+        onConfirm={() => setBulkProgressOpen(true)}
+      />
+
       <MbRecipeTable
         items={items}
         isLoading={isLoading}
@@ -226,6 +245,8 @@ export default function MbRecipePageClient() {
         sortOrder={filters.sortOrder as "asc" | "desc" | undefined}
         onSort={handleSort}
         visibility={visibility}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
       />
 
       {totalItems > 0 && (
@@ -241,6 +262,15 @@ export default function MbRecipePageClient() {
 
       <MBRecipeFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       <MBHeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      <MbRecipeBulkJobProgressDialog
+        open={bulkProgressOpen}
+        onOpenChange={setBulkProgressOpen}
+        mbhIds={Array.from(selectedIds)}
+        onSettled={() => {
+          queryClient.invalidateQueries({ queryKey: mbHeadKeys.lists() })
+          setSelectedIds(new Set())
+        }}
+      />
     </div>
   )
 }

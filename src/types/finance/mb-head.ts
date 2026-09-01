@@ -36,6 +36,19 @@ export type {
   RevokeMBHeadResponse,
   RejectMBHeadRequest,
   RejectMBHeadResponse,
+  // Bulk MB Head lifecycle regenerate (Super Admin) — see plan phase E.
+  BulkForceUnvalidateMBHeadRequest,
+  BulkForceUnvalidateMBHeadResponse,
+  BulkSubmitMBHeadRequest,
+  BulkSubmitMBHeadResponse,
+  BulkValidateMBHeadRequest,
+  BulkValidateMBHeadResponse,
+  BulkMBHeadJobInfo,
+  GetBulkMBHeadJobStatusRequest,
+  GetBulkMBHeadJobStatusResponse,
+  ListBulkMBHeadJobFailuresRequest,
+  ListBulkMBHeadJobFailuresResponse,
+  BulkMBHeadJobFailure,
 } from "@/types/generated/finance/v1/yarn_master"
 
 // Message functions for parsing (named exports as Parsers)
@@ -56,6 +69,14 @@ export {
   UnApproveMBHeadResponse as UnApproveMBHeadResponseParser,
   RevokeMBHeadResponse as RevokeMBHeadResponseParser,
   RejectMBHeadResponse as RejectMBHeadResponseParser,
+  // Bulk MB Head lifecycle regenerate (Super Admin)
+  BulkForceUnvalidateMBHeadResponse as BulkForceUnvalidateMBHeadResponseParser,
+  BulkSubmitMBHeadResponse as BulkSubmitMBHeadResponseParser,
+  BulkValidateMBHeadResponse as BulkValidateMBHeadResponseParser,
+  BulkMBHeadJobInfo as BulkMBHeadJobInfoParser,
+  GetBulkMBHeadJobStatusResponse as GetBulkMBHeadJobStatusResponseParser,
+  ListBulkMBHeadJobFailuresResponse as ListBulkMBHeadJobFailuresResponseParser,
+  BulkMBHeadJobFailure as BulkMBHeadJobFailureParser,
 } from "@/types/generated/finance/v1/yarn_master"
 
 // Re-export shared enums/types from UOM (same package)
@@ -179,6 +200,24 @@ export type MBHeadEntryStatus =
   // decision; it exits to DRAFT (granted) or back to APPROVED/VALIDATED
   // (rejected). ⛔ Not reachable from DRAFT.
   | "UNLOCK_REQUESTED"
+
+// ============================================================================
+// Bulk MB Head Lifecycle Regenerate (Super Admin) — job status
+// ============================================================================
+
+/**
+ * Status values a bulk MB Head lifecycle job (BulkForceUnvalidateMBHead,
+ * BulkSubmitMBHead, BulkValidateMBHead) reports via GetBulkMBHeadJobStatus.
+ * Mirrors the proto doc comment on GetBulkMBHeadJobStatusResponse.status.
+ */
+export type BulkMBHeadJobStatus = "QUEUED" | "PROCESSING" | "DONE" | "FAILED" | "PARTIAL"
+
+/** Terminal statuses — once reached, the job's polling hook stops refetching. */
+export const BULK_MB_HEAD_JOB_TERMINAL_STATUSES: readonly BulkMBHeadJobStatus[] = [
+  "DONE",
+  "FAILED",
+  "PARTIAL",
+]
 
 // ============================================================================
 // Form Types
