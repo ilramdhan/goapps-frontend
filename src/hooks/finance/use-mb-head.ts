@@ -41,6 +41,7 @@ import {
   revokeMBHead,
   rejectMBHead,
   returnMBHeadToDraft,
+  unrevokeMBHead,
   requestUnlockMBHead,
   grantUnlockMBHead,
   rejectUnlockMBHead,
@@ -270,6 +271,17 @@ export function useReturnMBHeadToDraft() {
     returnMBHeadToDraft,
     "MB Head returned to draft",
     "Failed to return MB Head to draft",
+  )
+}
+
+// 2026-08-31: REVOKED → DRAFT, gated by the dedicated finance.mb.head.unrevoke
+// permission (Super Admin only). Reason is OPTIONAL — same shape as
+// useReturnMBHeadToDraft above.
+export function useUnrevokeMBHead() {
+  return useMbHeadReasonTransition(
+    unrevokeMBHead,
+    "MB Head unrevoked",
+    "Failed to unrevoke MB Head",
   )
 }
 
