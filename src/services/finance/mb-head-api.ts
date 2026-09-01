@@ -53,6 +53,13 @@ export async function returnMBHeadToDraft(mbhId: string, reason: string): Promis
   return postTransition(`/api/v1/finance/mb-heads/${mbhId}/return-to-draft`, { reason })
 }
 
+// 2026-08-31: REVOKED → DRAFT, gated by the dedicated finance.mb.head.unrevoke
+// permission (Super Admin only). Reason is OPTIONAL, same semantics as
+// returnMBHeadToDraft above — an empty reason preserves the prior stateReason.
+export async function unrevokeMBHead(mbhId: string, reason: string): Promise<MBHead> {
+  return postTransition(`/api/v1/finance/mb-heads/${mbhId}/unrevoke`, { reason })
+}
+
 // ============================================================================
 // P10 lock/unlock (RequestUnlock / GrantUnlock / RejectUnlock)
 // ============================================================================

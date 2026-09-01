@@ -14,8 +14,17 @@
 //
 // ⛔ The REVOKED and UN_APPROVED statuses were ⛔ NOT removed anywhere. Production
 // already holds rows in both, and this bar must keep RENDERING them without crashing —
-// it simply offers them no action. That is why the guard below still lists those
-// statuses and why the component returns null for them rather than throwing.
+// it simply offers them no action for most users. That is why the guard below still
+// lists those statuses and why the component returns null for them rather than
+// throwing, UNLESS the exception below applies.
+//
+// 🔴 USER DECISION 2026-08-31 — REVOKED is no longer an unconditional dead end. A
+// NEW, DEDICATED permission (finance.mb.head.unrevoke), granted ONLY to Super Admin
+// via IAM migration 000091, gates a genuine REVOKED → DRAFT "Unrevoke" transition —
+// an exit-only edge mirroring the UN_APPROVED → APPROVED precedent (nothing can ever
+// re-enter REVOKED; Revoke itself stays removed as a feature). A holder of that
+// permission sees an "Unrevoke" button on a REVOKED row; everyone else still sees
+// nothing, exactly as before.
 //
 // ⛔ The backend RPCs RevokeMBHead / UnApproveMBHead still exist (removing an RPC is a
 // breaking proto change); they now refuse with a 410 BaseResponse. The hooks and API
@@ -55,6 +64,7 @@ import {
   useApproveMBHead,
   useRejectMBHead,
   useReturnMBHeadToDraft,
+  useUnrevokeMBHead,
   useRequestUnlockMBHead,
   useGrantUnlockMBHead,
   useRejectUnlockMBHead,
@@ -77,8 +87,9 @@ interface Props {
 export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   const status = mbHead.entryStatus as MBHeadEntryStatus
   // 2026-08-26: ~~"unapprove" | "revoke" |~~ dropped along with their buttons.
+  // 2026-08-31: "unrevoke" added back — see the REVOKED → DRAFT exception above.
   const [reasonDialog, setReasonDialog] = useState<
-    "reject" | "return-to-draft" | "request-unlock" | "reject-unlock" | null
+    "reject" | "return-to-draft" | "unrevoke" | "request-unlock" | "reject-unlock" | null
   >(null)
 
   const { hasPermission } = usePermissionContext()
@@ -99,11 +110,15 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   // violate that decision, and the backend deliberately has none either.
   const canRequestUnlockPerm = hasPermission("finance.mb.recipe.unlockrequest")
   const canDecideUnlockPerm = hasPermission("finance.mb.recipe.unlock")
+  // 2026-08-31: NEW, DEDICATED permission — deliberately NOT reused from any other
+  // MB Head code. Granted only to SUPER_ADMIN (IAM migration 000091).
+  const canUnrevokePerm = hasPermission("finance.mb.head.unrevoke")
 
   const submitM = useSubmitMBHead()
   const approveM = useApproveMBHead()
   const rejectM = useRejectMBHead()
   const returnToDraftM = useReturnMBHeadToDraft()
+  const unrevokeM = useUnrevokeMBHead()
   const requestUnlockM = useRequestUnlockMBHead()
   const grantUnlockM = useGrantUnlockMBHead()
   const rejectUnlockM = useRejectUnlockMBHead()
@@ -139,6 +154,9 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   const canReject = status === "SUBMITTED" && canRejectPerm
   // K-29/K-30: a REJECTED MB Head can be sent back to DRAFT, gated on finance.mb.head.submit.
   const canReturnToDraft = status === "REJECTED" && canSubmitPerm
+  // 2026-08-31: a REVOKED MB Head can be sent back to DRAFT, gated on the new
+  // finance.mb.head.unrevoke permission (Super Admin only) — see the top-of-file note.
+  const canUnrevoke = status === "REVOKED" && canUnrevokePerm
   // P10: only the two states the backend locks on entry can park for an unlock
   // (domain canRequestUnlock: APPROVED, VALIDATED).
   const canRequestUnlock = (status === "APPROVED" || status === "VALIDATED") && canRequestUnlockPerm
@@ -151,6 +169,7 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
     !canApprove &&
     !canReject &&
     !canReturnToDraft &&
+    !canUnrevoke &&
     !canRequestUnlock &&
     !canDecideUnlock
   ) {
@@ -184,6 +203,11 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
       {canReturnToDraft && (
         <Button size="sm" variant="outline" onClick={() => setReasonDialog("return-to-draft")}>
           Return to Draft
+        </Button>
+      )}
+      {canUnrevoke && (
+        <Button size="sm" variant="outline" onClick={() => setReasonDialog("unrevoke")}>
+          Unrevoke
         </Button>
       )}
       {canRequestUnlock && (
@@ -256,6 +280,21 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
         pending={returnToDraftM.isPending}
         onConfirm={(reason) => {
           returnToDraftM.mutate({ mbhId: mbHead.mbhId, reason }, { onSuccess: () => setReasonDialog(null) })
+        }}
+      />
+
+      {/* 2026-08-31: reason is OPTIONAL here — same rationale as return-to-draft above.
+          The prior REVOKE reason is preserved server-side when this is left empty. */}
+      <ReasonDialog
+        open={reasonDialog === "unrevoke"}
+        onOpenChange={(o) => !o && setReasonDialog(null)}
+        title="Unrevoke MB Head"
+        description="This sends the revoked MB Head back to Draft for editing and resubmission. A reason is optional."
+        confirmLabel="Unrevoke"
+        reasonOptional
+        pending={unrevokeM.isPending}
+        onConfirm={(reason) => {
+          unrevokeM.mutate({ mbhId: mbHead.mbhId, reason }, { onSuccess: () => setReasonDialog(null) })
         }}
       />
 

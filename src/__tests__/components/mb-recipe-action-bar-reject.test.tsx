@@ -27,6 +27,7 @@ vi.mock("@/hooks/finance/use-mb-head", () => {
     // Return-to-Draft (K-29) is rendered by the same bar; stub it so this suite
     // keeps exercising only the Reject path.
     useReturnMBHeadToDraft: stub,
+    useUnrevokeMBHead: stub,
     // P10 unlock hooks are rendered by the same bar; stub them so this suite keeps
     // exercising only its own path.
     useRequestUnlockMBHead: stub,

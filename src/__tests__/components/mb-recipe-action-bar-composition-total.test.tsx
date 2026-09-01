@@ -30,6 +30,7 @@ vi.mock("@/hooks/finance/use-mb-head", () => {
     useRevokeMBHead: stub,
     useRejectMBHead: stub,
     useReturnMBHeadToDraft: stub,
+    useUnrevokeMBHead: stub,
     useRequestUnlockMBHead: stub,
     useGrantUnlockMBHead: stub,
     useRejectUnlockMBHead: stub,

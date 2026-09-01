@@ -2017,6 +2017,24 @@ export interface ReturnMBHeadToDraftResponse {
   data: MBHead | undefined;
 }
 
+/** UnrevokeMBHeadRequest is the request for unrevoking a revoked MB Head back to draft. */
+export interface UnrevokeMBHeadRequest {
+  /** MB Head UUID. */
+  mbhId: string;
+  /** Reason for unrevoking. Optional; when empty the existing state_reason is preserved. */
+  reason: string;
+}
+
+/** UnrevokeMBHeadResponse is the response for unrevoking an MB Head. */
+export interface UnrevokeMBHeadResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated MB Head data. */
+  data: MBHead | undefined;
+}
+
 /** RequestUnlockMBHeadRequest is the request for asking that a locked MB Head be unlocked (P10). */
 export interface RequestUnlockMBHeadRequest {
   /** MB Head UUID. */
@@ -18797,6 +18815,164 @@ export const ReturnMBHeadToDraftResponse: MessageFns<ReturnMBHeadToDraftResponse
   },
   fromPartial(object: DeepPartial<ReturnMBHeadToDraftResponse>): ReturnMBHeadToDraftResponse {
     const message = createBaseReturnMBHeadToDraftResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null) ? MBHead.fromPartial(object.data) : undefined;
+    return message;
+  },
+};
+
+function createBaseUnrevokeMBHeadRequest(): UnrevokeMBHeadRequest {
+  return { mbhId: "", reason: "" };
+}
+
+export const UnrevokeMBHeadRequest: MessageFns<UnrevokeMBHeadRequest> = {
+  encode(message: UnrevokeMBHeadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mbhId !== "") {
+      writer.uint32(10).string(message.mbhId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(18).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnrevokeMBHeadRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUnrevokeMBHeadRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.mbhId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UnrevokeMBHeadRequest {
+    return {
+      mbhId: isSet(object.mbhId)
+        ? globalThis.String(object.mbhId)
+        : isSet(object.mbh_id)
+        ? globalThis.String(object.mbh_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: UnrevokeMBHeadRequest): unknown {
+    const obj: any = {};
+    if (message.mbhId !== "") {
+      obj.mbhId = message.mbhId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UnrevokeMBHeadRequest>): UnrevokeMBHeadRequest {
+    return UnrevokeMBHeadRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UnrevokeMBHeadRequest>): UnrevokeMBHeadRequest {
+    const message = createBaseUnrevokeMBHeadRequest();
+    message.mbhId = object.mbhId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseUnrevokeMBHeadResponse(): UnrevokeMBHeadResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UnrevokeMBHeadResponse: MessageFns<UnrevokeMBHeadResponse> = {
+  encode(message: UnrevokeMBHeadResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      MBHead.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnrevokeMBHeadResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUnrevokeMBHeadResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = MBHead.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UnrevokeMBHeadResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? MBHead.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UnrevokeMBHeadResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = MBHead.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UnrevokeMBHeadResponse>): UnrevokeMBHeadResponse {
+    return UnrevokeMBHeadResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UnrevokeMBHeadResponse>): UnrevokeMBHeadResponse {
+    const message = createBaseUnrevokeMBHeadResponse();
     message.base = (object.base !== undefined && object.base !== null)
       ? BaseResponse.fromPartial(object.base)
       : undefined;
@@ -36816,6 +36992,15 @@ export const MBHeadServiceDefinition = {
       requestType: ReturnMBHeadToDraftRequest,
       requestStream: false,
       responseType: ReturnMBHeadToDraftResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** UnrevokeMBHead returns a revoked MB Head back to draft. Reason is optional; when empty the existing state_reason is preserved. */
+    unrevokeMBHead: {
+      name: "UnrevokeMBHead",
+      requestType: UnrevokeMBHeadRequest,
+      requestStream: false,
+      responseType: UnrevokeMBHeadResponse,
       responseStream: false,
       options: {},
     },
