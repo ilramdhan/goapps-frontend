@@ -35,6 +35,7 @@ import {
   ActiveFilter,
   ACTIVE_FILTER_OPTIONS,
   type ListMBHeadsParams,
+  type MBHeadEntryStatus,
   type MBRecipeFullCheckStatusCalc,
 } from "@/types/finance/mb-head"
 
@@ -80,8 +81,10 @@ export default function MbRecipePageClient() {
 
   // Bulk MB Head lifecycle regenerate (Super Admin, Phase F) — selection lives here
   // (not inside MbRecipeTable) so both the table's checkboxes and the toolbar/dialog
-  // below share the same state.
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // below share the same state. Keyed by mbhId → entryStatus AT SELECTION TIME (not
+  // just the id) so the dialog's adaptive per-status orchestration works even after
+  // the user paginates away from the page a row was selected on.
+  const [selectedIds, setSelectedIds] = useState<Map<string, MBHeadEntryStatus>>(new Map())
   const [bulkProgressOpen, setBulkProgressOpen] = useState(false)
 
   function handleSort(sortKey: string) {
@@ -265,10 +268,10 @@ export default function MbRecipePageClient() {
       <MbRecipeBulkJobProgressDialog
         open={bulkProgressOpen}
         onOpenChange={setBulkProgressOpen}
-        mbhIds={Array.from(selectedIds)}
+        selection={selectedIds}
         onSettled={() => {
           queryClient.invalidateQueries({ queryKey: mbHeadKeys.lists() })
-          setSelectedIds(new Set())
+          setSelectedIds(new Map())
         }}
       />
     </div>

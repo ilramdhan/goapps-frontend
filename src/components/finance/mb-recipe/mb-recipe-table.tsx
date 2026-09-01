@@ -14,9 +14,21 @@ import {
 import { SortableHeader } from "@/components/shared/data-table/sortable-header"
 import { useColumnVisibility } from "@/components/shared/data-table/use-column-visibility"
 import type { ColumnDef } from "@/components/shared/data-table/types"
-import type { MBHead } from "@/types/finance/mb-head"
+import type { MBHead, MBHeadEntryStatus } from "@/types/finance/mb-head"
 
 export const MB_RECIPE_TABLE_ID = "finance-mb-recipe"
+
+// Bulk Regenerate (the only feature that opts into `selectable`) re-triggers a
+// SUBSET of Unvalidate → Submit → Validate adapted to each row's own starting
+// status (see MbRecipeBulkJobProgressDialog): VALIDATED needs all 3 stages,
+// SUBMITTED needs only Validate, DRAFT needs Submit → Validate. Anything else
+// (APPROVED, REJECTED, REVOKED, UNLOCK_REQUESTED, …) has no legal path through
+// that chain and stays out of scope for this feature.
+const BULK_REGENERATE_ELIGIBLE_STATUSES: ReadonlySet<string> = new Set<MBHeadEntryStatus>([
+  "DRAFT",
+  "SUBMITTED",
+  "VALIDATED",
+])
 
 // Backend sort keys actually accepted by ListMBHeadsRequest.sort_by (buf.validate `in:` list).
 // Only columns whose id is in this set get a clickable SortableHeader — every other column
@@ -55,13 +67,18 @@ interface Props {
   onSort: (sortKey: string) => void
   visibility: Record<string, boolean>
   /**
-   * Bulk-selection state, keyed by `mbhId`. Both props are optional — omitting
-   * them (e.g. any other future caller of this table) simply hides the
-   * checkbox column entirely, so this is additive and does not change the
-   * table's behavior for callers that don't opt in.
+   * Bulk-selection state, keyed by `mbhId` → the row's `entryStatus` AT THE
+   * MOMENT IT WAS SELECTED. A Map (not a Set) so the adaptive orchestration in
+   * MbRecipeBulkJobProgressDialog can bucket selected items by starting status
+   * without re-deriving it later — selection can span multiple pages, so a
+   * later page's `items` list may no longer contain an earlier page's selected
+   * rows. Both props are optional — omitting them (e.g. any other future
+   * caller of this table) simply hides the checkbox column entirely, so this
+   * is additive and does not change the table's behavior for callers that
+   * don't opt in.
    */
-  selectedIds?: Set<string>
-  onSelectionChange?: (ids: Set<string>) => void
+  selectedIds?: Map<string, MBHeadEntryStatus>
+  onSelectionChange?: (ids: Map<string, MBHeadEntryStatus>) => void
 }
 
 export function MbRecipeTable({
@@ -80,26 +97,39 @@ export function MbRecipeTable({
 
   const sortProps = { currentSortBy: sortBy, currentSortOrder: sortOrder, onSort }
 
-  const selectedCount = items.filter((mb) => selectedIds?.has(mb.mbhId)).length
-  const allSelected = items.length > 0 && selectedCount === items.length
+  // Bulk Regenerate (the only feature that opts into `selectable`) adapts its
+  // stage chain to each row's starting status — DRAFT/SUBMITTED/VALIDATED all
+  // have a legal path through it (see MbRecipeBulkJobProgressDialog). Anything
+  // else has no legal path and stays disabled up front instead of letting the
+  // attempt surface as a reported failure.
+  const eligibleItems = items.filter((mb) => BULK_REGENERATE_ELIGIBLE_STATUSES.has(mb.entryStatus))
+  const selectedCount = eligibleItems.filter((mb) => selectedIds?.has(mb.mbhId)).length
+  const allSelected = eligibleItems.length > 0 && selectedCount === eligibleItems.length
   const someSelected = selectedCount > 0 && !allSelected
+
+  // mb.entryStatus is typed as a plain `string` on the generated proto message;
+  // eligibility is already gated by BULK_REGENERATE_ELIGIBLE_STATUSES before any
+  // caller reaches this cast, so it's safe to narrow here.
+  function eligibleStatus(mb: MBHead): MBHeadEntryStatus {
+    return mb.entryStatus as MBHeadEntryStatus
+  }
 
   function toggleAll(checked: boolean) {
     if (!onSelectionChange || !selectedIds) return
-    const next = new Set(selectedIds)
+    const next = new Map(selectedIds)
     if (checked) {
-      items.forEach((mb) => next.add(mb.mbhId))
+      eligibleItems.forEach((mb) => next.set(mb.mbhId, eligibleStatus(mb)))
     } else {
-      items.forEach((mb) => next.delete(mb.mbhId))
+      eligibleItems.forEach((mb) => next.delete(mb.mbhId))
     }
     onSelectionChange(next)
   }
 
-  function toggleRow(mbhId: string, checked: boolean) {
+  function toggleRow(mb: MBHead, checked: boolean) {
     if (!onSelectionChange || !selectedIds) return
-    const next = new Set(selectedIds)
-    if (checked) next.add(mbhId)
-    else next.delete(mbhId)
+    const next = new Map(selectedIds)
+    if (checked) next.set(mb.mbhId, eligibleStatus(mb))
+    else next.delete(mb.mbhId)
     onSelectionChange(next)
   }
 
@@ -125,8 +155,8 @@ export function MbRecipeTable({
                   <Checkbox
                     checked={allSelected ? true : someSelected ? "indeterminate" : false}
                     onCheckedChange={(checked) => toggleAll(checked === true)}
-                    disabled={items.length === 0}
-                    aria-label="Select all rows"
+                    disabled={eligibleItems.length === 0}
+                    aria-label="Select all eligible rows (DRAFT, SUBMITTED, or VALIDATED)"
                   />
                 </TableHead>
               )}
@@ -189,10 +219,18 @@ export function MbRecipeTable({
                   // top of any other z-index:auto sibling. `relative z-10` here lifts this
                   // cell into its own stacking context above that overlay so the checkbox
                   // stays clickable instead of triggering navigation.
-                  <TableCell className="relative z-10 pl-4">
+                  <TableCell
+                    className="relative z-10 pl-4"
+                    title={
+                      BULK_REGENERATE_ELIGIBLE_STATUSES.has(mb.entryStatus)
+                        ? undefined
+                        : "Only DRAFT, SUBMITTED, or VALIDATED recipes can be selected for Regenerate"
+                    }
+                  >
                     <Checkbox
                       checked={selectedIds?.has(mb.mbhId) ?? false}
-                      onCheckedChange={(checked) => toggleRow(mb.mbhId, checked === true)}
+                      onCheckedChange={(checked) => toggleRow(mb, checked === true)}
+                      disabled={!BULK_REGENERATE_ELIGIBLE_STATUSES.has(mb.entryStatus)}
                       aria-label={`Select ${mb.devCode || mb.mbhId}`}
                     />
                   </TableCell>
