@@ -1,38 +1,34 @@
 "use client"
 
-// MbRecipeBulkJobProgressDialog — orchestrates the 3-stage Bulk MB Head
+// MbRecipeBulkJobProgressDialog — orchestrates the (adaptive) Bulk MB Head
 // lifecycle-regenerate chain (Unvalidate → Submit → Validate) for one fixed
-// selection of mbhIds, driven entirely by Phase E's hooks
-// (use-mb-head-bulk.ts) — this file never talks to the API directly.
+// selection of { mbhId → entryStatus at selection time }, driven entirely by
+// Phase E's hooks (use-mb-head-bulk.ts) — this file never talks to the API
+// directly.
 //
-// 🔴 DESIGN DECISION — SAME FULL SELECTION on every stage, not a shrinking
-// working set. Each of the 3 stages is called with the exact same `mbhIds`
-// array the user selected, every time — stage 2 (Submit) is NOT restricted to
-// only the records that succeeded stage 1 (Unvalidate), and likewise for
-// stage 3. Rationale:
-//   - It matches the plan's own default recommendation.
-//   - It keeps the mental model simple: "regenerate exactly these N records,
-//     3 steps, see per-step results for the SAME N" — there's no need to
-//     cross-reference which subset made it into a later stage.
-//   - A record that failed an earlier stage will very likely fail the next
-//     one too (it's not in the right source status), and that failure is
-//     still surfaced per-stage via useBulkMBHeadJobFailures, so nothing is
-//     silently swallowed — the user sees exactly which stage a given record
-//     stopped at.
-//   - The backend bulk RPCs are explicitly documented as accepting 1-500 IDs
-//     regardless of their current status per-item (failures are reported,
-//     not a hard request-level rejection), so re-submitting the full set is
-//     a supported, inexpensive no-op for records that already moved on.
+// 🔴 DESIGN DECISION — ADAPTIVE PER-ITEM REQUEST SETS, not the same full
+// selection on every stage. Each stage is called with only the subset of the
+// selection that actually needs it, computed from each item's STARTING status:
+//   - VALIDATED → needs Unvalidate → Submit → Validate (all 3 stages)
+//   - DRAFT     → needs Submit → Validate only (skips Unvalidate)
+//   - SUBMITTED → needs Validate only (skips Unvalidate and Submit)
+// Concretely:
+//   - Stage 1 (Unvalidate) runs against the VALIDATED bucket only.
+//   - Stage 2 (Submit) runs against DRAFT ∪ (VALIDATED items that SUCCEEDED
+//     stage 1). Items that failed stage 1 are dropped, not retried here.
+//   - Stage 3 (Validate) runs against SUBMITTED ∪ (whatever SUCCEEDED stage 2)
+//     — i.e. everything that has reached SUBMITTED by the time this stage
+//     runs, however it got there.
+// A stage whose computed request set is empty is never called — it renders as
+// "Skipped" instead of running a no-op API call or spinning forever waiting on
+// a job that was never queued.
 //
-// Close is gated on the WHOLE CHAIN reaching a terminal state — either every
-// stage completed (DONE/PARTIAL) through Validate, or an earlier stage came
-// back FAILED (zero succeeded) and the chain was stopped early. Either way
+// Close is gated on the WHOLE CHAIN reaching a terminal state — every stage
+// either ran to completion (DONE/PARTIAL/FAILED) or was skipped. That always
 // counts as "settled" for the purpose of refreshing the parent list and
-// clearing selection (see onSettled below) — a stopped-early chain still
-// changed real data (whatever the failed stage's zero-succeeded status
-// implies) and the list must reflect it.
-import { useEffect, useRef, useState } from "react"
-import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react"
+// clearing selection (see onSettled below).
+import { useEffect, useMemo, useRef, useState } from "react"
+import { AlertTriangle, CheckCircle2, Loader2, MinusCircle, XCircle } from "lucide-react"
 
 import {
   Dialog,
@@ -50,7 +46,7 @@ import {
   useBulkSubmitMBHeads,
   useBulkValidateMBHeads,
 } from "@/hooks/finance/use-mb-head-bulk"
-import { BULK_MB_HEAD_JOB_TERMINAL_STATUSES } from "@/types/finance/mb-head"
+import { BULK_MB_HEAD_JOB_TERMINAL_STATUSES, type MBHeadEntryStatus } from "@/types/finance/mb-head"
 
 type StageKey = "unvalidate" | "submit" | "validate"
 
@@ -69,10 +65,14 @@ const STAGE_LABELS: Record<StageKey, string> = {
 // three permissions.
 const UNVALIDATE_REASON = "Bulk lifecycle regenerate (Super Admin)"
 
+// Client-side-only status: a stage whose computed request set came out empty
+// was never sent to the API at all — distinct from any real job status.
+const SKIPPED = "SKIPPED" as const
+
 interface StageResult {
   jobId: string
   jobCode: string
-  status: string
+  status: string // one of BulkMBHeadJobStatus, or the client-only SKIPPED marker
   total: number
   completed: number
   failed: number
@@ -82,45 +82,113 @@ function isTerminal(status: string): boolean {
   return (BULK_MB_HEAD_JOB_TERMINAL_STATUSES as readonly string[]).includes(status)
 }
 
+function skippedResult(): StageResult {
+  return { jobId: "", jobCode: "", status: SKIPPED, total: 0, completed: 0, failed: 0 }
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  mbhIds: string[]
+  /** mbhId → entryStatus at the moment the row was selected. */
+  selection: Map<string, MBHeadEntryStatus>
   /**
    * Fired when the dialog is closed AFTER the chain reached a terminal state
-   * (completed through Validate, or stopped early on a FAILED stage) — never
-   * fired if the user somehow closes before that (Close is disabled until
-   * then, so in practice this always corresponds to a real state change).
+   * (every stage ran to completion or was skipped) — never fired if the user
+   * somehow closes before that (Close is disabled until then, so in practice
+   * this always corresponds to a real state change).
    */
   onSettled: () => void
 }
 
-export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSettled }: Props) {
-  const [stageIndex, setStageIndex] = useState(-1) // -1 = not started yet
+/** Buckets a selection by starting status — the three status values the table allows to be selected. */
+function useSelectionBuckets(selection: Map<string, MBHeadEntryStatus>) {
+  return useMemo(() => {
+    const validated: string[] = []
+    const draft: string[] = []
+    const submitted: string[] = []
+    selection.forEach((status, id) => {
+      if (status === "VALIDATED") validated.push(id)
+      else if (status === "DRAFT") draft.push(id)
+      else if (status === "SUBMITTED") submitted.push(id)
+    })
+    return { validated, draft, submitted }
+  }, [selection])
+}
+
+export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, selection, onSettled }: Props) {
+  const buckets = useSelectionBuckets(selection)
+  const totalSelected = selection.size
+
   const [jobIds, setJobIds] = useState<(string | undefined)[]>([undefined, undefined, undefined])
   const [results, setResults] = useState<(StageResult | undefined)[]>([undefined, undefined, undefined])
-  const [phase, setPhase] = useState<"idle" | "running" | "stopped" | "complete">("idle")
+  const [requestSets, setRequestSets] = useState<(string[] | undefined)[]>([undefined, undefined, undefined])
+  const [phase, setPhase] = useState<"idle" | "running" | "complete">("idle")
   const [viewFailuresStage, setViewFailuresStage] = useState<number | null>(null)
 
-  // Guards against double-starting a stage (e.g. effect re-runs before async
-  // mutate() state settles) — each stage index may only ever be started once
-  // per dialog "open" lifecycle.
-  const startedStages = useRef<Set<number>>(new Set())
+  // Guards against double-starting/double-skipping a stage (e.g. effect re-runs
+  // before async mutate() state settles) — each stage index may only ever be
+  // resolved (started OR skipped) once per dialog "open" lifecycle.
+  const resolvedStages = useRef<Set<number>>(new Set())
 
   const unvalidateM = useBulkForceUnvalidateMBHeads()
   const submitM = useBulkSubmitMBHeads()
   const validateM = useBulkValidateMBHeads()
 
-  const currentJobId = stageIndex >= 0 && stageIndex < 3 ? jobIds[stageIndex] : undefined
-  const statusQuery = useBulkMBHeadJobStatus(currentJobId)
+  // Poll whichever stage is currently in flight (has a jobId but no recorded result yet).
+  const activeStageIndex = results.findIndex((r, i) => jobIds[i] && !r)
+  const statusQuery = useBulkMBHeadJobStatus(activeStageIndex >= 0 ? jobIds[activeStageIndex] : undefined)
 
   const failuresJobId = viewFailuresStage !== null ? jobIds[viewFailuresStage] : undefined
   const failuresQuery = useBulkMBHeadJobFailures(failuresJobId)
 
-  function startStage(index: number) {
-    if (startedStages.current.has(index)) return
-    startedStages.current.add(index)
-    setStageIndex(index)
+  // Per-stage failure detail, fetched automatically (independent of the "view
+  // failures" UI toggle above) whenever a stage terminates PARTIALLY — i.e.
+  // some but not all of its request set failed — so the next stage's request
+  // set can exclude exactly those ids. A stage that fully succeeded or fully
+  // failed needs no per-item detail (see resolveSucceeded below).
+  function needsFailureDetail(index: number): boolean {
+    const r = results[index]
+    return !!r && r.status !== SKIPPED && r.failed > 0 && r.failed < r.total
+  }
+  const stage0Failures = useBulkMBHeadJobFailures(needsFailureDetail(0) ? jobIds[0] : undefined)
+  const stage1Failures = useBulkMBHeadJobFailures(needsFailureDetail(1) ? jobIds[1] : undefined)
+  const stageFailureQueries = [stage0Failures, stage1Failures]
+
+  // Resolves which ids in a settled stage's OWN request set succeeded.
+  // Returns undefined while that determination is still pending (stage not
+  // yet terminal, or its partial-failure detail hasn't loaded yet).
+  function resolveSucceeded(index: number): string[] | undefined {
+    const set = requestSets[index]
+    const r = results[index]
+    if (!set) return undefined
+    if (set.length === 0 || r?.status === SKIPPED) return []
+    if (!r) return undefined
+    if (r.failed === 0) return set
+    if (r.failed >= r.total) return [] // every item in this stage's request set failed
+    const fq = stageFailureQueries[index]
+    if (!fq || fq.isLoading || !fq.data) return undefined
+    const failedIds = new Set(fq.data.map((f) => f.mbhId))
+    return set.filter((id) => !failedIds.has(id))
+  }
+
+  function startStage(index: number, ids: string[]) {
+    if (resolvedStages.current.has(index)) return
+    resolvedStages.current.add(index)
+    setRequestSets((prev) => {
+      const next = [...prev]
+      next[index] = ids
+      return next
+    })
+
+    if (ids.length === 0) {
+      setResults((prev) => {
+        const next = [...prev]
+        next[index] = skippedResult()
+        return next
+      })
+      return
+    }
+
     setPhase("running")
 
     function onQueued(data: { jobId: string }) {
@@ -132,47 +200,50 @@ export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSe
     }
     function onQueueError() {
       // The queueing call itself failed (network/permission/validation) —
-      // there is no job to poll, so treat this the same as a hard stage
-      // failure and stop the chain here.
-      setPhase("stopped")
+      // there is no job to poll. Record the whole request set as failed so
+      // downstream stages correctly exclude these ids.
+      setResults((prev) => {
+        const next = [...prev]
+        next[index] = { jobId: "", jobCode: "", status: "FAILED", total: ids.length, completed: 0, failed: ids.length }
+        return next
+      })
     }
 
     if (index === 0) {
-      unvalidateM.mutate(
-        { mbhIds, reason: UNVALIDATE_REASON },
-        { onSuccess: onQueued, onError: onQueueError },
-      )
+      unvalidateM.mutate({ mbhIds: ids, reason: UNVALIDATE_REASON }, { onSuccess: onQueued, onError: onQueueError })
     } else if (index === 1) {
-      submitM.mutate(mbhIds, { onSuccess: onQueued, onError: onQueueError })
+      submitM.mutate(ids, { onSuccess: onQueued, onError: onQueueError })
     } else {
-      validateM.mutate(mbhIds, { onSuccess: onQueued, onError: onQueueError })
+      validateM.mutate(ids, { onSuccess: onQueued, onError: onQueueError })
     }
   }
 
-  // Kick off stage 0 once the dialog opens; reset all local state when it closes
-  // so the next open starts a fresh chain.
+  // Kick off stage 0 (Unvalidate, against the VALIDATED bucket) once the
+  // dialog opens; reset all local state when it closes so the next open
+  // starts a fresh chain.
   useEffect(() => {
     if (open) {
-      startStage(0)
+      setPhase("running")
+      startStage(0, buckets.validated)
     } else {
-      startedStages.current = new Set()
-      setStageIndex(-1)
+      resolvedStages.current = new Set()
       setJobIds([undefined, undefined, undefined])
       setResults([undefined, undefined, undefined])
+      setRequestSets([undefined, undefined, undefined])
       setPhase("idle")
       setViewFailuresStage(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Record the current stage's result once its polled status goes terminal.
+  // Record the in-flight stage's result once its polled status goes terminal.
   useEffect(() => {
     const data = statusQuery.data
-    if (!data || stageIndex < 0 || stageIndex > 2 || !isTerminal(data.status)) return
+    if (!data || activeStageIndex < 0 || !isTerminal(data.status)) return
     setResults((prev) => {
-      if (prev[stageIndex]) return prev
+      if (prev[activeStageIndex]) return prev
       const next = [...prev]
-      next[stageIndex] = {
+      next[activeStageIndex] = {
         jobId: data.jobId,
         jobCode: data.jobCode,
         status: data.status,
@@ -182,30 +253,34 @@ export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSe
       }
       return next
     })
-  }, [statusQuery.data, stageIndex])
+  }, [statusQuery.data, activeStageIndex])
 
-  // Once a stage's result is recorded, decide whether to stop the chain or
-  // advance to the next stage.
+  // Advance the chain: once stage N's succeeded-ids are known, compute stage
+  // N+1's request set (its own bucket plus whatever succeeded upstream) and
+  // start or skip it. Once stage 2 has settled (ran or skipped), the chain is
+  // complete.
   useEffect(() => {
-    if (stageIndex < 0 || stageIndex > 2) return
-    const r = results[stageIndex]
-    if (!r) return
-    // FAILED means zero succeeded per the job status vocabulary (DONE = all
-    // succeeded, PARTIAL = a mix, FAILED = none) — stop the chain rather than
-    // feeding a hard-failed batch into the next stage.
-    if (r.status === "FAILED") {
-      setPhase("stopped")
+    if (phase === "idle") return
+
+    const succeeded0 = resolveSucceeded(0)
+    if (succeeded0 !== undefined && !resolvedStages.current.has(1)) {
+      startStage(1, [...buckets.draft, ...succeeded0])
       return
     }
-    if (stageIndex < 2) {
-      startStage(stageIndex + 1)
-    } else {
+
+    const succeeded1 = resolveSucceeded(1)
+    if (succeeded1 !== undefined && !resolvedStages.current.has(2)) {
+      startStage(2, [...buckets.submitted, ...succeeded1])
+      return
+    }
+
+    if (results[2] && phase !== "complete") {
       setPhase("complete")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, stageIndex])
+  }, [results, requestSets, stage0Failures.data, stage1Failures.data, phase])
 
-  const settled = phase === "stopped" || phase === "complete"
+  const settled = phase === "complete"
 
   function handleClose() {
     if (!settled) return
@@ -217,7 +292,7 @@ export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSe
     <Dialog open={open} onOpenChange={(v) => { if (!v && settled) handleClose() }}>
       <DialogContent className="sm:max-w-[560px]" onInteractOutside={(e) => { if (!settled) e.preventDefault() }}>
         <DialogHeader>
-          <DialogTitle>Bulk Regenerate — {mbhIds.length} MB Head{mbhIds.length === 1 ? "" : "s"}</DialogTitle>
+          <DialogTitle>Bulk Regenerate — {totalSelected} MB Head{totalSelected === 1 ? "" : "s"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -227,8 +302,8 @@ export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSe
               label={STAGE_LABELS[stage]}
               stepNumber={idx + 1}
               result={results[idx]}
-              isActive={stageIndex === idx && phase === "running"}
-              isPending={stageIndex < idx}
+              isActive={activeStageIndex === idx}
+              isPending={!results[idx] && activeStageIndex !== idx}
               onViewFailures={() => setViewFailuresStage(idx)}
               viewingFailures={viewFailuresStage === idx}
             />
@@ -260,16 +335,15 @@ export function MbRecipeBulkJobProgressDialog({ open, onOpenChange, mbhIds, onSe
             </div>
           )}
 
-          {phase === "stopped" && (
-            <p className="text-sm text-muted-foreground">
-              Chain stopped — a stage failed completely (zero succeeded). Records that reached an
-              earlier stage successfully were not rolled back; review the failures above before
-              retrying.
-            </p>
-          )}
           {phase === "complete" && (
             <p className="text-sm text-muted-foreground">
-              All 3 stages finished. Review any per-stage failures above before closing.
+              {(() => {
+                const skippedCount = results.filter((r) => r?.status === SKIPPED).length
+                const ranCount = 3 - skippedCount
+                return `Regenerate finished — ${ranCount} of 3 stage${ranCount === 1 ? "" : "s"} ran` +
+                  (skippedCount > 0 ? ` (${skippedCount} skipped as not needed for the selected items).` : ".") +
+                  " Review any per-stage failures above before closing."
+              })()}
             </p>
           )}
         </div>
@@ -301,6 +375,7 @@ function StageRow({
   onViewFailures: () => void
   viewingFailures: boolean
 }) {
+  const skipped = result?.status === SKIPPED
   const pct = result && result.total > 0 ? Math.round(((result.completed + result.failed) / result.total) * 100) : 0
 
   return (
@@ -310,11 +385,12 @@ function StageRow({
           <StageIcon result={result} isActive={isActive} isPending={isPending} />
           Step {stepNumber}/3: {label}
         </span>
-        {result && (
+        {result && !skipped && (
           <span className="text-xs text-muted-foreground">
             {result.completed} completed · {result.failed} failed / {result.total} total
           </span>
         )}
+        {skipped && <span className="text-xs text-muted-foreground">Skipped — not needed</span>}
       </div>
       {isActive && !result && (
         <>
@@ -322,10 +398,10 @@ function StageRow({
           <p className="text-xs text-muted-foreground">Processing…</p>
         </>
       )}
-      {result && (
+      {result && !skipped && (
         <Progress value={pct} className="h-1.5" />
       )}
-      {result && result.failed > 0 && (
+      {result && !skipped && result.failed > 0 && (
         <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onViewFailures}>
           {viewingFailures ? "Viewing failures" : `View ${result.failed} failure${result.failed === 1 ? "" : "s"}`}
         </Button>
@@ -343,6 +419,7 @@ function StageIcon({
   isActive: boolean
   isPending: boolean
 }) {
+  if (result?.status === SKIPPED) return <MinusCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
   if (isPending) return <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/30" />
   if (isActive && !result) return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
   if (!result) return <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/30" />

@@ -26,21 +26,36 @@ export async function POST(request: NextRequest) {
         const client = getAuthClient()
         const response = await client.refreshToken({ refreshToken })
 
+        // IAM's RefreshToken RPC never returns a transport-level gRPC error for a
+        // rejected/expired/revoked refresh token (auth_handler.go folds the domain
+        // error into `base` and always returns a nil gRPC error) — so a business
+        // failure lands here in the try block, not in the catch below. Without this
+        // check the route fell through to a 200 OK with no tokens set, which made
+        // AuthProvider's `!response.ok` check in refreshSession() read a genuinely
+        // failed refresh as a success: the silent-refresh interval kept running,
+        // never re-logged the user in, and the still-httpOnly access-token cookie
+        // was left to expire on its own ~15 min later with nothing alerting the
+        // app — the next request from any tab then hits the backend with no
+        // Authorization header at all. Surface the failure as a real 401 instead.
+        if (!response.base?.isSuccess || !response.data?.accessToken || !response.data?.refreshToken) {
+            const errResponse = NextResponse.json({ base: response.base }, { status: 401 })
+            clearAuthCookiesOnResponse(errResponse)
+            return errResponse
+        }
+
         const jsonResponse = NextResponse.json({
             base: response.base,
             data: {
-                expiresIn: response.data?.expiresIn,
+                expiresIn: response.data.expiresIn,
             },
         })
 
         // Set new tokens directly on the response (next/headers cookies().set() broken in Next.js 16.2+)
-        if (response.data?.accessToken && response.data?.refreshToken) {
-            setAuthCookiesOnResponse(jsonResponse, {
-                accessToken: response.data.accessToken,
-                refreshToken: response.data.refreshToken,
-                expiresIn: response.data.expiresIn,
-            })
-        }
+        setAuthCookiesOnResponse(jsonResponse, {
+            accessToken: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            expiresIn: response.data.expiresIn,
+        })
 
         return jsonResponse
     } catch (error) {

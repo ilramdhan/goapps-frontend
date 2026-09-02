@@ -1,10 +1,15 @@
 /**
- * Tests for MbRecipeBulkJobProgressDialog's stage-progression logic (Phase G
- * frontend verification pass for the Bulk MB Head Regenerate feature):
- *   - a DONE result on a stage advances to the next stage (unvalidate -> submit
- *     -> validate), all three running in sequence for the same mbhIds
- *   - a FAILED result (zero succeeded) on any stage stops the chain early and
- *     never starts a later stage
+ * Tests for MbRecipeBulkJobProgressDialog's ADAPTIVE stage-progression logic
+ * (Bulk MB Head Regenerate, widened selection eligibility):
+ *   - a selection is bucketed by each item's STARTING entryStatus (DRAFT /
+ *     SUBMITTED / VALIDATED)
+ *   - stage 1 (Unvalidate) only runs against the VALIDATED bucket; empty ->
+ *     skipped, never called
+ *   - stage 2 (Submit) runs against DRAFT ∪ (VALIDATED items that succeeded
+ *     stage 1); empty -> skipped
+ *   - stage 3 (Validate) runs against SUBMITTED ∪ (whatever succeeded stage 2)
+ *   - ids that fail a stage are dropped, never carried into the next stage's
+ *     request set
  *
  * Mocks `@/hooks/finance/use-mb-head-bulk` directly, mirroring the module-mock
  * convention used by mb-recipe-action-bar-return-to-draft.test.tsx. The polling
@@ -16,6 +21,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, act } from "@testing-library/react"
 import { useEffect, useState } from "react"
+
+import type { MBHeadEntryStatus } from "@/types/finance/mb-head"
 
 // ─── Reactive status store (pubsub) ────────────────────────────────────────
 
@@ -88,9 +95,13 @@ function failed(jobId: string, total = 2): JobStatusData {
   return { jobId, jobCode: jobId, status: "FAILED", totalChildren: total, completedChildren: 0, failedChildren: total }
 }
 
+function selectionOf(entries: Array<[string, MBHeadEntryStatus]>): Map<string, MBHeadEntryStatus> {
+  return new Map(entries)
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("MbRecipeBulkJobProgressDialog — stage progression", () => {
+describe("MbRecipeBulkJobProgressDialog — adaptive stage progression", () => {
   beforeEach(() => {
     resetStatusStore()
     nextJobSeq = 0
@@ -99,71 +110,127 @@ describe("MbRecipeBulkJobProgressDialog — stage progression", () => {
     validateMutate.mockClear()
   })
 
-  it("starts stage 1 (Unvalidate) immediately on open", () => {
+  it("starts stage 1 (Unvalidate) immediately for a VALIDATED-only selection", () => {
     render(
-      <MbRecipeBulkJobProgressDialog open mbhIds={["a", "b"]} onOpenChange={() => {}} onSettled={() => {}} />,
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["a", "VALIDATED"], ["b", "VALIDATED"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
     )
     expect(unvalidateMutate).toHaveBeenCalledTimes(1)
+    expect(unvalidateMutate.mock.calls[0][0]).toEqual({ mbhIds: ["a", "b"], reason: expect.any(String) })
     expect(submitMutate).not.toHaveBeenCalled()
     expect(validateMutate).not.toHaveBeenCalled()
   })
 
-  it("advances DONE -> Submit -> DONE -> Validate for the same full mbhIds selection", () => {
+  it("skips stage 1 and starts stage 2 (Submit) immediately for a DRAFT-only selection", () => {
     render(
-      <MbRecipeBulkJobProgressDialog open mbhIds={["a", "b"]} onOpenChange={() => {}} onSettled={() => {}} />,
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["d1", "DRAFT"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
+    )
+    expect(unvalidateMutate).not.toHaveBeenCalled()
+    expect(submitMutate).toHaveBeenCalledTimes(1)
+    expect(submitMutate.mock.calls[0][0]).toEqual(["d1"])
+    expect(screen.getByText(/skipped/i)).toBeInTheDocument()
+  })
+
+  it("skips stages 1 and 2, starts stage 3 (Validate) immediately for a SUBMITTED-only selection", () => {
+    render(
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["s1", "SUBMITTED"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
+    )
+    expect(unvalidateMutate).not.toHaveBeenCalled()
+    expect(submitMutate).not.toHaveBeenCalled()
+    expect(validateMutate).toHaveBeenCalledTimes(1)
+    expect(validateMutate.mock.calls[0][0]).toEqual(["s1"])
+  })
+
+  it("advances DONE -> Submit -> DONE -> Validate for a VALIDATED-only selection, carrying the same ids forward on full success", () => {
+    render(
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["a", "VALIDATED"], ["b", "VALIDATED"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
     )
 
     // Stage 1 (Unvalidate) queued — the mock's onSuccess fired synchronously
     // with a deterministic id: job-unvalidate-0.
     setJobStatus("job-unvalidate-0", done("job-unvalidate-0"))
 
-    // Submit (stage 2) should now have been triggered, with the SAME mbhIds.
+    // Submit (stage 2) should now have been triggered, with the SAME ids.
     expect(submitMutate).toHaveBeenCalledTimes(1)
     expect(submitMutate.mock.calls[0][0]).toEqual(["a", "b"])
     expect(validateMutate).not.toHaveBeenCalled()
 
     setJobStatus("job-submit-1", done("job-submit-1"))
 
-    // Validate (stage 3) should now have been triggered, with the SAME mbhIds.
+    // Validate (stage 3) should now have been triggered, with the SAME ids.
     expect(validateMutate).toHaveBeenCalledTimes(1)
     expect(validateMutate.mock.calls[0][0]).toEqual(["a", "b"])
 
     setJobStatus("job-validate-2", done("job-validate-2"))
 
-    expect(screen.getByText(/all 3 stages finished/i)).toBeInTheDocument()
+    expect(screen.getByText(/regenerate finished/i)).toBeInTheDocument()
   })
 
-  it("stops the chain early when a stage comes back fully FAILED, never starting the next stage", () => {
+  it("drops ids that fully failed a stage, skipping downstream stages when nothing remains", () => {
     render(
-      <MbRecipeBulkJobProgressDialog open mbhIds={["a", "b"]} onOpenChange={() => {}} onSettled={() => {}} />,
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["a", "VALIDATED"], ["b", "VALIDATED"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
     )
 
-    // Stage 1 (Unvalidate) fully fails — zero succeeded.
+    // Stage 1 (Unvalidate) fully fails — zero succeeded, and this selection has
+    // no DRAFT/SUBMITTED items to fall back on, so stages 2 and 3 both end up
+    // with an empty request set and are SKIPPED rather than called.
     setJobStatus("job-unvalidate-0", failed("job-unvalidate-0"))
 
     expect(submitMutate).not.toHaveBeenCalled()
     expect(validateMutate).not.toHaveBeenCalled()
-    expect(screen.getByText(/chain stopped/i)).toBeInTheDocument()
+    expect(screen.getByText(/regenerate finished/i)).toBeInTheDocument()
 
-    // Close is enabled once settled (stopped counts as settled). Two buttons
-    // match the "Close" accessible name — the footer button and the dialog's
-    // default X close button (sr-only label) — so pick the footer one, which
-    // is the only one this dialog gates on `settled`.
+    // Close is enabled once the whole chain has settled (every stage ran or was
+    // skipped). Two buttons match the "Close" accessible name — the footer
+    // button and the dialog's default X close button (sr-only label) — so pick
+    // the footer one, which is the only one this dialog gates on `settled`.
     const footerClose = screen.getAllByRole("button", { name: /^close$/i }).find((b) => !b.querySelector(".sr-only"))
     expect(footerClose).toBeEnabled()
   })
 
-  it("stops after a FAILED Submit stage without ever starting Validate", () => {
+  it("a fully-failed Submit stage still lets Validate run against the SUBMITTED bucket", () => {
     render(
-      <MbRecipeBulkJobProgressDialog open mbhIds={["a", "b"]} onOpenChange={() => {}} onSettled={() => {}} />,
+      <MbRecipeBulkJobProgressDialog
+        open
+        selection={selectionOf([["a", "VALIDATED"], ["s1", "SUBMITTED"]])}
+        onOpenChange={() => {}}
+        onSettled={() => {}}
+      />,
     )
 
-    setJobStatus("job-unvalidate-0", done("job-unvalidate-0"))
+    setJobStatus("job-unvalidate-0", done("job-unvalidate-0", 1))
     expect(submitMutate).toHaveBeenCalledTimes(1)
+    expect(submitMutate.mock.calls[0][0]).toEqual(["a"])
 
-    setJobStatus("job-submit-1", failed("job-submit-1"))
+    setJobStatus("job-submit-1", failed("job-submit-1", 1))
 
-    expect(validateMutate).not.toHaveBeenCalled()
-    expect(screen.getByText(/chain stopped/i)).toBeInTheDocument()
+    // "a" failed Submit and is dropped, but "s1" (originally SUBMITTED) still
+    // reaches Validate — the two buckets are independent.
+    expect(validateMutate).toHaveBeenCalledTimes(1)
+    expect(validateMutate.mock.calls[0][0]).toEqual(["s1"])
   })
 })

@@ -3,15 +3,18 @@
 // MbRecipeBulkToolbar — Super Admin-only bulk lifecycle-regenerate trigger.
 //
 // Renders ONLY while there is a non-empty selection (selectedCount > 0). The
-// "Regenerate Selected" action re-triggers Unvalidate → Submit → Validate for
-// every selected MB Head, so it is gated on ALL THREE of the bulk permission
-// codes — a partial grant (e.g. bulkunvalidate + bulksubmit but not
-// bulkvalidate) must NOT be enough to start a chain that would otherwise get
-// stuck on the last step. The button stays visible-but-disabled (with a
-// tooltip explaining why) rather than being hidden outright, so a partially
-// permissioned user still understands the action exists and why they can't
-// use it — matching this codebase's general preference for explaining gates
-// rather than silently omitting affordances.
+// "Regenerate Selected" action adaptively re-triggers Unvalidate → Submit →
+// Validate for every selected MB Head — each record only goes through the
+// stages it actually needs based on its current status (see
+// MbRecipeBulkJobProgressDialog) — so it is gated on ALL THREE of the bulk
+// permission codes regardless, since any selection may include a VALIDATED
+// row that needs the full chain. A partial grant (e.g. bulkunvalidate +
+// bulksubmit but not bulkvalidate) must NOT be enough to start a chain that
+// would otherwise get stuck on the last step. The button stays
+// visible-but-disabled (with a tooltip explaining why) rather than being
+// hidden outright, so a partially permissioned user still understands the
+// action exists and why they can't use it — matching this codebase's general
+// preference for explaining gates rather than silently omitting affordances.
 import { useState } from "react"
 import { RefreshCw } from "lucide-react"
 
@@ -91,9 +94,11 @@ export function MbRecipeBulkToolbar({ selectedCount, onConfirm }: Props) {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   This runs a bulk, multi-step regenerate across all {selectedCount} selected MB
-                  Head{plural}: Unvalidate, then Submit, then Validate — in that order — to
-                  re-trigger downstream cost product, CAPP, CPP, and MB Spin generation for each
-                  record.
+                  Head{plural}, re-triggering downstream cost product, CAPP, CPP, and MB Spin
+                  generation for each record. Each record moves through Unvalidate, Submit, and
+                  Validate as needed based on its own current status — a DRAFT record only needs
+                  Submit and Validate, a SUBMITTED record only needs Validate, and a VALIDATED
+                  record goes through all three.
                 </p>
                 <p>
                   This action is <strong>not simply reversible</strong>. Once a stage starts, the
