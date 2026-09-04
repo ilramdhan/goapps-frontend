@@ -485,7 +485,7 @@ export function GroupFormDialog({
                 <div>
                   <h4 className="text-sm font-medium">Selection Flags (V2)</h4>
                   <p className="text-xs text-muted-foreground">
-                    AUTO uses cascade fallback (CL→SL→FL for valuation, SP→PP→FP for marketing).
+                    AUTO uses cascade fallback (CL→SL→FL→PR for valuation, SP→PP→FP for marketing).
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">

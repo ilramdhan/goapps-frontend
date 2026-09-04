@@ -69,6 +69,8 @@ function valuationFlagLabel(flag: RMValuationFlag | undefined): string {
       return "SL"
     case RMValuationFlag.RM_VALUATION_FLAG_FL:
       return "FL"
+    case RMValuationFlag.RM_VALUATION_FLAG_NONE:
+      return "NONE"
     case RMValuationFlag.RM_VALUATION_FLAG_UNSPECIFIED:
     default:
       return "AUTO"
@@ -84,6 +86,8 @@ function marketingFlagLabel(flag: RMMarketingFlag | undefined): string {
       return "PP"
     case RMMarketingFlag.RM_MARKETING_FLAG_FP:
       return "FP"
+    case RMMarketingFlag.RM_MARKETING_FLAG_NONE:
+      return "NONE"
     case RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED:
     default:
       return "AUTO"

@@ -214,11 +214,15 @@ export const RM_VALUATION_FLAG_LABELS: Record<RMValuationFlag, string> = {
   [RMValuationFlag.RM_VALUATION_FLAG_CL]: "CL (Consumption Landed)",
   [RMValuationFlag.RM_VALUATION_FLAG_SL]: "SL (Stock Landed)",
   [RMValuationFlag.RM_VALUATION_FLAG_FL]: "FL (Fix Landed)",
+  [RMValuationFlag.RM_VALUATION_FLAG_NONE]: "NONE (no source)",
   [RMValuationFlag.UNRECOGNIZED]: "AUTO",
 }
 
+// RM_VALUATION_FLAG_NONE is engine-written only (AUTO cascade found no price
+// source) — it is never a user-selectable option, so it is intentionally
+// excluded from this dropdown list.
 export const RM_VALUATION_FLAG_OPTIONS: Array<{ value: RMValuationFlag; label: string }> = [
-  { value: RMValuationFlag.RM_VALUATION_FLAG_UNSPECIFIED, label: "AUTO (CL → SL → FL)" },
+  { value: RMValuationFlag.RM_VALUATION_FLAG_UNSPECIFIED, label: "AUTO (CL → SL → FL → PR)" },
   { value: RMValuationFlag.RM_VALUATION_FLAG_CR, label: "CR (Consumption Rate)" },
   { value: RMValuationFlag.RM_VALUATION_FLAG_SR, label: "SR (Stock Rate)" },
   { value: RMValuationFlag.RM_VALUATION_FLAG_PR, label: "PR (PO Rate)" },
@@ -232,9 +236,13 @@ export const RM_MARKETING_FLAG_LABELS: Record<RMMarketingFlag, string> = {
   [RMMarketingFlag.RM_MARKETING_FLAG_SP]: "SP (Projection Stock)",
   [RMMarketingFlag.RM_MARKETING_FLAG_PP]: "PP (Projection PO)",
   [RMMarketingFlag.RM_MARKETING_FLAG_FP]: "FP (Projection Fix)",
+  [RMMarketingFlag.RM_MARKETING_FLAG_NONE]: "NONE (no projection)",
   [RMMarketingFlag.UNRECOGNIZED]: "AUTO",
 }
 
+// RM_MARKETING_FLAG_NONE is engine-written only (AUTO cascade found no
+// marketing projection source) — it is never a user-selectable option, so it
+// is intentionally excluded from this dropdown list.
 export const RM_MARKETING_FLAG_OPTIONS: Array<{ value: RMMarketingFlag; label: string }> = [
   { value: RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED, label: "AUTO (SP → PP → FP)" },
   { value: RMMarketingFlag.RM_MARKETING_FLAG_SP, label: "SP (Projection Stock)" },
