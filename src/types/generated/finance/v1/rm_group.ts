@@ -96,11 +96,11 @@ export function rMGroupFlagToJSON(object: RMGroupFlag): string {
 
 /**
  * RMValuationFlag selects which computed rate becomes `cost_val` in the
- * RM Cost row. UNSPECIFIED behaves as AUTO (CL → SL → FL fallback, where
+ * RM Cost row. UNSPECIFIED behaves as AUTO (CL → SL → FL → PR fallback, where
  * FL incorporates the per-detail valuation_default_value).
  */
 export enum RMValuationFlag {
-  /** RM_VALUATION_FLAG_UNSPECIFIED - Default zero value. Treated as AUTO (CL→SL→FL fallback). */
+  /** RM_VALUATION_FLAG_UNSPECIFIED - Default zero value. Treated as AUTO (CL→SL→FL→PR fallback). */
   RM_VALUATION_FLAG_UNSPECIFIED = 0,
   /** RM_VALUATION_FLAG_CR - Use Consumption Rate (CR) — group-total cons_val / cons_qty. */
   RM_VALUATION_FLAG_CR = 1,
@@ -114,6 +114,12 @@ export enum RMValuationFlag {
   RM_VALUATION_FLAG_SL = 5,
   /** RM_VALUATION_FLAG_FL - Use Fix Landed Cost (FL) — MAX of per-detail FL. */
   RM_VALUATION_FLAG_FL = 6,
+  /**
+   * RM_VALUATION_FLAG_NONE - AUTO resolved to nothing — every cascade candidate (CL/SL/FL/PR) was zero,
+   * so there is no price source for this period. Never user-selectable; it is
+   * only ever written by the engine as the resolved `valuation_flag_used`.
+   */
+  RM_VALUATION_FLAG_NONE = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -140,6 +146,9 @@ export function rMValuationFlagFromJSON(object: any): RMValuationFlag {
     case 6:
     case "RM_VALUATION_FLAG_FL":
       return RMValuationFlag.RM_VALUATION_FLAG_FL;
+    case 7:
+    case "RM_VALUATION_FLAG_NONE":
+      return RMValuationFlag.RM_VALUATION_FLAG_NONE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -163,6 +172,8 @@ export function rMValuationFlagToJSON(object: RMValuationFlag): string {
       return "RM_VALUATION_FLAG_SL";
     case RMValuationFlag.RM_VALUATION_FLAG_FL:
       return "RM_VALUATION_FLAG_FL";
+    case RMValuationFlag.RM_VALUATION_FLAG_NONE:
+      return "RM_VALUATION_FLAG_NONE";
     case RMValuationFlag.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -182,6 +193,13 @@ export enum RMMarketingFlag {
   RM_MARKETING_FLAG_PP = 2,
   /** RM_MARKETING_FLAG_FP - Projection Fix Value Landed Cost. */
   RM_MARKETING_FLAG_FP = 3,
+  /**
+   * RM_MARKETING_FLAG_NONE - AUTO resolved to nothing — every cascade candidate (SP/PP/FP) was zero,
+   * so there is no marketing projection for this period. Never
+   * user-selectable; it is only ever written by the engine as the resolved
+   * `marketing_flag_used`.
+   */
+  RM_MARKETING_FLAG_NONE = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -199,6 +217,9 @@ export function rMMarketingFlagFromJSON(object: any): RMMarketingFlag {
     case 3:
     case "RM_MARKETING_FLAG_FP":
       return RMMarketingFlag.RM_MARKETING_FLAG_FP;
+    case 4:
+    case "RM_MARKETING_FLAG_NONE":
+      return RMMarketingFlag.RM_MARKETING_FLAG_NONE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -216,6 +237,8 @@ export function rMMarketingFlagToJSON(object: RMMarketingFlag): string {
       return "RM_MARKETING_FLAG_PP";
     case RMMarketingFlag.RM_MARKETING_FLAG_FP:
       return "RM_MARKETING_FLAG_FP";
+    case RMMarketingFlag.RM_MARKETING_FLAG_NONE:
+      return "RM_MARKETING_FLAG_NONE";
     case RMMarketingFlag.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

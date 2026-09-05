@@ -229,7 +229,7 @@ function GroupDetailContent() {
                   </Badge>
                 </div>
                 <p className="text-[10px] text-muted-foreground pt-2 border-t">
-                  AUTO uses cascade fallback (CL→SL→FL / SP→PP→FP).
+                  AUTO uses cascade fallback (CL→SL→FL→PR / SP→PP→FP).
                 </p>
               </div>
             </CardContent>

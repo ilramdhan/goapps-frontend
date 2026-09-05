@@ -184,14 +184,21 @@ export function CostDetailSnapshotsPanel({ rmCostId }: Props) {
   }
 
   return (
-    <DataTable
-      data={details}
-      columns={columns}
-      keyField="costDetailId"
-      isLoading={isLoading}
-      tableId="rmcost.detail.snapshot"
-      emptyMessage="No detail snapshots"
-      emptyDescription="Run the V2 calculation to generate them"
-    />
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Fix Rate edits here apply to this period only and will be overwritten by the next
+        full recalculation. To set a permanent value, edit &quot;Default Value&quot; on the item
+        in the RM Group page.
+      </p>
+      <DataTable
+        data={details}
+        columns={columns}
+        keyField="costDetailId"
+        isLoading={isLoading}
+        tableId="rmcost.detail.snapshot"
+        emptyMessage="No detail snapshots"
+        emptyDescription="Run the V2 calculation to generate them"
+      />
+    </div>
   )
 }
