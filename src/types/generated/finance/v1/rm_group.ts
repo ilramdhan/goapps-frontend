@@ -571,6 +571,8 @@ export interface CreateRMGroupResponse {
 export interface GetRMGroupRequest {
   /** Head UUID. */
   groupHeadId: string;
+  /** Optional period (YYYYMM) for period-scoped read; empty means anchor/latest read. */
+  period?: string | undefined;
 }
 
 /** Get response. */
@@ -672,6 +674,8 @@ export interface UpdateRMGroupRequest {
   clearMarketingFreightRate: boolean;
   clearMarketingAntiDumpingPct: boolean;
   clearMarketingDefaultValue: boolean;
+  /** Period (YYYYMM) this update targets. */
+  period: string;
 }
 
 /** Update response. */
@@ -819,6 +823,8 @@ export interface UpdateGroupItemRequest {
   clearValuationDutyPct: boolean;
   clearValuationTransportRate: boolean;
   clearValuationDefaultValue: boolean;
+  /** Period (YYYYMM) this update targets. */
+  period: string;
 }
 
 /** V2: Update one detail response. */
@@ -2860,13 +2866,16 @@ export const CreateRMGroupResponse: MessageFns<CreateRMGroupResponse> = {
 };
 
 function createBaseGetRMGroupRequest(): GetRMGroupRequest {
-  return { groupHeadId: "" };
+  return { groupHeadId: "", period: undefined };
 }
 
 export const GetRMGroupRequest: MessageFns<GetRMGroupRequest> = {
   encode(message: GetRMGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.groupHeadId !== "") {
       writer.uint32(10).string(message.groupHeadId);
+    }
+    if (message.period !== undefined) {
+      writer.uint32(18).string(message.period);
     }
     return writer;
   },
@@ -2886,6 +2895,14 @@ export const GetRMGroupRequest: MessageFns<GetRMGroupRequest> = {
           message.groupHeadId = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2902,6 +2919,7 @@ export const GetRMGroupRequest: MessageFns<GetRMGroupRequest> = {
         : isSet(object.group_head_id)
         ? globalThis.String(object.group_head_id)
         : "",
+      period: isSet(object.period) ? globalThis.String(object.period) : undefined,
     };
   },
 
@@ -2909,6 +2927,9 @@ export const GetRMGroupRequest: MessageFns<GetRMGroupRequest> = {
     const obj: any = {};
     if (message.groupHeadId !== "") {
       obj.groupHeadId = message.groupHeadId;
+    }
+    if (message.period !== undefined) {
+      obj.period = message.period;
     }
     return obj;
   },
@@ -2919,6 +2940,7 @@ export const GetRMGroupRequest: MessageFns<GetRMGroupRequest> = {
   fromPartial(object: DeepPartial<GetRMGroupRequest>): GetRMGroupRequest {
     const message = createBaseGetRMGroupRequest();
     message.groupHeadId = object.groupHeadId ?? "";
+    message.period = object.period ?? undefined;
     return message;
   },
 };
@@ -3030,6 +3052,7 @@ function createBaseUpdateRMGroupRequest(): UpdateRMGroupRequest {
     clearMarketingFreightRate: false,
     clearMarketingAntiDumpingPct: false,
     clearMarketingDefaultValue: false,
+    period: "",
   };
 }
 
@@ -3109,6 +3132,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     }
     if (message.clearMarketingDefaultValue !== false) {
       writer.uint32(200).bool(message.clearMarketingDefaultValue);
+    }
+    if (message.period !== "") {
+      writer.uint32(210).string(message.period);
     }
     return writer;
   },
@@ -3320,6 +3346,14 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
           message.clearMarketingDefaultValue = reader.bool();
           continue;
         }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3448,6 +3482,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
         : isSet(object.clear_marketing_default_value)
         ? globalThis.Boolean(object.clear_marketing_default_value)
         : false,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
     };
   },
 
@@ -3528,6 +3563,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     if (message.clearMarketingDefaultValue !== false) {
       obj.clearMarketingDefaultValue = message.clearMarketingDefaultValue;
     }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
     return obj;
   },
 
@@ -3561,6 +3599,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     message.clearMarketingFreightRate = object.clearMarketingFreightRate ?? false;
     message.clearMarketingAntiDumpingPct = object.clearMarketingAntiDumpingPct ?? false;
     message.clearMarketingDefaultValue = object.clearMarketingDefaultValue ?? false;
+    message.period = object.period ?? "";
     return message;
   },
 };
@@ -4607,6 +4646,7 @@ function createBaseUpdateGroupItemRequest(): UpdateGroupItemRequest {
     clearValuationDutyPct: false,
     clearValuationTransportRate: false,
     clearValuationDefaultValue: false,
+    period: "",
   };
 }
 
@@ -4653,6 +4693,9 @@ export const UpdateGroupItemRequest: MessageFns<UpdateGroupItemRequest> = {
     }
     if (message.clearValuationDefaultValue !== false) {
       writer.uint32(112).bool(message.clearValuationDefaultValue);
+    }
+    if (message.period !== "") {
+      writer.uint32(122).string(message.period);
     }
     return writer;
   },
@@ -4776,6 +4819,14 @@ export const UpdateGroupItemRequest: MessageFns<UpdateGroupItemRequest> = {
           message.clearValuationDefaultValue = reader.bool();
           continue;
         }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4857,6 +4908,7 @@ export const UpdateGroupItemRequest: MessageFns<UpdateGroupItemRequest> = {
         : isSet(object.clear_valuation_default_value)
         ? globalThis.Boolean(object.clear_valuation_default_value)
         : false,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
     };
   },
 
@@ -4904,6 +4956,9 @@ export const UpdateGroupItemRequest: MessageFns<UpdateGroupItemRequest> = {
     if (message.clearValuationDefaultValue !== false) {
       obj.clearValuationDefaultValue = message.clearValuationDefaultValue;
     }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
     return obj;
   },
 
@@ -4926,6 +4981,7 @@ export const UpdateGroupItemRequest: MessageFns<UpdateGroupItemRequest> = {
     message.clearValuationDutyPct = object.clearValuationDutyPct ?? false;
     message.clearValuationTransportRate = object.clearValuationTransportRate ?? false;
     message.clearValuationDefaultValue = object.clearValuationDefaultValue ?? false;
+    message.period = object.period ?? "";
     return message;
   },
 };
