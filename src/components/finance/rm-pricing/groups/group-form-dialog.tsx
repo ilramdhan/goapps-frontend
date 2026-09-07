@@ -117,6 +117,7 @@ interface GroupFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   group?: RMGroupHead | null
+  period: string
   onSuccess?: (groupHeadId: string) => void
 }
 
@@ -124,6 +125,7 @@ export function GroupFormDialog({
   open,
   onOpenChange,
   group,
+  period,
   onSuccess,
 }: GroupFormDialogProps) {
   const isEditing = !!group
@@ -169,6 +171,7 @@ export function GroupFormDialog({
       if (isEditing && group) {
         const updateData: UpdateRMGroupRequest = {
           groupHeadId: group.groupHeadId,
+          period,
           groupName: values.groupName,
           description: values.description || "",
           colourant: values.colourant || "",
@@ -233,7 +236,7 @@ export function GroupFormDialog({
           <DialogTitle>{isEditing ? "Edit RM Group" : "Add New RM Group"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update the RM group configuration. Code cannot be changed."
+              ? `Update the RM group configuration for period ${period}. Code cannot be changed.`
               : "Create a new RM group with V2 marketing inputs. Per-detail valuation inputs are configured per item after adding them."}
           </DialogDescription>
         </DialogHeader>

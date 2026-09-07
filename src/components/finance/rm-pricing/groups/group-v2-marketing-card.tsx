@@ -1,6 +1,11 @@
 "use client"
 
 // V2: Group head marketing inputs editor (defaults applied at next calc).
+// NOTE: appears unused (no import sites beyond this file's own definition and
+// the barrel re-export in ./index.ts) — confirmed dead code as of the
+// rm-group-period-versioning change. Intentionally left untouched (not
+// deleted): removal is out of scope for that change and needs product
+// confirmation first.
 
 import { useState } from "react"
 import { Loader2, Save } from "lucide-react"
@@ -30,6 +35,7 @@ import { useUpdateRMGroup } from "@/hooks/finance/use-rm-group"
 
 interface GroupV2MarketingCardProps {
   group: RMGroupHead
+  period: string
 }
 
 function toStr(v: number | undefined): string {
@@ -43,7 +49,7 @@ function toNumOrUndef(v: string): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-export function GroupV2MarketingCard({ group }: GroupV2MarketingCardProps) {
+export function GroupV2MarketingCard({ group, period }: GroupV2MarketingCardProps) {
   const [freight, setFreight] = useState(toStr(group.marketingFreightRate))
   const [anti, setAnti] = useState(toStr(group.marketingAntiDumpingPct))
   const [defaultVal, setDefaultVal] = useState(toStr(group.marketingDefaultValue))
@@ -64,6 +70,7 @@ export function GroupV2MarketingCard({ group }: GroupV2MarketingCardProps) {
       id: group.groupHeadId,
       data: {
         groupHeadId: group.groupHeadId,
+        period,
         marketingFreightRate: toNumOrUndef(freight),
         marketingAntiDumpingPct: toNumOrUndef(anti),
         marketingDefaultValue: toNumOrUndef(defaultVal),

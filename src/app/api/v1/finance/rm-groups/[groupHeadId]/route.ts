@@ -87,9 +87,11 @@ function serializeBase(base: any) {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { groupHeadId } = await context.params
+    const { searchParams } = new URL(request.url)
+    const period = searchParams.get("period") || undefined
     const metadata = createMetadataFromRequest(request)
     const client = getRmGroupClient()
-    const response = await client.getRMGroup({ groupHeadId }, metadata)
+    const response = await client.getRMGroup({ groupHeadId, period }, metadata)
 
     // response.data is RMGroupHeadWithDetails { head, details[] }
     const withDetails = response.data
@@ -119,6 +121,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const body = await request.json()
     const metadata = createMetadataFromRequest(request)
     const client = getRmGroupClient()
+    // body already carries `period` (required end-to-end per UpdateRMGroupRequest) and is forwarded as-is
     const response = await client.updateRMGroup({ groupHeadId, ...body }, metadata)
 
     return NextResponse.json({

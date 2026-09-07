@@ -29,6 +29,7 @@ export async function PUT(
       {
         groupHeadId,
         groupDetailId,
+        period: body.period,
         valuationFreightRate: body.valuationFreightRate ?? undefined,
         valuationAntiDumpingPct: body.valuationAntiDumpingPct ?? undefined,
         valuationDutyPct: body.valuationDutyPct ?? undefined,
