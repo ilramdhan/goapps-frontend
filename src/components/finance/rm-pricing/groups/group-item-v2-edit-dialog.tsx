@@ -58,7 +58,7 @@ export function GroupItemV2EditDialog({ open, onOpenChange, detail, period }: Gr
   // state always derives from the current detail row.
   return (
     <GroupItemV2EditDialogInner
-      key={detail.groupDetailId}
+      key={`${detail.groupDetailId}::${period}`}
       open={open}
       onOpenChange={onOpenChange}
       detail={detail}

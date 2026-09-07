@@ -117,10 +117,16 @@ function GroupDetailContent() {
   const { data: periodConfigData } = useGroupPeriodConfig(groupId, effectivePeriod)
 
   const group = data?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | undefined
-  const details = group?.details || []
+  // Period-scoped read (falls back to the anchor/latest read while the
+  // period-scoped query is disabled/loading). Used as the source of truth
+  // for BOTH the Marketing Inputs display card AND the item rows / edit
+  // dialogs below — the backend's period overlay covers head-level fields
+  // AND `details[]`, so anchor-only `group.details` must never be used for
+  // anything the user can view/edit at a specific period.
   const marketingGroup =
     (periodConfigData?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | undefined) ??
     group
+  const details = marketingGroup?.details || []
 
   const handleRemoveItem = async (item: RMGroupDetail) => {
     if (!groupId) return
@@ -319,7 +325,7 @@ function GroupDetailContent() {
       <GroupFormDialog
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
-        group={group}
+        group={marketingGroup}
         period={effectivePeriod}
       />
 
