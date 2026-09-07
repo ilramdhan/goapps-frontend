@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { useRMGroup } from "@/hooks/finance/use-rm-group"
+import { useRMGroup, useGroupPeriodConfig } from "@/hooks/finance/use-rm-group"
 import { useRemoveItemsFromGroup } from "@/hooks/finance/use-rm-group-items"
 import { useSyncPeriods } from "@/hooks/finance/use-oracle-sync"
 import { useGroupItemRates } from "@/hooks/finance/use-group-item-rates"
@@ -112,8 +112,15 @@ function GroupDetailContent() {
   )
   const rates = ratesData?.data || []
 
+  // Period-scoped marketing config (falls back to the raw group head while
+  // the period-scoped query is disabled/loading, e.g. before periods load).
+  const { data: periodConfigData } = useGroupPeriodConfig(groupId, effectivePeriod)
+
   const group = data?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | undefined
   const details = group?.details || []
+  const marketingGroup =
+    (periodConfigData?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | undefined) ??
+    group
 
   const handleRemoveItem = async (item: RMGroupDetail) => {
     if (!groupId) return
@@ -182,28 +189,28 @@ function GroupDetailContent() {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Duty %</span>
-                  <span className="font-mono">{formatPctFromDecimal(group.costPercentage)}</span>
+                  <span className="font-mono">{formatPctFromDecimal(marketingGroup?.costPercentage)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Transport Rate</span>
-                  <span className="font-mono">{formatDecimal(group.costPerKg, 4)}</span>
+                  <span className="font-mono">{formatDecimal(marketingGroup?.costPerKg, 4)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Freight Rate</span>
                   <span className="font-mono">
-                    {formatDecimal(group.marketingFreightRate, 4)}
+                    {formatDecimal(marketingGroup?.marketingFreightRate, 4)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Anti Dumping %</span>
                   <span className="font-mono">
-                    {formatPctFromDecimal(group.marketingAntiDumpingPct)}
+                    {formatPctFromDecimal(marketingGroup?.marketingAntiDumpingPct)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Default Value</span>
                   <span className="font-mono">
-                    {formatDecimal(group.marketingDefaultValue, 4)}
+                    {formatDecimal(marketingGroup?.marketingDefaultValue, 4)}
                   </span>
                 </div>
               </div>
@@ -313,6 +320,7 @@ function GroupDetailContent() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         group={group}
+        period={effectivePeriod}
       />
 
       <ItemPickerDialog
@@ -339,6 +347,7 @@ function GroupDetailContent() {
         open={!!editValuationDetail}
         onOpenChange={(open) => !open && setEditValuationDetail(null)}
         detail={editValuationDetail}
+        period={effectivePeriod}
       />
     </div>
   )

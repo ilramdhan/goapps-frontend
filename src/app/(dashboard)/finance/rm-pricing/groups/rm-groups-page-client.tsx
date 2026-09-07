@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useMemo, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Loader2, Download, Upload } from "lucide-react"
 
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { useRMGroups, useExportRMGroups } from "@/hooks/finance/use-rm-group"
+import { useSyncPeriods } from "@/hooks/finance/use-oracle-sync"
 import { useUrlState } from "@/lib/hooks"
 import {
   type RMGroupHead,
@@ -57,6 +58,15 @@ function RMGroupsPageContent() {
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedGroup, setSelectedGroup] = useState<RMGroupHead | null>(null)
   const exportMutation = useExportRMGroups()
+
+  // This list page is period-blind (edits here always target the anchor
+  // row) — pass the latest sync period so create/update write straight
+  // through to the anchor row per the "latest period write-through" rule.
+  const { data: periodsData } = useSyncPeriods()
+  const latestPeriod = useMemo(
+    () => periodsData?.periods?.[0] || "",
+    [periodsData?.periods]
+  )
 
   const handleExport = () => {
     // Export honors active_filter + search from the list-page filters.
@@ -195,6 +205,7 @@ function RMGroupsPageContent() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         group={selectedGroup}
+        period={latestPeriod}
         onSuccess={handleFormSuccess}
       />
 

@@ -24,6 +24,7 @@ interface GroupItemV2EditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   detail: RMGroupDetail | null
+  period: string
 }
 
 function toStr(v: number | undefined): string {
@@ -51,7 +52,7 @@ function decimalFromPctStr(v: string): number | undefined {
   return Math.round((n / 100) * 1e8) / 1e8
 }
 
-export function GroupItemV2EditDialog({ open, onOpenChange, detail }: GroupItemV2EditDialogProps) {
+export function GroupItemV2EditDialog({ open, onOpenChange, detail, period }: GroupItemV2EditDialogProps) {
   if (!detail) return null
   // Render the inner dialog with the detail-keyed remount pattern so initial
   // state always derives from the current detail row.
@@ -61,6 +62,7 @@ export function GroupItemV2EditDialog({ open, onOpenChange, detail }: GroupItemV
       open={open}
       onOpenChange={onOpenChange}
       detail={detail}
+      period={period}
     />
   )
 }
@@ -69,9 +71,10 @@ interface GroupItemV2EditDialogInnerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   detail: RMGroupDetail
+  period: string
 }
 
-function GroupItemV2EditDialogInner({ open, onOpenChange, detail }: GroupItemV2EditDialogInnerProps) {
+function GroupItemV2EditDialogInner({ open, onOpenChange, detail, period }: GroupItemV2EditDialogInnerProps) {
   const [freight, setFreight] = useState(toStr(detail.valuationFreightRate))
   // anti / duty are stored as decimal (0.04) but displayed as whole percent (4).
   const [antiPct, setAntiPct] = useState(pctStrFromDecimal(detail.valuationAntiDumpingPct))
@@ -84,6 +87,7 @@ function GroupItemV2EditDialogInner({ open, onOpenChange, detail }: GroupItemV2E
     await updateMutation.mutateAsync({
       groupHeadId: detail.groupHeadId,
       groupDetailId: detail.groupDetailId,
+      period,
       valuationFreightRate: toNumOrUndef(freight),
       valuationAntiDumpingPct: decimalFromPctStr(antiPct),
       valuationDutyPct: decimalFromPctStr(dutyPct),
