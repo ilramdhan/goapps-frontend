@@ -122,6 +122,9 @@ export function useUpdateRMGroup() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateRMGroupRequest }) => {
+      // `data` (UpdateRMGroupRequest) already carries the required `period`
+      // field end-to-end from the proto type — it is forwarded to the BFF
+      // route as-is in the PUT body.
       const raw = await apiClient.put<unknown>(`/api/v1/finance/rm-groups/${id}`, data)
       const response = UpdateRMGroupResponseParser.fromJSON(raw)
       if (!response.base?.isSuccess) {
@@ -246,5 +249,41 @@ export function useDownloadRMGroupTemplate() {
     onError: (error: Error) => {
       toast.error(error.message || "Failed to download template")
     },
+  })
+}
+
+// --- Period-scoped config read hook ---
+// Source of truth for the Marketing Inputs card / item table's *displayed*
+// values once a period is selected — a period-aware sibling to `useRMGroup`
+// (which stays anchor/latest-only for identity fields). The BFF route just
+// forwards `period` to the same GetRMGroup RPC, so we reuse
+// GetRMGroupResponseParser to parse the response.
+export const groupPeriodConfigKeys = {
+  all: ["finance", "rm-group-period-config"] as const,
+  detail: (groupHeadId: string, period: string) =>
+    [...groupPeriodConfigKeys.all, groupHeadId, period] as const,
+}
+
+export function useGroupPeriodConfig(groupHeadId: string, period: string) {
+  return useQuery({
+    queryKey: groupPeriodConfigKeys.detail(groupHeadId, period),
+    queryFn: async () => {
+      const qs = buildQueryString({ period })
+      const raw = await apiClient.get<unknown>(`/api/v1/finance/rm-groups/${groupHeadId}${qs}`)
+      const response = GetRMGroupResponseParser.fromJSON(raw)
+      if (response.base && response.base.isSuccess === false) {
+        throw new Error(response.base.message || "Failed to load RM group for period")
+      }
+      const withDetails = response.data
+      const head = withDetails?.head
+      return {
+        data: head
+          ? { ...head, details: withDetails?.details || [] }
+          : null,
+      }
+    },
+    enabled: !!groupHeadId && !!period,
+    staleTime: 5_000,
+    gcTime: 5 * 60_000,
   })
 }

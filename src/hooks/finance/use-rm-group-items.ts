@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { apiClient, downloadFileFromBytes } from "@/lib/api"
-import { rmGroupKeys } from "./use-rm-group"
+import { rmGroupKeys, groupPeriodConfigKeys } from "./use-rm-group"
 import { groupItemRatesKeys } from "./use-group-item-rates"
 import {
   AddItemsResponseParser,
@@ -97,6 +97,7 @@ export function useAddItemsToGroup() {
 export interface UpdateGroupItemVars {
   groupHeadId: string
   groupDetailId: string
+  period: string
   valuationFreightRate?: number | null
   valuationAntiDumpingPct?: number | null
   valuationDutyPct?: number | null
@@ -116,6 +117,8 @@ export function useUpdateGroupItem() {
   return useMutation({
     mutationFn: async (vars: UpdateGroupItemVars): Promise<UpdateGroupItemResponse> => {
       const { groupHeadId, groupDetailId, ...body } = vars
+      // `body` still carries `period` (part of ...vars) — forwarded as-is in
+      // the PUT body to the BFF route, which threads it to UpdateGroupItem.
       const raw = await apiClient.put<unknown>(
         `/api/v1/finance/rm-groups/${groupHeadId}/items/${groupDetailId}`,
         body,
@@ -125,6 +128,12 @@ export function useUpdateGroupItem() {
     onSuccess: (response, vars) => {
       queryClient.invalidateQueries({ queryKey: rmGroupKeys.detail(vars.groupHeadId) })
       queryClient.invalidateQueries({ queryKey: groupItemRatesKeys.all })
+      // Period-scoped display config (Marketing Inputs card / item table)
+      // must also refresh — invalidating only the read-only rates key above
+      // is not enough now that header/item config is period-displayable.
+      queryClient.invalidateQueries({
+        queryKey: groupPeriodConfigKeys.detail(vars.groupHeadId, vars.period),
+      })
       if (response.base?.isSuccess) {
         toast.success("Item updated")
       } else {
