@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCostRouteClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { DuplicateRouteTargetMode } from "@/types/generated/finance/v1/cost_route"
+
+function toTargetMode(value: unknown): DuplicateRouteTargetMode {
+  if (value === "SAME_PRODUCT" || value === DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT) {
+    return DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT
+  }
+  return DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ headId: string }> }) {
   try {
@@ -16,6 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         includeValues: !!body.includeValues,
         newCodePrefix: String(body.newCodePrefix ?? ""),
         linkedRequestId: Number(body.linkedRequestId ?? 0),
+        targetMode: toTargetMode(body.targetMode),
       },
       metadata,
     )
