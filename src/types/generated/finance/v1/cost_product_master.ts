@@ -177,6 +177,18 @@ export interface DownloadCostProductMasterTemplateResponse {
   fileName: string;
 }
 
+export interface DuplicateProductRequest {
+  productSysId: number;
+  newCodePrefix: string;
+  copyParams: boolean;
+}
+
+export interface DuplicateProductResponse {
+  base: BaseResponse | undefined;
+  newProductSysId: number;
+  newProductCode: string;
+}
+
 function createBaseCostProductMaster(): CostProductMaster {
   return {
     productSysId: 0,
@@ -2880,6 +2892,212 @@ export const DownloadCostProductMasterTemplateResponse: MessageFns<DownloadCostP
   },
 };
 
+function createBaseDuplicateProductRequest(): DuplicateProductRequest {
+  return { productSysId: 0, newCodePrefix: "", copyParams: false };
+}
+
+export const DuplicateProductRequest: MessageFns<DuplicateProductRequest> = {
+  encode(message: DuplicateProductRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.newCodePrefix !== "") {
+      writer.uint32(18).string(message.newCodePrefix);
+    }
+    if (message.copyParams !== false) {
+      writer.uint32(24).bool(message.copyParams);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DuplicateProductRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDuplicateProductRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.newCodePrefix = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.copyParams = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DuplicateProductRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      newCodePrefix: isSet(object.newCodePrefix)
+        ? globalThis.String(object.newCodePrefix)
+        : isSet(object.new_code_prefix)
+        ? globalThis.String(object.new_code_prefix)
+        : "",
+      copyParams: isSet(object.copyParams)
+        ? globalThis.Boolean(object.copyParams)
+        : isSet(object.copy_params)
+        ? globalThis.Boolean(object.copy_params)
+        : false,
+    };
+  },
+
+  toJSON(message: DuplicateProductRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.newCodePrefix !== "") {
+      obj.newCodePrefix = message.newCodePrefix;
+    }
+    if (message.copyParams !== false) {
+      obj.copyParams = message.copyParams;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DuplicateProductRequest>): DuplicateProductRequest {
+    return DuplicateProductRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DuplicateProductRequest>): DuplicateProductRequest {
+    const message = createBaseDuplicateProductRequest();
+    message.productSysId = object.productSysId ?? 0;
+    message.newCodePrefix = object.newCodePrefix ?? "";
+    message.copyParams = object.copyParams ?? false;
+    return message;
+  },
+};
+
+function createBaseDuplicateProductResponse(): DuplicateProductResponse {
+  return { base: undefined, newProductSysId: 0, newProductCode: "" };
+}
+
+export const DuplicateProductResponse: MessageFns<DuplicateProductResponse> = {
+  encode(message: DuplicateProductResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.newProductSysId !== 0) {
+      writer.uint32(16).int64(message.newProductSysId);
+    }
+    if (message.newProductCode !== "") {
+      writer.uint32(26).string(message.newProductCode);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DuplicateProductResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDuplicateProductResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.newProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.newProductCode = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DuplicateProductResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      newProductSysId: isSet(object.newProductSysId)
+        ? globalThis.Number(object.newProductSysId)
+        : isSet(object.new_product_sys_id)
+        ? globalThis.Number(object.new_product_sys_id)
+        : 0,
+      newProductCode: isSet(object.newProductCode)
+        ? globalThis.String(object.newProductCode)
+        : isSet(object.new_product_code)
+        ? globalThis.String(object.new_product_code)
+        : "",
+    };
+  },
+
+  toJSON(message: DuplicateProductResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.newProductSysId !== 0) {
+      obj.newProductSysId = Math.round(message.newProductSysId);
+    }
+    if (message.newProductCode !== "") {
+      obj.newProductCode = message.newProductCode;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DuplicateProductResponse>): DuplicateProductResponse {
+    return DuplicateProductResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DuplicateProductResponse>): DuplicateProductResponse {
+    const message = createBaseDuplicateProductResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.newProductSysId = object.newProductSysId ?? 0;
+    message.newProductCode = object.newProductCode ?? "";
+    return message;
+  },
+};
+
 export type CostProductMasterServiceDefinition = typeof CostProductMasterServiceDefinition;
 export const CostProductMasterServiceDefinition = {
   name: "CostProductMasterService",
@@ -2970,6 +3188,14 @@ export const CostProductMasterServiceDefinition = {
       requestType: DownloadCostProductMasterTemplateRequest,
       requestStream: false,
       responseType: DownloadCostProductMasterTemplateResponse,
+      responseStream: false,
+      options: {},
+    },
+    duplicateProduct: {
+      name: "DuplicateProduct",
+      requestType: DuplicateProductRequest,
+      requestStream: false,
+      responseType: DuplicateProductResponse,
       responseStream: false,
       options: {},
     },

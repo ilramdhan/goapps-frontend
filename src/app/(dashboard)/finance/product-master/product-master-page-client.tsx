@@ -20,7 +20,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
+  BulkEditParamsDialog,
+  BulkEditParamsToolbar,
+  BulkProductParamJobProgressDialog,
   DeactivateProductMasterDialog,
+  DuplicateProductDialog,
   ProductDetailDrawer,
   ProductMasterFormDialog,
   ProductMasterTable,
@@ -35,6 +39,7 @@ import { useExportData } from "@/hooks/finance/use-cost-import"
 import { useUrlState } from "@/lib/hooks"
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
 import type { CostProductMaster, ListCostProductMastersParams } from "@/types/finance/cost-product-master"
+import type { BulkParamJobInfo } from "@/types/finance/cost-product-param-bulk"
 
 const defaultFilters: ListCostProductMastersParams = {
   search: "",
@@ -91,6 +96,7 @@ export default function ProductMasterPageClient() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [viewOpen, setViewOpen] = useState(false)
   const [viewId, setViewId] = useState<number | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -99,6 +105,12 @@ export default function ProductMasterPageClient() {
   // Both bulk menu items open the same unified ETL dialog, differing only by kind.
   const [editing, setEditing] = useState<CostProductMaster | null>(null)
   const [bulkExportLoading, setBulkExportLoading] = useState(false)
+
+  // F4 — bulk edit params across multiple selected products.
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkJob, setBulkJob] = useState<BulkParamJobInfo | undefined>(undefined)
+  const [bulkProgressOpen, setBulkProgressOpen] = useState(false)
 
   const { exportEntity, loading: exportLoading } = useExportData()
 
@@ -114,9 +126,53 @@ export default function ProductMasterPageClient() {
     setEditing(p)
     setDeactivateOpen(true)
   }
+  function openDuplicate(p: CostProductMaster) {
+    setEditing(p)
+    setDuplicateOpen(true)
+  }
   function openView(p: CostProductMaster) {
     setViewId(p.productSysId)
     setViewOpen(true)
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const pageIds = items.map((p) => p.productSysId)
+      const allSelected = pageIds.length > 0 && pageIds.every((id) => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) {
+        pageIds.forEach((id) => next.delete(id))
+      } else {
+        pageIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  function handleBulkQueued(job: BulkParamJobInfo) {
+    setBulkEditOpen(false)
+    setBulkJob(job)
+    setBulkProgressOpen(true)
+  }
+
+  function handleBulkSettled() {
+    setSelectedIds(new Set())
+    setBulkJob(undefined)
+    // Job submission already invalidates product-master + parameter caches; refresh again now
+    // that the job has actually reached a terminal status, so per-product param values (which
+    // only change once the async job completes) reflect the finished state, not just the QUEUED
+    // moment.
+    void queryClient.invalidateQueries({ queryKey: costProductMasterKeys.all })
+    void queryClient.invalidateQueries({ queryKey: ["finance", "cost-product-parameter"] })
   }
 
   function handleSort(sortKey: string) {
@@ -269,16 +325,22 @@ export default function ProductMasterPageClient() {
         </div>
       ) : null}
 
+      <BulkEditParamsToolbar selectedCount={selectedIds.size} onOpen={() => setBulkEditOpen(true)} />
+
       <ProductMasterTable
         items={items}
         isLoading={isLoading}
         onEdit={openEdit}
         onDeactivate={openDeactivate}
         onView={openView}
+        onDuplicate={openDuplicate}
         sortBy={filters.sortBy}
         sortOrder={filters.sortOrder}
         onSort={handleSort}
         visibility={visibility}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onToggleSelectAll={toggleSelectAll}
       />
 
       {totalItems > 0 && (
@@ -306,9 +368,27 @@ export default function ProductMasterPageClient() {
         onOpenChange={setDeactivateOpen}
         product={editing}
       />
+      <DuplicateProductDialog
+        open={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
+        product={editing}
+      />
       <BulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} kind="product_routing" />
       <BulkImportDialog open={paramsImportOpen} onOpenChange={setParamsImportOpen} kind="params_only" />
       <ProductDetailDrawer productSysId={viewId} open={viewOpen} onOpenChange={setViewOpen} />
+      <BulkEditParamsDialog
+        open={bulkEditOpen}
+        onOpenChange={setBulkEditOpen}
+        productSysIds={[...selectedIds]}
+        onQueued={handleBulkQueued}
+      />
+      <BulkProductParamJobProgressDialog
+        open={bulkProgressOpen}
+        onOpenChange={setBulkProgressOpen}
+        jobId={bulkJob?.jobId}
+        jobCode={bulkJob?.jobCode}
+        onSettled={handleBulkSettled}
+      />
     </div>
   )
 }

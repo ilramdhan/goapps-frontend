@@ -14,12 +14,14 @@
 // product master" branch is preserved inline, not dropped.
 import { useState } from "react"
 
+import { AttachRouteDialog } from "@/components/finance/cost-route/attach-route-dialog"
 import { ProductMasterCombobox } from "@/components/finance/comboboxes/product-master-combobox"
 import { ProductTypeCombobox } from "@/components/finance/comboboxes/product-type-combobox"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useCreateCostProductMaster } from "@/hooks/finance/use-cost-product-master"
 import { useCreateRouteFromProduct, useRouteByProduct } from "@/hooks/finance/use-cost-route"
 import { useLinkExistingRoute } from "@/hooks/finance/use-link-route"
@@ -104,12 +106,21 @@ export function RoutingResolver({
   forceNewProduct = false,
 }: RoutingResolverProps) {
   const [selectedProductSysId, setSelectedProductSysId] = useState<number | undefined>(productSysId)
+  const [selectedProductCode, setSelectedProductCode] = useState<string | undefined>(undefined)
+  const [selectedProductName, setSelectedProductName] = useState<string | undefined>(undefined)
   const [isNewProduct, setIsNewProduct] = useState(forceNewProduct)
   const [newProduct, setNewProduct] = useState<NewProductInput>(emptyNewProduct)
+  // Only meaningful when the selected product has no route yet (design.md §3, F3):
+  // "create" builds a route level-by-level from scratch (existing behavior);
+  // "attach" copies an existing route from a different product instead.
+  const [routeMode, setRouteMode] = useState<"create" | "attach">("create")
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false)
 
   const { routeQuery, hasExistingRoute, resolveExisting, resolveNewProduct, isPending } = useResolveRouting(
     isNewProduct ? undefined : selectedProductSysId,
   )
+
+  const showAttachOption = !isNewProduct && !!selectedProductSysId && !routeQuery.isLoading && !hasExistingRoute
 
   async function handleResolve() {
     try {
@@ -122,7 +133,7 @@ export function RoutingResolver({
     }
   }
 
-  const canResolveExisting = !isNewProduct && !!selectedProductSysId
+  const canResolveExisting = !isNewProduct && !!selectedProductSysId && !(showAttachOption && routeMode === "attach")
   const canResolveNew = isNewProduct && newProduct.name.trim().length > 0 && newProduct.typeId > 0
   const canResolve = canResolveExisting || canResolveNew
 
@@ -146,7 +157,11 @@ export function RoutingResolver({
           <Label>Product</Label>
           <ProductMasterCombobox
             value={selectedProductSysId}
-            onChange={(id) => setSelectedProductSysId(id)}
+            onChange={(id, code, name) => {
+              setSelectedProductSysId(id)
+              setSelectedProductCode(code)
+              setSelectedProductName(name)
+            }}
             placeholder="Search product by code or name…"
           />
           {selectedProductSysId && (
@@ -155,8 +170,44 @@ export function RoutingResolver({
                 ? "Checking for an existing route…"
                 : hasExistingRoute
                   ? `Existing route #${routeQuery.data?.headId} will be linked to this request.`
-                  : "No route yet for this product — a new route will be created."}
+                  : "No route yet for this product."}
             </p>
+          )}
+        </div>
+      )}
+
+      {showAttachOption && (
+        <div className="space-y-2 rounded-md border p-3">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Routing source</Label>
+          <RadioGroup
+            value={routeMode}
+            onValueChange={(v) => setRouteMode(v as "create" | "attach")}
+            className="gap-2"
+          >
+            <div className="flex items-start gap-2">
+              <RadioGroupItem value="create" id="rr-mode-create" className="mt-0.5" />
+              <Label htmlFor="rr-mode-create" className="text-sm font-normal">
+                Create a new route from scratch (build level-by-level)
+              </Label>
+            </div>
+            <div className="flex items-start gap-2">
+              <RadioGroupItem value="attach" id="rr-mode-attach" className="mt-0.5" />
+              <Label htmlFor="rr-mode-attach" className="text-sm font-normal">
+                Attach an existing route from another product
+              </Label>
+            </div>
+          </RadioGroup>
+
+          {routeMode === "attach" && (
+            <div className="pt-1">
+              <p className="text-xs text-muted-foreground mb-2">
+                Copy a route already built for a different product (e.g. masterbatch → POY → FG) onto this
+                product. Shared raw materials/intermediates keep referencing the same existing products.
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setAttachDialogOpen(true)}>
+                Choose route to attach…
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -208,9 +259,23 @@ export function RoutingResolver({
         </div>
       )}
 
-      <Button disabled={isPending || !canResolve} onClick={handleResolve}>
-        {isPending ? "Resolving…" : "Resolve routing"}
-      </Button>
+      {!(showAttachOption && routeMode === "attach") && (
+        <Button disabled={isPending || !canResolve} onClick={handleResolve}>
+          {isPending ? "Resolving…" : "Resolve routing"}
+        </Button>
+      )}
+
+      {showAttachOption && selectedProductSysId && (
+        <AttachRouteDialog
+          open={attachDialogOpen}
+          onClose={() => setAttachDialogOpen(false)}
+          targetProductSysId={selectedProductSysId}
+          targetProductCode={selectedProductCode}
+          targetProductName={selectedProductName}
+          linkedRequestId={requestId || undefined}
+          onAttached={(headId) => onResolved(headId)}
+        />
+      )}
     </div>
   )
 }

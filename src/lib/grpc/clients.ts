@@ -74,6 +74,7 @@ import { CostRoutingRuleServiceDefinition } from "@/types/generated/finance/v1/c
 import { CostAuditLogServiceDefinition } from "@/types/generated/finance/v1/cost_audit_log"
 import { CostNotificationServiceDefinition } from "@/types/generated/finance/v1/cost_notification"
 import { CostProductParameterServiceDefinition } from "@/types/generated/finance/v1/cost_product_parameter"
+import { CostProductParamBulkServiceDefinition } from "@/types/generated/finance/v1/cost_product_param_bulk"
 import { CostCalcServiceDefinition } from "@/types/generated/finance/v1/cost_calc"
 import {
   CostLevelAssignmentConfigServiceDefinition,
@@ -434,6 +435,14 @@ export function getCostNotificationClient() {
 export function getCostProductParameterClient() {
   return getOrCreate("costProductParameter", () =>
     createServiceClient(CostProductParameterServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+// CostProductParamBulkService — async bulk edit (add/remove applicable param,
+// upsert param value) across many products at once (F4, product-route-fork-attach-bulk).
+export function getCostProductParamBulkClient() {
+  return getOrCreate("costProductParamBulk", () =>
+    createServiceClient(CostProductParamBulkServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

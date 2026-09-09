@@ -194,3 +194,24 @@ export function getProductsAtLevel(
   if (!graph || level === undefined) return []
   return graph.seqs.filter((s) => s.routeLevel === level)
 }
+
+/**
+ * Human-readable upstream-to-FG summary of a route graph, e.g.
+ * "MASTERBATCH → POY → FG_CODE". Level 1 is always the FG (the head's own
+ * product); higher levels are further upstream — so levels are walked from
+ * highest to lowest (upstream-first) to read as a left-to-right process flow.
+ * Used by the attach-route picker (F3) to show what a source route contains
+ * before the user commits to copying it.
+ */
+export function getRouteLevelSummary(graph: RouteGraph | null | undefined): string {
+  if (!graph || graph.seqs.length === 0) return ""
+  const levels = Array.from(new Set(graph.seqs.map((s) => s.routeLevel))).sort((a, b) => b - a)
+  return levels
+    .map((lvl) =>
+      graph.seqs
+        .filter((s) => s.routeLevel === lvl)
+        .map((s) => s.productCode || s.productName || `L${lvl}`)
+        .join(" / "),
+    )
+    .join(" → ")
+}

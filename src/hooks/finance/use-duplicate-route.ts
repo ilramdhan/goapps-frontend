@@ -3,6 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+/**
+ * Mirrors finance.v1.DuplicateRouteTargetMode. Kept as a plain string union
+ * (rather than importing the generated numeric enum) so the hook/dialog can
+ * stay decoupled from the wire encoding — the BFF route is the only place
+ * that needs to know the numeric values.
+ */
+export type DuplicateRouteTargetMode = "NEW_PRODUCT" | "SAME_PRODUCT"
+
 export interface DuplicateRouteInput {
   headId: number
   includeRouting: boolean
@@ -11,6 +19,8 @@ export interface DuplicateRouteInput {
   includeValues: boolean
   newCodePrefix?: string
   linkedRequestId?: number
+  /** Defaults to NEW_PRODUCT (existing behavior) when omitted. */
+  targetMode?: DuplicateRouteTargetMode
 }
 
 export interface DuplicateRouteResult {
@@ -33,6 +43,7 @@ export function useDuplicateRoute() {
           includeValues: input.includeValues,
           newCodePrefix: input.newCodePrefix ?? "",
           linkedRequestId: input.linkedRequestId ?? 0,
+          targetMode: input.targetMode ?? "NEW_PRODUCT",
         }),
       })
       const json = await res.json()

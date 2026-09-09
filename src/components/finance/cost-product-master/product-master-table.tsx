@@ -2,12 +2,13 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
-import { Edit, Eye, Package, Power } from "lucide-react"
+import { Copy, Edit, Eye, Package, Power } from "lucide-react"
 
 import { ProductTypeName } from "@/components/common/product-type-name"
 import { EmptyState } from "@/components/common/empty-state"
 import { StatusBadge } from "@/components/common/status-badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -49,10 +50,15 @@ interface Props {
   onEdit: (p: CostProductMaster) => void
   onDeactivate: (p: CostProductMaster) => void
   onView: (p: CostProductMaster) => void
+  onDuplicate: (p: CostProductMaster) => void
   sortBy?: string
   sortOrder?: "asc" | "desc"
   onSort: (sortKey: string) => void
   visibility: Record<string, boolean>
+  /** When provided, renders a leading checkbox column for multi-select bulk actions. */
+  selectedIds?: Set<number>
+  onToggleSelect?: (id: number) => void
+  onToggleSelectAll?: () => void
 }
 
 export function ProductMasterTable({
@@ -61,13 +67,22 @@ export function ProductMasterTable({
   onEdit,
   onDeactivate,
   onView,
+  onDuplicate,
   sortBy,
   sortOrder,
   onSort,
   visibility,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: Props) {
   const show = (id: string) => visibility[id] !== false
-  const visibleCount = PRODUCT_MASTER_COLUMNS.filter((c) => show(c.id)).length + 1 // +1 actions
+  const selectable = !!selectedIds && !!onToggleSelect && !!onToggleSelectAll
+  const visibleCount =
+    PRODUCT_MASTER_COLUMNS.filter((c) => show(c.id)).length + 1 + (selectable ? 1 : 0) // +1 actions, +1 checkbox
+  const selectableItems = items // all rows on the page are selectable
+  const allSelected = selectable && selectableItems.length > 0 && selectableItems.every((p) => selectedIds!.has(p.productSysId))
+  const someSelected = selectable && selectableItems.some((p) => selectedIds!.has(p.productSysId)) && !allSelected
 
   const sortProps = { currentSortBy: sortBy, currentSortOrder: sortOrder, onSort }
 
@@ -77,6 +92,15 @@ export function ProductMasterTable({
         <Table>
           <TableHeader>
             <TableRow>
+              {selectable && (
+                <TableHead className="w-10 pl-4">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={() => onToggleSelectAll!()}
+                    aria-label="Select all products on this page"
+                  />
+                </TableHead>
+              )}
               {show("product_code") && (
                 <SortableHeader label="Product code" sortKey="product_code" className="w-44 pl-4" {...sortProps} />
               )}
@@ -104,14 +128,15 @@ export function ProductMasterTable({
               {show("status") && (
                 <SortableHeader label="Status" sortKey="status" className="w-24" {...sortProps} />
               )}
-              <TableHead className="w-28 pr-4 text-right">Actions</TableHead>
+              <TableHead className="w-36 pr-4 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {show("product_code") && <TableCell className="pl-4"><Skeleton className="h-4 w-32" /></TableCell>}
+                  {selectable && <TableCell className="pl-4"><Skeleton className="h-4 w-4" /></TableCell>}
+                  {show("product_code") && <TableCell className={selectable ? "" : "pl-4"}><Skeleton className="h-4 w-32" /></TableCell>}
                   {show("product_name") && <TableCell><Skeleton className="h-4 w-48" /></TableCell>}
                   {show("product_type_code") && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                   {show("shade_code") && <TableCell><Skeleton className="h-4 w-14" /></TableCell>}
@@ -137,8 +162,17 @@ export function ProductMasterTable({
             )}
             {items.map((p) => (
               <TableRow key={p.productSysId} className="relative cursor-pointer hover:bg-muted/50">
+                {selectable && (
+                  <TableCell className="relative z-10 pl-4" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds!.has(p.productSysId)}
+                      onCheckedChange={() => onToggleSelect!(p.productSysId)}
+                      aria-label={`Select ${p.productCode}`}
+                    />
+                  </TableCell>
+                )}
                 {show("product_code") && (
-                  <TableCell className="pl-4 font-mono text-xs">
+                  <TableCell className={selectable ? "font-mono text-xs" : "pl-4 font-mono text-xs"}>
                     <Link href={`/finance/product-master/${p.productSysId}`} className="absolute inset-0">
                       <span className="sr-only">View {p.productCode}</span>
                     </Link>
@@ -178,6 +212,9 @@ export function ProductMasterTable({
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => onEdit(p)} disabled={!p.isActive} title="Edit">
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => onDuplicate(p)} title="Duplicate">
+                    <Copy className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"

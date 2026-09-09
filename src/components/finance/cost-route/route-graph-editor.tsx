@@ -12,7 +12,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { isValidProductRmEdge } from "@/components/finance/cost-route/dag-rules"
+import { computeGridPosition, RM_GAP_X, RM_GAP_Y, RM_W } from "@/components/finance/cost-route/route-graph-layout"
+import { isSelfReferencing, spliceGraph } from "@/components/finance/cost-route/route-splice"
 import {
+  RouteSourcePickerList,
+  RouteSourcePreview,
+  useRouteSourcePicker,
+} from "@/components/finance/cost-route/route-source-picker"
+import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   GitFork,
@@ -31,6 +39,7 @@ import { DuplicateRouteDialog } from "@/components/finance/cost-route/duplicate-
 import { LinkedRequestsSheet } from "@/components/finance/cost-route/linked-requests-sheet"
 import { RouteGraphEditPanel } from "@/components/finance/cost-route/route-graph-edit-panel"
 import { RouteGraphFlow } from "@/components/finance/cost-route/route-graph-flow"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { StatusBadge } from "@/components/common/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -237,6 +246,32 @@ export function RouteGraphEditor({ headId }: Props) {
     setDirty(true)
   }
 
+  // B4 — splice an entire COMPLETE/LOCKED source route in as new upstream
+  // levels above `seqIdx`'s stage, plus one bridge PRODUCT-RM on that stage
+  // pointing at the source route's FG product. See route-splice.ts for the
+  // pure level-shift/clone algorithm; self-reference is pre-checked by the
+  // caller (AddRmDialog) before this is invoked.
+  const spliceExistingRoute = (seqIdx: number, sourceGraph: RouteGraph) => {
+    setWorking((prev) => {
+      const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
+      if (!base) return prev
+      const targetSeq = base.seqs[seqIdx]
+      if (!targetSeq) return base
+      const { clonedSeqs, bridgeRm } = spliceGraph({ sourceGraph, targetSeq, existingSeqs: base.seqs })
+      const newBridgeRm: CostRouteRm = {
+        ...bridgeRm,
+        uid: newUid(),
+        seqId: targetSeq.seqId,
+        parentProductSysId: targetSeq.productSysId,
+      }
+      const updatedSeqs = base.seqs.map((s, i) =>
+        i === seqIdx ? { ...s, rms: [...(s.rms ?? []), newBridgeRm] } : s,
+      )
+      return { ...base, seqs: [...updatedSeqs, ...clonedSeqs] }
+    })
+    setDirty(true)
+  }
+
   const deleteRm = (seqIdx: number, rmIdx: number) => {
     setWorking((prev) => {
       const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
@@ -297,6 +332,33 @@ export function RouteGraphEditor({ headId }: Props) {
     },
     [persisted],
   )
+
+  // Auto-arrange (post-ship fix 4c) — explicit user action only, recomputes
+  // EVERY seq/RM position via the same shared grid function buildFlow()
+  // uses for its fallback layout, and writes them all back through the
+  // existing position setters. Never runs automatically on render/change.
+  const handleAutoArrange = useCallback(() => {
+    if (locked || !graph) return
+    const byLevel = new Map<number, CostRouteSeq[]>()
+    for (const s of graph.seqs) {
+      const list = byLevel.get(s.routeLevel) ?? []
+      list.push(s)
+      byLevel.set(s.routeLevel, list)
+    }
+    const levels = Array.from(byLevel.keys()).sort((a, b) => a - b)
+    const maxLevel = levels.length > 0 ? Math.max(...levels) : 1
+    for (const level of levels) {
+      const list = (byLevel.get(level) ?? []).slice().sort((a, b) => a.routeSeq - b.routeSeq)
+      list.forEach((s, idx) => {
+        const { x, y } = computeGridPosition(level, idx, maxLevel)
+        updateSeqPosition(s.uid, x, y)
+        const localRms = (s.rms ?? []).filter((r) => r.rmType !== "PRODUCT")
+        localRms.forEach((rm, rmIdx) => {
+          updateRmPosition(rm.uid, x - (RM_W + RM_GAP_X), y + rmIdx * RM_GAP_Y)
+        })
+      })
+    }
+  }, [locked, graph, updateSeqPosition, updateRmPosition])
 
   // Add a PRODUCT-RM by drawing an edge from upstream → downstream stage
   // (keyed on client uids so newly-added, unsaved stages can be linked).
@@ -523,6 +585,8 @@ export function RouteGraphEditor({ headId }: Props) {
             graph={graph}
             locked={locked}
             onAddStage={!locked ? () => setStageDialogState({ open: true }) : undefined}
+            onAddRm={!locked ? (seqIdx: number) => setRmDialog({ seqIdx }) : undefined}
+            onAutoArrange={!locked ? handleAutoArrange : undefined}
             onStagePositionChange={updateSeqPosition}
             onRmPositionChange={updateRmPosition}
             onConnectStages={addProductRmFromEdge}
@@ -754,8 +818,13 @@ export function RouteGraphEditor({ headId }: Props) {
           stageLevel={seqs[rmDialog.seqIdx]?.routeLevel ?? 1}
           // Products produced at higher levels are candidates for PRODUCT-type RM:
           upstreamProducts={upstreamProductsForLevel(seqs[rmDialog.seqIdx]?.routeLevel ?? 1)}
+          headProductSysId={head?.productSysId ?? 0}
           onAdd={(rm) => {
             addRm(rmDialog.seqIdx, rm)
+            setRmDialog(null)
+          }}
+          onAttachRoute={(sourceGraph) => {
+            spliceExistingRoute(rmDialog.seqIdx, sourceGraph)
             setRmDialog(null)
           }}
         />
@@ -950,19 +1019,30 @@ interface UpstreamProduct {
   level: number
 }
 
-function AddRmDialog({
+type AddRmSourceMode = "manual" | "attach"
+
+// Exported (only) so B4's mode-toggle / self-reference-guard tests can mount
+// it directly without pulling in the full RouteGraphEditor + React Flow tree.
+export function AddRmDialog({
   open,
   onClose,
   stageLevel,
   upstreamProducts,
+  headProductSysId,
   onAdd,
+  onAttachRoute,
 }: {
   open: boolean
   onClose: () => void
   stageLevel: number
   upstreamProducts: UpstreamProduct[]
+  /** The route's own head product — excluded from the attach picker and used for the self-reference guard. */
+  headProductSysId: number
   onAdd: (rm: Omit<CostRouteRm, "uid">) => void
+  /** B4 — splice mode: caller merges the fetched source graph in as new upstream levels. */
+  onAttachRoute: (sourceGraph: RouteGraph) => void
 }) {
+  const [sourceMode, setSourceMode] = useState<AddRmSourceMode>("manual")
   const [rmType, setRmType] = useState<RmRefType>("PRODUCT")
   const [productPick, setProductPick] = useState<UpstreamProduct | null>(null)
   const [groupPick, setGroupPick] = useState<{ code: string; name: string } | null>(null)
@@ -972,150 +1052,250 @@ function AddRmDialog({
   const [shadeName, setRmShadeName] = useState("")
   const [notes, setNotes] = useState("")
 
+  const picker = useRouteSourcePicker(headProductSysId)
+  const [selfRefError, setSelfRefError] = useState<string | undefined>(undefined)
+
   const isValid =
     Number(ratio) > 0 &&
     ((rmType === "PRODUCT" && !!productPick) ||
       (rmType === "GROUP" && !!groupPick))
 
+  function handleClose() {
+    picker.reset()
+    setSourceMode("manual")
+    setSelfRefError(undefined)
+    onClose()
+  }
+
+  function handleAttachConfirm() {
+    if (!picker.sourceGraph) return
+    // Client-side pre-check mirroring the backend's ErrSelfReferencingRoute
+    // guard — fast UX feedback; SaveGraph re-validates server-side regardless.
+    if (isSelfReferencing(picker.sourceGraph, headProductSysId)) {
+      setSelfRefError(
+        "This route (or one of its own upstream stages) eventually produces this product itself — attaching it here would create a self-consuming cycle. Pick a different source route.",
+      )
+      return
+    }
+    setSelfRefError(undefined)
+    onAttachRoute(picker.sourceGraph)
+    picker.reset()
+    setSourceMode("manual")
+    onClose()
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <ScrollableDialogContent className="max-w-lg">
         <ScrollableDialogHeader>
           <DialogTitle>Add RM input</DialogTitle>
           <DialogDescription>
-            Feeding the stage at level {stageLevel}. PRODUCT comes from another
-            stage in this routing; GROUP is a raw-material group.
+            {sourceMode === "manual"
+              ? "Feeding the stage at level " +
+                stageLevel +
+                ". PRODUCT comes from another stage in this routing; GROUP is a raw-material group."
+              : "Splice a whole COMPLETE or LOCKED route in as new upstream stages feeding this stage."}
           </DialogDescription>
         </ScrollableDialogHeader>
         <ScrollableDialogBody className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="rm-type">Source</Label>
-            <Select
-              value={rmType}
-              onValueChange={(v) => {
-                setRmType(v as RmRefType)
-                setProductPick(null)
-                setGroupPick(null)
-              }}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={sourceMode === "manual" ? "default" : "outline"}
+              onClick={() => setSourceMode("manual")}
             >
-              <SelectTrigger id="rm-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PRODUCT">PRODUCT — from another stage in this routing</SelectItem>
-                <SelectItem value="GROUP">GROUP — RM group (cons/stock/PO)</SelectItem>
-              </SelectContent>
-            </Select>
+              Pick existing product/item/group
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={sourceMode === "attach" ? "default" : "outline"}
+              onClick={() => setSourceMode("attach")}
+            >
+              Attach an existing route
+            </Button>
           </div>
 
-          {rmType === "PRODUCT" && (
-            <div className="space-y-1.5">
-              <Label>Upstream stage (must be at higher level)</Label>
-              <UpstreamProductPicker
-                candidates={upstreamProducts}
-                value={productPick}
-                onChange={setProductPick}
-              />
-              {upstreamProducts.length === 0 && (
-                <p className="mt-1 text-xs text-amber-700">
-                  No upstream stages yet. Add a stage at level &gt; {stageLevel} first.
-                </p>
+          {sourceMode === "manual" && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="rm-type">Source</Label>
+                <Select
+                  value={rmType}
+                  onValueChange={(v) => {
+                    setRmType(v as RmRefType)
+                    setProductPick(null)
+                    setGroupPick(null)
+                  }}
+                >
+                  <SelectTrigger id="rm-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PRODUCT">PRODUCT — from another stage in this routing</SelectItem>
+                    <SelectItem value="GROUP">GROUP — RM group (cons/stock/PO)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {rmType === "PRODUCT" && (
+                <div className="space-y-1.5">
+                  <Label>Upstream stage (must be at higher level)</Label>
+                  <UpstreamProductPicker
+                    candidates={upstreamProducts}
+                    value={productPick}
+                    onChange={setProductPick}
+                  />
+                  {upstreamProducts.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      No upstream stages yet. Add a stage at level &gt; {stageLevel} first.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {rmType === "GROUP" && (
+                <div className="space-y-1.5">
+                  <Label>RM group</Label>
+                  <RmGroupCombobox value={groupPick?.code} onChange={(code, name) => setGroupPick({ code, name })} />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="rm-ratio">Ratio per output unit *</Label>
+                  <Input
+                    id="rm-ratio"
+                    type="number"
+                    step="0.01"
+                    min={0.0001}
+                    value={ratio}
+                    onChange={(e) => setRatio(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rm-subtype">Sub type (optional)</Label>
+                  <Input
+                    id="rm-subtype"
+                    value={subType}
+                    onChange={(e) => setSubType(e.target.value)}
+                    placeholder="WARP / WEFT"
+                  />
+                </div>
+              </div>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground select-none">Additional metadata (optional)</summary>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Shade code</Label>
+                    <Input value={shadeCode} onChange={(e) => setShadeCode(e.target.value)} placeholder="NL" className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Shade name</Label>
+                    <Input value={shadeName} onChange={(e) => setRmShadeName(e.target.value)} placeholder="NATURAL" className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs">Notes</Label>
+                    <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" className="h-9 text-sm" />
+                  </div>
+                </div>
+              </details>
+            </>
+          )}
+
+          {sourceMode === "attach" && (
+            <div className="space-y-4">
+              {picker.step === "pick" && <RouteSourcePickerList state={picker} />}
+
+              {picker.step === "confirm" && picker.selectedRoute && (
+                <RouteSourcePreview state={picker} targetLabel={`this stage (level ${stageLevel})`}>
+                  <Alert>
+                    <AlertTitle className="text-xs font-semibold">What gets spliced in</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      Every stage of the source route is copied in as new upstream levels above this stage
+                      (shared upstream products, e.g. masterbatch/POY, reference the <strong>same existing
+                      products</strong> — not new copies). One new bridge input is added on this stage pointing at
+                      the source route&apos;s finished-good product, ratio 1.0 (editable after).
+                    </AlertDescription>
+                  </Alert>
+
+                  {selfRefError && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle className="text-xs font-semibold">Can&apos;t attach this route</AlertTitle>
+                      <AlertDescription className="text-xs">{selfRefError}</AlertDescription>
+                    </Alert>
+                  )}
+                </RouteSourcePreview>
               )}
             </div>
           )}
-
-          {rmType === "GROUP" && (
-            <div className="space-y-1.5">
-              <Label>RM group</Label>
-              <RmGroupCombobox value={groupPick?.code} onChange={(code, name) => setGroupPick({ code, name })} />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="rm-ratio">Ratio per output unit *</Label>
-              <Input
-                id="rm-ratio"
-                type="number"
-                step="0.01"
-                min={0.0001}
-                value={ratio}
-                onChange={(e) => setRatio(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="rm-subtype">Sub type (optional)</Label>
-              <Input
-                id="rm-subtype"
-                value={subType}
-                onChange={(e) => setSubType(e.target.value)}
-                placeholder="WARP / WEFT"
-              />
-            </div>
-          </div>
-          <details className="text-xs">
-            <summary className="cursor-pointer text-muted-foreground select-none">Additional metadata (optional)</summary>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Shade code</Label>
-                <Input value={shadeCode} onChange={(e) => setShadeCode(e.target.value)} placeholder="NL" className="h-9 text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Shade name</Label>
-                <Input value={shadeName} onChange={(e) => setRmShadeName(e.target.value)} placeholder="NATURAL" className="h-9 text-sm" />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs">Notes</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" className="h-9 text-sm" />
-              </div>
-            </div>
-          </details>
         </ScrollableDialogBody>
         <ScrollableDialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!isValid}
-            onClick={() => {
-              const ratioNum = Number(ratio) || 1
-              const rmExtra = {
-                routeRmShadeCode: shadeCode || undefined,
-                routeRmShadeName: shadeName || undefined,
-                notes: notes || undefined,
-                subType: subType || undefined,
-              }
-              if (rmType === "PRODUCT" && productPick) {
-                onAdd({
-                  rmId: 0,
-                  seqId: 0,
-                  parentProductSysId: 0,
-                  rmType: "PRODUCT",
-                  rmProductSysId: productPick.productSysId,
-                  routeRmName: productPick.productCode
-                    ? `${productPick.productCode}${productPick.productName ? " — " + productPick.productName : ""}`
-                    : productPick.productName,
-                  routeRmRatio: ratioNum,
-                  ...rmExtra,
-                })
-                return
-              }
-              if (rmType === "GROUP" && groupPick) {
-                onAdd({
-                  rmId: 0,
-                  seqId: 0,
-                  parentProductSysId: 0,
-                  rmType: "GROUP",
-                  rmGroupCode: groupPick.code,
-                  routeRmName: groupPick.name,
-                  routeRmRatio: ratioNum,
-                  ...rmExtra,
-                })
-              }
-            }}
-          >
-            Add input
-          </Button>
+          {sourceMode === "manual" && (
+            <>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!isValid}
+                onClick={() => {
+                  const ratioNum = Number(ratio) || 1
+                  const rmExtra = {
+                    routeRmShadeCode: shadeCode || undefined,
+                    routeRmShadeName: shadeName || undefined,
+                    notes: notes || undefined,
+                    subType: subType || undefined,
+                  }
+                  if (rmType === "PRODUCT" && productPick) {
+                    onAdd({
+                      rmId: 0,
+                      seqId: 0,
+                      parentProductSysId: 0,
+                      rmType: "PRODUCT",
+                      rmProductSysId: productPick.productSysId,
+                      routeRmName: productPick.productCode
+                        ? `${productPick.productCode}${productPick.productName ? " — " + productPick.productName : ""}`
+                        : productPick.productName,
+                      routeRmRatio: ratioNum,
+                      ...rmExtra,
+                    })
+                    return
+                  }
+                  if (rmType === "GROUP" && groupPick) {
+                    onAdd({
+                      rmId: 0,
+                      seqId: 0,
+                      parentProductSysId: 0,
+                      rmType: "GROUP",
+                      rmGroupCode: groupPick.code,
+                      routeRmName: groupPick.name,
+                      routeRmRatio: ratioNum,
+                      ...rmExtra,
+                    })
+                  }
+                }}
+              >
+                Add input
+              </Button>
+            </>
+          )}
+          {sourceMode === "attach" && picker.step === "confirm" && (
+            <>
+              <Button variant="ghost" onClick={picker.back}>
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+              </Button>
+              <Button onClick={handleAttachConfirm} disabled={picker.isGraphLoading}>
+                Attach route
+              </Button>
+            </>
+          )}
+          {sourceMode === "attach" && picker.step === "pick" && (
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+          )}
         </ScrollableDialogFooter>
       </ScrollableDialogContent>
     </Dialog>

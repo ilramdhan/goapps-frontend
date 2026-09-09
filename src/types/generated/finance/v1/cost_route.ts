@@ -10,6 +10,49 @@ import { AuditInfo, BaseResponse, PaginationResponse } from "../../common/v1/com
 
 export const protobufPackage = "finance.v1";
 
+/** DuplicateRouteTargetMode selects what DuplicateRoute duplicates onto. */
+export enum DuplicateRouteTargetMode {
+  /** DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED - Default -- treated as NEW_PRODUCT for backward compatibility. */
+  DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED = 0,
+  /** DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT - Existing behavior: duplicate onto brand-new product(s). */
+  DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT = 1,
+  /** DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT - Fork the route graph only, keeping the same product. */
+  DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function duplicateRouteTargetModeFromJSON(object: any): DuplicateRouteTargetMode {
+  switch (object) {
+    case 0:
+    case "DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED":
+      return DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED;
+    case 1:
+    case "DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT":
+      return DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT;
+    case 2:
+    case "DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT":
+      return DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return DuplicateRouteTargetMode.UNRECOGNIZED;
+  }
+}
+
+export function duplicateRouteTargetModeToJSON(object: DuplicateRouteTargetMode): string {
+  switch (object) {
+    case DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED:
+      return "DUPLICATE_ROUTE_TARGET_MODE_UNSPECIFIED";
+    case DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT:
+      return "DUPLICATE_ROUTE_TARGET_MODE_NEW_PRODUCT";
+    case DuplicateRouteTargetMode.DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT:
+      return "DUPLICATE_ROUTE_TARGET_MODE_SAME_PRODUCT";
+    case DuplicateRouteTargetMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * CostRouteHead is the per-product released routing aggregate.
  * One non-LOCKED head per product (UK by cpm_product_sys_id).
@@ -185,6 +228,8 @@ export interface DuplicateRouteRequest {
   includeValues: boolean;
   newCodePrefix: string;
   linkedRequestId: number;
+  /** Defaults to NEW_PRODUCT when unspecified, matching pre-existing behavior. */
+  targetMode: DuplicateRouteTargetMode;
 }
 
 export interface DuplicateRouteResponse {
@@ -222,6 +267,18 @@ export interface CreateRouteFromProductRequest {
 export interface CreateRouteFromProductResponse {
   base: BaseResponse | undefined;
   headId: number;
+}
+
+export interface AttachRouteRequest {
+  sourceHeadId: number;
+  targetProductSysId: number;
+  /** optional, atomically links the request on success. */
+  linkedRequestId: number;
+}
+
+export interface AttachRouteResponse {
+  base: BaseResponse | undefined;
+  newHeadId: number;
 }
 
 function createBaseCostRouteHead(): CostRouteHead {
@@ -2692,6 +2749,7 @@ function createBaseDuplicateRouteRequest(): DuplicateRouteRequest {
     includeValues: false,
     newCodePrefix: "",
     linkedRequestId: 0,
+    targetMode: 0,
   };
 }
 
@@ -2717,6 +2775,9 @@ export const DuplicateRouteRequest: MessageFns<DuplicateRouteRequest> = {
     }
     if (message.linkedRequestId !== 0) {
       writer.uint32(56).int64(message.linkedRequestId);
+    }
+    if (message.targetMode !== 0) {
+      writer.uint32(64).int32(message.targetMode);
     }
     return writer;
   },
@@ -2784,6 +2845,14 @@ export const DuplicateRouteRequest: MessageFns<DuplicateRouteRequest> = {
           message.linkedRequestId = longToNumber(reader.int64());
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.targetMode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2830,6 +2899,11 @@ export const DuplicateRouteRequest: MessageFns<DuplicateRouteRequest> = {
         : isSet(object.linked_request_id)
         ? globalThis.Number(object.linked_request_id)
         : 0,
+      targetMode: isSet(object.targetMode)
+        ? duplicateRouteTargetModeFromJSON(object.targetMode)
+        : isSet(object.target_mode)
+        ? duplicateRouteTargetModeFromJSON(object.target_mode)
+        : 0,
     };
   },
 
@@ -2856,6 +2930,9 @@ export const DuplicateRouteRequest: MessageFns<DuplicateRouteRequest> = {
     if (message.linkedRequestId !== 0) {
       obj.linkedRequestId = Math.round(message.linkedRequestId);
     }
+    if (message.targetMode !== 0) {
+      obj.targetMode = duplicateRouteTargetModeToJSON(message.targetMode);
+    }
     return obj;
   },
 
@@ -2871,6 +2948,7 @@ export const DuplicateRouteRequest: MessageFns<DuplicateRouteRequest> = {
     message.includeValues = object.includeValues ?? false;
     message.newCodePrefix = object.newCodePrefix ?? "";
     message.linkedRequestId = object.linkedRequestId ?? 0;
+    message.targetMode = object.targetMode ?? 0;
     return message;
   },
 };
@@ -3485,6 +3563,192 @@ export const CreateRouteFromProductResponse: MessageFns<CreateRouteFromProductRe
   },
 };
 
+function createBaseAttachRouteRequest(): AttachRouteRequest {
+  return { sourceHeadId: 0, targetProductSysId: 0, linkedRequestId: 0 };
+}
+
+export const AttachRouteRequest: MessageFns<AttachRouteRequest> = {
+  encode(message: AttachRouteRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourceHeadId !== 0) {
+      writer.uint32(8).int64(message.sourceHeadId);
+    }
+    if (message.targetProductSysId !== 0) {
+      writer.uint32(16).int64(message.targetProductSysId);
+    }
+    if (message.linkedRequestId !== 0) {
+      writer.uint32(24).int64(message.linkedRequestId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AttachRouteRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAttachRouteRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sourceHeadId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.targetProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.linkedRequestId = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AttachRouteRequest {
+    return {
+      sourceHeadId: isSet(object.sourceHeadId)
+        ? globalThis.Number(object.sourceHeadId)
+        : isSet(object.source_head_id)
+        ? globalThis.Number(object.source_head_id)
+        : 0,
+      targetProductSysId: isSet(object.targetProductSysId)
+        ? globalThis.Number(object.targetProductSysId)
+        : isSet(object.target_product_sys_id)
+        ? globalThis.Number(object.target_product_sys_id)
+        : 0,
+      linkedRequestId: isSet(object.linkedRequestId)
+        ? globalThis.Number(object.linkedRequestId)
+        : isSet(object.linked_request_id)
+        ? globalThis.Number(object.linked_request_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: AttachRouteRequest): unknown {
+    const obj: any = {};
+    if (message.sourceHeadId !== 0) {
+      obj.sourceHeadId = Math.round(message.sourceHeadId);
+    }
+    if (message.targetProductSysId !== 0) {
+      obj.targetProductSysId = Math.round(message.targetProductSysId);
+    }
+    if (message.linkedRequestId !== 0) {
+      obj.linkedRequestId = Math.round(message.linkedRequestId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AttachRouteRequest>): AttachRouteRequest {
+    return AttachRouteRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AttachRouteRequest>): AttachRouteRequest {
+    const message = createBaseAttachRouteRequest();
+    message.sourceHeadId = object.sourceHeadId ?? 0;
+    message.targetProductSysId = object.targetProductSysId ?? 0;
+    message.linkedRequestId = object.linkedRequestId ?? 0;
+    return message;
+  },
+};
+
+function createBaseAttachRouteResponse(): AttachRouteResponse {
+  return { base: undefined, newHeadId: 0 };
+}
+
+export const AttachRouteResponse: MessageFns<AttachRouteResponse> = {
+  encode(message: AttachRouteResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.newHeadId !== 0) {
+      writer.uint32(16).int64(message.newHeadId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AttachRouteResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAttachRouteResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.newHeadId = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AttachRouteResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      newHeadId: isSet(object.newHeadId)
+        ? globalThis.Number(object.newHeadId)
+        : isSet(object.new_head_id)
+        ? globalThis.Number(object.new_head_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: AttachRouteResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.newHeadId !== 0) {
+      obj.newHeadId = Math.round(message.newHeadId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AttachRouteResponse>): AttachRouteResponse {
+    return AttachRouteResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AttachRouteResponse>): AttachRouteResponse {
+    const message = createBaseAttachRouteResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.newHeadId = object.newHeadId ?? 0;
+    return message;
+  },
+};
+
 /** CostRouteService manages persisted routings (replaces CostProductOrderService). */
 export type CostRouteServiceDefinition = typeof CostRouteServiceDefinition;
 export const CostRouteServiceDefinition = {
@@ -3576,6 +3840,14 @@ export const CostRouteServiceDefinition = {
       requestType: CreateRouteFromProductRequest,
       requestStream: false,
       responseType: CreateRouteFromProductResponse,
+      responseStream: false,
+      options: {},
+    },
+    attachRoute: {
+      name: "AttachRoute",
+      requestType: AttachRouteRequest,
+      requestStream: false,
+      responseType: AttachRouteResponse,
       responseStream: false,
       options: {},
     },
