@@ -41,6 +41,7 @@ function renderTable(onSort = vi.fn()) {
       onEdit={vi.fn()}
       onDeactivate={vi.fn()}
       onView={vi.fn()}
+      onDuplicate={vi.fn()}
       onSort={onSort}
       visibility={visibility}
     />,
