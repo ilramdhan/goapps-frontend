@@ -41,16 +41,29 @@ import {
   type OnConnectStart,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { Plus } from "lucide-react"
+import { LayoutGrid, Plus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { CostRouteRm, CostRouteSeq, RouteGraph } from "@/types/finance/cost-route"
+import {
+  STAGE_W,
+  STAGE_H,
+  RM_W,
+  RM_GAP_X,
+  RM_GAP_Y,
+  computeGridPosition,
+  boxesOverlap,
+} from "@/components/finance/cost-route/route-graph-layout"
 
 interface Props {
   graph: RouteGraph
   locked?: boolean
   onAddStage?: () => void
+  /** User clicked the direct "+" affordance on a stage node — opens the Add RM dialog for that seq. */
+  onAddRm?: (seqIdx: number) => void
+  /** User clicked "Auto-arrange" — recompute every seq/RM position via the shared grid function. */
+  onAutoArrange?: () => void
   /** User finished dragging a stage node to (x,y). Keyed on the client uid. */
   onStagePositionChange?: (seqUid: string, x: number, y: number) => void
   /** User finished dragging an ITEM/GROUP RM node to (x,y). Keyed on the client uid. */
@@ -81,6 +94,12 @@ type StageNodeData = {
   productCode?: string
   productName?: string
   isFG: boolean
+  /** 0-based index of this seq within `graph.seqs`, threaded through so the
+   * node's own "+" button can call onAddRm(seqIdx) without a closure. */
+  seqIdx: number
+  /** Direct "+"-style affordance — opens the Add RM dialog for this seq
+   * without going through the side edit panel first (post-ship fix 2). */
+  onAddRm?: (seqIdx: number) => void
   [key: string]: unknown
 }
 
@@ -94,7 +113,7 @@ type RmNodeData = {
 const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
   return (
     <div
-      className={`rounded-md border px-3 py-2 shadow-sm text-card-foreground ${
+      className={`relative rounded-md border px-3 py-2 shadow-sm text-card-foreground ${
         data.isFG
           ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-700"
           : "border-blue-400 bg-card dark:border-blue-700"
@@ -102,6 +121,20 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
       style={{ minWidth: 180 }}
     >
       <Handle type="target" position={Position.Top} />
+      {data.onAddRm ? (
+        <button
+          type="button"
+          className="nodrag nopan absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+          title="Add RM"
+          aria-label="Add RM"
+          onClick={(e) => {
+            e.stopPropagation()
+            data.onAddRm?.(data.seqIdx)
+          }}
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      ) : null}
       <div className="font-mono text-[10px] text-muted-foreground">
         L{data.level} · seq {data.seq}
         {data.isFG ? " · FG" : ""}
@@ -144,14 +177,6 @@ const nodeTypes = { stage: StageNode, rm: RmNode }
 // Layout helpers
 // ============================================================================
 
-const STAGE_W = 220
-const STAGE_GAP_X = 80
-const LEVEL_GAP_Y = 180
-
-const RM_W = 180
-const RM_GAP_X = 30
-const RM_GAP_Y = 50
-
 // Node ID conventions — keyed on the stable client uid (not the DB id, which
 // is 0 until save). This makes new/unsaved elements clickable + editable, and
 // keeps node/edge ids collision-free so deleting one RM removes exactly one.
@@ -166,7 +191,7 @@ function rmNodeId(rm: CostRouteRm): string {
 // Edge data carries the rm uid so onEdgeClick can dispatch back.
 type EdgeData = { rmUid: string; rmType: "PRODUCT" | "ITEM" | "GROUP" }
 
-function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
+function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
   const edges: Edge[] = []
 
@@ -189,19 +214,55 @@ function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
     }
   }
 
+  // seqIdx map — the index of each seq within graph.seqs, so the node's "+"
+  // button can call onAddRm(seqIdx) exactly like the edit panel's Add RM
+  // button (which addresses seqs by their index in graph.seqs).
+  const seqIdxByUid = new Map<string, number>()
+  graph.seqs.forEach((s, idx) => seqIdxByUid.set(s.uid, idx))
+
+  // Bounding boxes of every stage with a PERSISTED (non-zero) position,
+  // grouped by level — used by the fallback grid layout below (fix 4b) so a
+  // newly-added zero-position node doesn't land on top of a persisted,
+  // possibly user-dragged sibling in the same level.
+  const persistedBoxesByLevel = new Map<number, { x: number; y: number }[]>()
+  for (const s of graph.seqs) {
+    if (s.positionX !== 0 || s.positionY !== 0) {
+      const list = persistedBoxesByLevel.get(s.routeLevel) ?? []
+      list.push({ x: s.positionX, y: s.positionY })
+      persistedBoxesByLevel.set(s.routeLevel, list)
+    }
+  }
+
   // Layout each level row.
   for (const level of levels) {
     const list = (byLevel.get(level) ?? []).slice().sort((a, b) => a.routeSeq - b.routeSeq)
     // Stages within a level are spaced LEFT-RIGHT by their route_seq.
-    list.forEach((s, idx) => {
+    let fallbackSlot = 0
+    list.forEach((s) => {
       const id = stageNodeId(s)
-      const fallbackX = idx * (STAGE_W + STAGE_GAP_X)
-      // Higher levels are HIGHER on screen (i.e. smaller y); level 1 at the bottom.
-      const fallbackY = (maxLevel - level) * LEVEL_GAP_Y
-      // Use persisted position if non-zero; otherwise fall back to grid layout.
       const hasPersistedPos = (s.positionX !== 0 || s.positionY !== 0)
-      const x = hasPersistedPos ? s.positionX : fallbackX
-      const y = hasPersistedPos ? s.positionY : fallbackY
+      let x: number
+      let y: number
+      if (hasPersistedPos) {
+        x = s.positionX
+        y = s.positionY
+      } else {
+        // Advance the fallback grid slot until it doesn't overlap any
+        // persisted sibling at this level (fix 4b).
+        const persistedBoxes = persistedBoxesByLevel.get(level) ?? []
+        let candidate = computeGridPosition(level, fallbackSlot, maxLevel)
+        while (
+          persistedBoxes.some((b) =>
+            boxesOverlap(candidate.x, candidate.y, STAGE_W, STAGE_H, b.x, b.y, STAGE_W, STAGE_H),
+          )
+        ) {
+          fallbackSlot += 1
+          candidate = computeGridPosition(level, fallbackSlot, maxLevel)
+        }
+        x = candidate.x
+        y = candidate.y
+        fallbackSlot += 1
+      }
       nodes.push({
         id,
         type: "stage",
@@ -213,6 +274,8 @@ function buildFlow(graph: RouteGraph): { nodes: Node[]; edges: Edge[] } {
           productCode: s.productCode,
           productName: s.productName,
           isFG: s.routeLevel === 1,
+          seqIdx: seqIdxByUid.get(s.uid) ?? 0,
+          onAddRm,
         } satisfies StageNodeData,
       })
 
@@ -301,6 +364,8 @@ export function RouteGraphFlow({
   graph,
   locked = false,
   onAddStage,
+  onAddRm,
+  onAutoArrange,
   onStagePositionChange,
   onRmPositionChange,
   onConnectStages,
@@ -308,7 +373,10 @@ export function RouteGraphFlow({
   onEdgeClick,
   onDropOnPane,
 }: Props) {
-  const { nodes, edges } = useMemo(() => buildFlow(graph), [graph])
+  const { nodes, edges } = useMemo(
+    () => buildFlow(graph, !locked ? onAddRm : undefined),
+    [graph, locked, onAddRm],
+  )
   const { resolvedTheme } = useTheme()
   const colorMode = resolvedTheme === "dark" ? "dark" : "light"
 
@@ -420,11 +488,23 @@ export function RouteGraphFlow({
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
       >
-        {onAddStage && (
-          <Panel position="top-right">
-            <Button onClick={onAddStage} size="sm">
-              <Plus className="mr-1 h-4 w-4" /> Add stage
-            </Button>
+        {(onAddStage || onAutoArrange) && (
+          <Panel position="top-right" className="flex gap-2">
+            {onAddStage && (
+              <Button onClick={onAddStage} size="sm" title="Add a new stage to the route">
+                <Plus className="mr-1 h-4 w-4" /> Add stage
+              </Button>
+            )}
+            {onAutoArrange && (
+              <Button
+                onClick={onAutoArrange}
+                size="sm"
+                variant="outline"
+                title="Recompute every stage/RM position on a clean grid"
+              >
+                <LayoutGrid className="mr-1 h-4 w-4" /> Auto-arrange
+              </Button>
+            )}
           </Panel>
         )}
         <Background gap={24} />

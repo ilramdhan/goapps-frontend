@@ -23,6 +23,11 @@ let routeByProductData: CostRouteHead | null = null
 vi.mock("@/hooks/finance/use-cost-route", () => ({
   useRouteByProduct: vi.fn(() => ({ data: routeByProductData, isLoading: false })),
   useCreateRouteFromProduct: () => ({ mutateAsync: createFromProductMutateAsync, isPending: false }),
+  // RoutingResolver's AttachRouteDialog (F3) is always mounted (just hidden via
+  // Dialog `open`) whenever the "no route yet" branch is showing, so its own
+  // hook calls (useRoutes/useRouteGraph) run regardless of dialog open state.
+  useRoutes: () => ({ data: { items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }, isLoading: false }),
+  useRouteGraph: () => ({ data: null, isLoading: false }),
 }))
 
 vi.mock("@/hooks/finance/use-link-route", () => ({
@@ -31,6 +36,11 @@ vi.mock("@/hooks/finance/use-link-route", () => ({
 
 vi.mock("@/hooks/finance/use-cost-product-master", () => ({
   useCreateCostProductMaster: () => ({ mutateAsync: createProductMutateAsync, isPending: false }),
+}))
+
+vi.mock("@/hooks/finance/use-attach-route", () => ({
+  useAttachRoute: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  AttachRouteConflictError: class AttachRouteConflictError extends Error {},
 }))
 
 vi.mock("@/components/finance/comboboxes/product-master-combobox", () => ({
