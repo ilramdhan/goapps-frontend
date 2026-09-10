@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getMBHeadClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { checkBulkBatchLimit } from "../bulk-batch-limit"
 
 // POST /api/v1/finance/mb-heads/bulk-submit
 export async function POST(request: NextRequest) {
@@ -10,7 +11,12 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const metadata = createMetadataFromRequest(request)
         const client = getMBHeadClient()
-        const response = await client.bulkSubmitMBHead({ mbhIds: body.mbhIds ?? [] }, metadata)
+        const mbhIds: string[] = body.mbhIds ?? []
+
+        const overLimit = checkBulkBatchLimit(mbhIds, "submit")
+        if (overLimit) return overLimit
+
+        const response = await client.bulkSubmitMBHead({ mbhIds }, metadata)
 
         return NextResponse.json({
             base: response.base,

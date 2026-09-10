@@ -1,4 +1,10 @@
-export { MbRecipeTable, useMbRecipeTableColumns, MB_RECIPE_TABLE_ID, MB_RECIPE_COLUMNS } from "./mb-recipe-table"
+export {
+  MbRecipeTable,
+  useMbRecipeTableColumns,
+  MB_RECIPE_TABLE_ID,
+  MB_RECIPE_COLUMNS,
+  BULK_REGENERATE_ELIGIBLE_STATUSES,
+} from "./mb-recipe-table"
 export { MbCompositionTab } from "./mb-composition-tab"
 export { MbParametersTab } from "./mb-parameters-tab"
 export { MbWorkflowLogTab } from "./mb-workflow-log-tab"
