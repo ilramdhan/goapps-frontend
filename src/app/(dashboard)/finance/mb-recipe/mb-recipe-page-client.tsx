@@ -34,6 +34,7 @@ import {
   useMBHeads,
   useExportMBHeads,
   useExportMBRecipeFull,
+  useExportMBCostCalcDetail,
   useFetchAllMBHeads,
   mbHeadKeys,
 } from "@/hooks/finance/use-mb-head"
@@ -84,6 +85,7 @@ export default function MbRecipePageClient() {
   const [importOpen, setImportOpen] = useState(false)
   const exportMutation = useExportMBHeads()
   const exportFullMutation = useExportMBRecipeFull()
+  const exportCostCalcDetailMutation = useExportMBCostCalcDetail()
   const queryClient = useQueryClient()
 
   // Bulk MB Head lifecycle regenerate (Super Admin, Phase F) — selection lives here
@@ -140,7 +142,9 @@ export default function MbRecipePageClient() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
-                {exportMutation.isPending || exportFullMutation.isPending ? (
+                {exportMutation.isPending ||
+                exportFullMutation.isPending ||
+                exportCostCalcDetailMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="mr-2 h-4 w-4" />
@@ -226,6 +230,19 @@ export default function MbRecipePageClient() {
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              {/*
+                Flat 29-column snake_case calc dump: one row per (MB, raw-material line),
+                read straight out of the persisted cost snapshot. A THIRD, independent
+                export — it does not replace either item above, and the 37-column
+                "Export Full Recipe (with Cost)" stays byte-for-byte unchanged.
+              */}
+              <DropdownMenuItem
+                onClick={() => exportCostCalcDetailMutation.mutate({ activeFilter: filters.activeFilter })}
+                disabled={exportCostCalcDetailMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export MB Cost Calc Detail
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setImportOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />

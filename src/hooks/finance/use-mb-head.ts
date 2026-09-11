@@ -14,6 +14,7 @@ import {
   type ListMBHeadsParams,
   type ExportMBHeadsParams,
   type ExportMBRecipeFullParams,
+  type ExportMBCostCalcDetailParams,
   type ListMBHeadsResponse,
   type CreateMBHeadResponse,
   type UpdateMBHeadResponse,
@@ -21,6 +22,7 @@ import {
   type GetMBHeadResponse,
   type ExportMBHeadsResponse,
   type ExportMBRecipeFullResponse,
+  type ExportMBCostCalcDetailResponse,
   type ImportMBHeadsResponse,
   type DownloadMBHeadTemplateResponse,
   ListMBHeadsResponseParser,
@@ -30,6 +32,7 @@ import {
   GetMBHeadResponseParser,
   ExportMBHeadsResponseParser,
   ExportMBRecipeFullResponseParser,
+  ExportMBCostCalcDetailResponseParser,
   ImportMBHeadsResponseParser,
   DownloadMBHeadTemplateResponseParser,
 } from "@/types/finance/mb-head"
@@ -154,6 +157,49 @@ export function useExportMBRecipeFull() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to export full MB recipe")
+    },
+  })
+}
+
+/**
+ * Flat 29-column snake_case dump of the PERSISTED cost snapshot — one row per
+ * (MB, raw-material line).
+ *
+ * ⛔ Deliberately SEPARATE from `useExportMBRecipeFull`. That one is the 37-column
+ * recipe report and must stay byte-for-byte unchanged; this one has a different grain
+ * (RM lines out of the cost snapshot, not composition rows) and a different column set.
+ *
+ * Every mb_* aggregate in the output is READ FROM the stored snapshot, never re-derived
+ * by summing the RM detail rows — the two disagree for a large minority of MBs, so the
+ * stored value is the only correct one.
+ *
+ * Gated server-side on the same `finance.mb.recipe.export` permission as the full
+ * recipe export. Omitted params are sent omitted (D13).
+ */
+export function useExportMBCostCalcDetail() {
+  return useMutation({
+    mutationFn: async (
+      params: ExportMBCostCalcDetailParams = {}
+    ): Promise<ExportMBCostCalcDetailResponse> => {
+      const queryString = buildQueryString(params as Record<string, unknown>)
+      const rawResponse = await apiClient.get<unknown>(
+        `/api/v1/finance/mb-heads/export-cost-calc-detail${queryString}`
+      )
+      return ExportMBCostCalcDetailResponseParser.fromJSON(rawResponse)
+    },
+    onSuccess: (response) => {
+      if (response.base?.isSuccess && response.fileContent.length > 0) {
+        downloadFileFromBytes(
+          response.fileContent,
+          response.fileName || "mb_cost_calc_detail_export.xlsx"
+        )
+        toast.success("Cost calc detail export completed successfully")
+      } else {
+        toast.error(response.base?.message || "Failed to export MB cost calc detail")
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to export MB cost calc detail")
     },
   })
 }
