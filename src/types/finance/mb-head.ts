@@ -20,6 +20,7 @@ export type {
   ExportMBHeadsRequest,
   ExportMBHeadsResponse,
   ExportMBRecipeFullResponse,
+  ExportMBCostCalcDetailResponse,
   ImportMBHeadsRequest,
   ImportMBHeadsResponse,
   DownloadMBHeadTemplateRequest,
@@ -61,6 +62,7 @@ export {
   ListMBHeadsResponse as ListMBHeadsResponseParser,
   ExportMBHeadsResponse as ExportMBHeadsResponseParser,
   ExportMBRecipeFullResponse as ExportMBRecipeFullResponseParser,
+  ExportMBCostCalcDetailResponse as ExportMBCostCalcDetailResponseParser,
   ImportMBHeadsResponse as ImportMBHeadsResponseParser,
   DownloadMBHeadTemplateResponse as DownloadMBHeadTemplateResponseParser,
   SubmitMBHeadResponse as SubmitMBHeadResponseParser,
@@ -182,6 +184,38 @@ export type MBRecipeFullCheckStatusCalc =
   | "Approved"
   | "Outdated"
   | "Rejected"
+
+/**
+ * Params for the MB cost-calc-detail dump — the flat 29-column snake_case export of
+ * the persisted cost snapshot, one row per (MB, raw-material line).
+ *
+ * ⛔ DELIBERATELY SEPARATE from `ExportMBRecipeFullParams`. That export is the
+ * 37-column recipe report and must stay byte-for-byte unchanged; this one has a
+ * different grain (RM lines from the COST SNAPSHOT, not composition rows) and a
+ * different column set. ⛔ Do not merge the two param types.
+ *
+ * Every field is optional and MUST stay omittable: an absent filter is sent as absent,
+ * never coerced to a default on the client (D13). `period` empty means "the latest
+ * calculated period per head"; `calculationType` defaults server-side to ACTUAL;
+ * `calcStatus` empty means ALL statuses.
+ */
+export interface ExportMBCostCalcDetailParams {
+  activeFilter?: ActiveFilter
+  period?: string
+  calculationType?: MBRecipeFullCostType
+  calcStatus?: MBCostCalcStatus
+  /**
+   * Audit-only opt-in: includes MB Heads whose workflow status is REJECTED. Defaults
+   * to false (excluded) here, on the BFF route and in the backend.
+   */
+  includeRejected?: boolean
+}
+
+/**
+ * The cost-snapshot statuses cst_product_cost accepts (CHECK constraint
+ * chk_cpc_status, migration 000228). Mirrors the proto's validate `in` list.
+ */
+export type MBCostCalcStatus = "CALCULATED" | "VERIFIED" | "APPROVED" | "SUPERSEDED"
 
 // ============================================================================
 // Workflow State
