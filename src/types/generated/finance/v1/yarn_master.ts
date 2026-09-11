@@ -1855,6 +1855,52 @@ export interface ExportMBRecipeFullResponse {
   fileName: string;
 }
 
+/**
+ * ExportMBCostCalcDetailRequest is the request for the flat MB cost-calculation dump
+ * (29 snake_case columns): one row per (MB head, RM line) taken from the persisted
+ * cst_product_cost snapshot — cpc_rm_cost_detail for the RM lines and
+ * cpc_param_snapshot for the MB-level calc figures.
+ *
+ * ⛔ DELIBERATELY SEPARATE from ExportMBRecipeFull. That export is the 37-column
+ * recipe+cost report and must stay byte-for-byte unchanged; this one is a calc dump
+ * with a different grain (RM lines from the COST SNAPSHOT, not composition rows) and
+ * a different column set. ⛔ Do not merge them.
+ */
+export interface ExportMBCostCalcDetailRequest {
+  /** Filter by active status of the MB head. */
+  activeFilter: ActiveFilter;
+  /** Cost period YYYYMM. Empty means "latest calculated period per head". */
+  period: string;
+  /**
+   * Calculation type of the cost snapshot to dump. Empty defaults to ACTUAL, which
+   * keeps exactly one cost snapshot per head and therefore one row per RM line.
+   */
+  calculationType: string;
+  /**
+   * Filter on the cost snapshot status (cst_product_cost.cpc_status). Empty means
+   * ALL non-superseded statuses — the four values are the ones allowed by the CHECK
+   * constraint chk_cpc_status (migration 000228).
+   */
+  calcStatus: string;
+  /**
+   * Whether to include REJECTED MB Heads. Default false (proto3 zero value) excludes
+   * them, mirroring ExportMBRecipeFull's behaviour.
+   */
+  includeRejected: boolean;
+}
+
+/** ExportMBCostCalcDetailResponse carries the cost-calc-detail Excel workbook bytes. */
+export interface ExportMBCostCalcDetailResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Excel file content. */
+  fileContent: Uint8Array;
+  /** Excel file name. */
+  fileName: string;
+}
+
 /** ImportMBHeadsRequest is the request for importing MB Head records from Excel. */
 export interface ImportMBHeadsRequest {
   /** Excel file content (max 10 MB). */
@@ -17520,6 +17566,248 @@ export const ExportMBRecipeFullResponse: MessageFns<ExportMBRecipeFullResponse> 
   },
   fromPartial(object: DeepPartial<ExportMBRecipeFullResponse>): ExportMBRecipeFullResponse {
     const message = createBaseExportMBRecipeFullResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.fileContent = object.fileContent ?? new Uint8Array(0);
+    message.fileName = object.fileName ?? "";
+    return message;
+  },
+};
+
+function createBaseExportMBCostCalcDetailRequest(): ExportMBCostCalcDetailRequest {
+  return { activeFilter: 0, period: "", calculationType: "", calcStatus: "", includeRejected: false };
+}
+
+export const ExportMBCostCalcDetailRequest: MessageFns<ExportMBCostCalcDetailRequest> = {
+  encode(message: ExportMBCostCalcDetailRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.activeFilter !== 0) {
+      writer.uint32(8).int32(message.activeFilter);
+    }
+    if (message.period !== "") {
+      writer.uint32(18).string(message.period);
+    }
+    if (message.calculationType !== "") {
+      writer.uint32(26).string(message.calculationType);
+    }
+    if (message.calcStatus !== "") {
+      writer.uint32(34).string(message.calcStatus);
+    }
+    if (message.includeRejected !== false) {
+      writer.uint32(40).bool(message.includeRejected);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportMBCostCalcDetailRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportMBCostCalcDetailRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.activeFilter = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.calculationType = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.calcStatus = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.includeRejected = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportMBCostCalcDetailRequest {
+    return {
+      activeFilter: isSet(object.activeFilter)
+        ? activeFilterFromJSON(object.activeFilter)
+        : isSet(object.active_filter)
+        ? activeFilterFromJSON(object.active_filter)
+        : 0,
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      calculationType: isSet(object.calculationType)
+        ? globalThis.String(object.calculationType)
+        : isSet(object.calculation_type)
+        ? globalThis.String(object.calculation_type)
+        : "",
+      calcStatus: isSet(object.calcStatus)
+        ? globalThis.String(object.calcStatus)
+        : isSet(object.calc_status)
+        ? globalThis.String(object.calc_status)
+        : "",
+      includeRejected: isSet(object.includeRejected)
+        ? globalThis.Boolean(object.includeRejected)
+        : isSet(object.include_rejected)
+        ? globalThis.Boolean(object.include_rejected)
+        : false,
+    };
+  },
+
+  toJSON(message: ExportMBCostCalcDetailRequest): unknown {
+    const obj: any = {};
+    if (message.activeFilter !== 0) {
+      obj.activeFilter = activeFilterToJSON(message.activeFilter);
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.calculationType !== "") {
+      obj.calculationType = message.calculationType;
+    }
+    if (message.calcStatus !== "") {
+      obj.calcStatus = message.calcStatus;
+    }
+    if (message.includeRejected !== false) {
+      obj.includeRejected = message.includeRejected;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportMBCostCalcDetailRequest>): ExportMBCostCalcDetailRequest {
+    return ExportMBCostCalcDetailRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportMBCostCalcDetailRequest>): ExportMBCostCalcDetailRequest {
+    const message = createBaseExportMBCostCalcDetailRequest();
+    message.activeFilter = object.activeFilter ?? 0;
+    message.period = object.period ?? "";
+    message.calculationType = object.calculationType ?? "";
+    message.calcStatus = object.calcStatus ?? "";
+    message.includeRejected = object.includeRejected ?? false;
+    return message;
+  },
+};
+
+function createBaseExportMBCostCalcDetailResponse(): ExportMBCostCalcDetailResponse {
+  return { base: undefined, fileContent: new Uint8Array(0), fileName: "" };
+}
+
+export const ExportMBCostCalcDetailResponse: MessageFns<ExportMBCostCalcDetailResponse> = {
+  encode(message: ExportMBCostCalcDetailResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.fileContent.length !== 0) {
+      writer.uint32(18).bytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      writer.uint32(26).string(message.fileName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExportMBCostCalcDetailResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExportMBCostCalcDetailResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fileContent = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.fileName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExportMBCostCalcDetailResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      fileContent: isSet(object.fileContent)
+        ? bytesFromBase64(object.fileContent)
+        : isSet(object.file_content)
+        ? bytesFromBase64(object.file_content)
+        : new Uint8Array(0),
+      fileName: isSet(object.fileName)
+        ? globalThis.String(object.fileName)
+        : isSet(object.file_name)
+        ? globalThis.String(object.file_name)
+        : "",
+    };
+  },
+
+  toJSON(message: ExportMBCostCalcDetailResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.fileContent.length !== 0) {
+      obj.fileContent = base64FromBytes(message.fileContent);
+    }
+    if (message.fileName !== "") {
+      obj.fileName = message.fileName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExportMBCostCalcDetailResponse>): ExportMBCostCalcDetailResponse {
+    return ExportMBCostCalcDetailResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExportMBCostCalcDetailResponse>): ExportMBCostCalcDetailResponse {
+    const message = createBaseExportMBCostCalcDetailResponse();
     message.base = (object.base !== undefined && object.base !== null)
       ? BaseResponse.fromPartial(object.base)
       : undefined;
@@ -38168,6 +38456,19 @@ export const MBHeadServiceDefinition = {
       requestType: ExportMBRecipeFullRequest,
       requestStream: false,
       responseType: ExportMBRecipeFullResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * ExportMBCostCalcDetail exports the flat MB cost-calculation detail dump
+     * (29 columns) to Excel, one row per (MB head, RM line) from the persisted
+     * cst_product_cost snapshot. Separate from ExportMBRecipeFull by design.
+     */
+    exportMBCostCalcDetail: {
+      name: "ExportMBCostCalcDetail",
+      requestType: ExportMBCostCalcDetailRequest,
+      requestStream: false,
+      responseType: ExportMBCostCalcDetailResponse,
       responseStream: false,
       options: {},
     },
