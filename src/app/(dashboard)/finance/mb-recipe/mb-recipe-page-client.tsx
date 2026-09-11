@@ -26,10 +26,17 @@ import {
   MBRecipeFormDialog,
   MbRecipeBulkToolbar,
   MbRecipeBulkJobProgressDialog,
+  BULK_REGENERATE_ELIGIBLE_STATUSES,
 } from "@/components/finance/mb-recipe"
 import { MBHeadImportDialog } from "@/components/finance/mb-head"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
-import { useMBHeads, useExportMBHeads, useExportMBRecipeFull, mbHeadKeys } from "@/hooks/finance/use-mb-head"
+import {
+  useMBHeads,
+  useExportMBHeads,
+  useExportMBRecipeFull,
+  useFetchAllMBHeads,
+  mbHeadKeys,
+} from "@/hooks/finance/use-mb-head"
 import { useUrlState } from "@/lib/hooks"
 import {
   ActiveFilter,
@@ -62,7 +69,7 @@ const CHECK_STATUS_CALC_EXPORT_OPTIONS: MBRecipeFullCheckStatusCalc[] = [
 
 const defaultFilters: ListMBHeadsParams = {
   search: "",
-  activeFilter: ActiveFilter.ACTIVE_FILTER_ACTIVE,
+  activeFilter: ActiveFilter.ACTIVE_FILTER_UNSPECIFIED,
   sortBy: "",
   sortOrder: "",
   page: 1,
@@ -86,6 +93,36 @@ export default function MbRecipePageClient() {
   // the user paginates away from the page a row was selected on.
   const [selectedIds, setSelectedIds] = useState<Map<string, MBHeadEntryStatus>>(new Map())
   const [bulkProgressOpen, setBulkProgressOpen] = useState(false)
+  const fetchAllMutation = useFetchAllMBHeads()
+
+  /**
+   * Header checkbox: selects/clears every ELIGIBLE row matching the CURRENT
+   * FILTER across ALL pages — not just the page on screen. There is no
+   * ids-only bulk RPC, so the ids are materialized client-side by paging the
+   * list endpoint (useFetchAllMBHeads) with the exact same filters, minus
+   * pagination.
+   *
+   * Unticking clears the whole selection rather than re-fetching just to
+   * subtract: "select all → deselect all" should leave nothing selected, and
+   * that is true regardless of what the filter matches.
+   */
+  async function handleToggleAllMatching(checked: boolean) {
+    if (!checked) {
+      setSelectedIds(new Map())
+      return
+    }
+    const filterOnly: ListMBHeadsParams = { ...filters }
+    delete filterOnly.page
+    delete filterOnly.pageSize
+    const all = await fetchAllMutation.mutateAsync(filterOnly)
+    const next = new Map(selectedIds)
+    all.forEach((mb) => {
+      if (BULK_REGENERATE_ELIGIBLE_STATUSES.has(mb.entryStatus)) {
+        next.set(mb.mbhId, mb.entryStatus as MBHeadEntryStatus)
+      }
+    })
+    setSelectedIds(next)
+  }
 
   function handleSort(sortKey: string) {
     const nextOrder = filters.sortBy === sortKey && filters.sortOrder === "asc" ? "desc" : "asc"
@@ -212,7 +249,7 @@ export default function MbRecipePageClient() {
           className="h-9"
         />
         <Select
-          value={String(filters.activeFilter ?? ActiveFilter.ACTIVE_FILTER_ACTIVE)}
+          value={String(filters.activeFilter ?? ActiveFilter.ACTIVE_FILTER_UNSPECIFIED)}
           onValueChange={(v) => setFilters({ ...filters, activeFilter: Number(v) as ActiveFilter, page: 1 })}
         >
           <SelectTrigger className="h-9">
@@ -250,6 +287,8 @@ export default function MbRecipePageClient() {
         visibility={visibility}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
+        onToggleAllMatching={handleToggleAllMatching}
+        isSelectingAll={fetchAllMutation.isPending}
       />
 
       {totalItems > 0 && (

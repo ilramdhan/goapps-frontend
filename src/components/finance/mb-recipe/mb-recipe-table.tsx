@@ -24,7 +24,7 @@ export const MB_RECIPE_TABLE_ID = "finance-mb-recipe"
 // SUBMITTED needs only Validate, DRAFT needs Submit → Validate. Anything else
 // (APPROVED, REJECTED, REVOKED, UNLOCK_REQUESTED, …) has no legal path through
 // that chain and stays out of scope for this feature.
-const BULK_REGENERATE_ELIGIBLE_STATUSES: ReadonlySet<string> = new Set<MBHeadEntryStatus>([
+export const BULK_REGENERATE_ELIGIBLE_STATUSES: ReadonlySet<string> = new Set<MBHeadEntryStatus>([
   "DRAFT",
   "SUBMITTED",
   "VALIDATED",
@@ -79,6 +79,15 @@ interface Props {
    */
   selectedIds?: Map<string, MBHeadEntryStatus>
   onSelectionChange?: (ids: Map<string, MBHeadEntryStatus>) => void
+  /**
+   * Opt-in override for the HEADER checkbox: when provided, ticking it selects
+   * every eligible row MATCHING THE CURRENT FILTER across ALL pages (the parent
+   * fetches them), not just the ~20 rows currently rendered. Without it the
+   * header checkbox keeps its page-scoped behaviour.
+   */
+  onToggleAllMatching?: (checked: boolean) => void
+  /** True while onToggleAllMatching is fetching — disables the header checkbox. */
+  isSelectingAll?: boolean
 }
 
 export function MbRecipeTable({
@@ -90,6 +99,8 @@ export function MbRecipeTable({
   visibility,
   selectedIds,
   onSelectionChange,
+  onToggleAllMatching,
+  isSelectingAll,
 }: Props) {
   const show = (id: string) => visibility[id] !== false
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined
@@ -154,9 +165,17 @@ export function MbRecipeTable({
                 <TableHead className="w-10 pl-4">
                   <Checkbox
                     checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                    onCheckedChange={(checked) => toggleAll(checked === true)}
-                    disabled={eligibleItems.length === 0}
-                    aria-label="Select all eligible rows (DRAFT, SUBMITTED, or VALIDATED)"
+                    onCheckedChange={(checked) =>
+                      onToggleAllMatching
+                        ? onToggleAllMatching(checked === true)
+                        : toggleAll(checked === true)
+                    }
+                    disabled={isSelectingAll || (!onToggleAllMatching && eligibleItems.length === 0)}
+                    aria-label={
+                      onToggleAllMatching
+                        ? "Select all eligible rows matching the current filter (DRAFT, SUBMITTED, or VALIDATED), across every page"
+                        : "Select all eligible rows (DRAFT, SUBMITTED, or VALIDATED)"
+                    }
                   />
                 </TableHead>
               )}

@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getMBHeadClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { checkBulkBatchLimit } from "../bulk-batch-limit"
 
 // POST /api/v1/finance/mb-heads/bulk-unvalidate
 export async function POST(request: NextRequest) {
@@ -11,8 +12,13 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const metadata = createMetadataFromRequest(request)
         const client = getMBHeadClient()
+        const mbhIds: string[] = body.mbhIds ?? []
+
+        const overLimit = checkBulkBatchLimit(mbhIds, "force-unvalidate")
+        if (overLimit) return overLimit
+
         const response = await client.bulkForceUnvalidateMBHead(
-            { mbhIds: body.mbhIds ?? [], reason: body.reason ?? "" },
+            { mbhIds, reason: body.reason ?? "" },
             metadata
         )
 

@@ -343,3 +343,62 @@ export function useDownloadMBHeadTemplate() {
     },
   })
 }
+
+// ============================================================================
+// Fetch-all-matching (bulk "select all") Hook
+// ============================================================================
+
+/**
+ * Fetches EVERY MB Head matching a filter, paging through the list endpoint at
+ * the proto's maximum `page_size` (100 — `ListMBHeadsRequest.page_size` carries
+ * `lte: 100`, so asking for more is a validation error, not a bigger page).
+ *
+ * Exists because the MB Recipe header checkbox selects all rows matching the
+ * current filter across every page, and there is no ids-only/filter-based bulk
+ * RPC to do that server-side. Deliberately NOT a useQuery: it runs on demand
+ * (a click), not on render, and its result feeds selection state rather than
+ * the cache.
+ *
+ * `page`/`pageSize` on the incoming params are ignored — every other filter
+ * (search, activeFilter, sortBy/sortOrder, costProductId) is preserved verbatim
+ * so the selection matches exactly what the user is looking at.
+ */
+const FETCH_ALL_PAGE_SIZE = 100
+// Hard stop so a runaway/looping backend can't spin this forever. 200 pages ×
+// 100 = 20 000 heads, far above any realistic MB Recipe list.
+const FETCH_ALL_MAX_PAGES = 200
+
+export function useFetchAllMBHeads() {
+  return useMutation({
+    mutationFn: async (params: ListMBHeadsParams = {}): Promise<MBHead[]> => {
+      const all: MBHead[] = []
+      let page = 1
+      let totalPages = 1
+
+      do {
+        const queryString = buildQueryString({
+          ...params,
+          page,
+          pageSize: FETCH_ALL_PAGE_SIZE,
+        } as Record<string, unknown>)
+        const rawResponse = await apiClient.get<unknown>(`/api/v1/finance/mb-heads${queryString}`)
+        const response = ListMBHeadsResponseParser.fromJSON(rawResponse)
+
+        if (response.base?.isSuccess === false) {
+          throw new Error(response.base.message || "Failed to load MB Heads")
+        }
+
+        all.push(...(response.data || []))
+        // totalPages is int32 on the wire but totalItems is int64 (a STRING in
+        // JSON) — Number() both rather than trusting the parsed type.
+        totalPages = Number(response.pagination?.totalPages ?? 1) || 1
+        page += 1
+      } while (page <= totalPages && page <= FETCH_ALL_MAX_PAGES)
+
+      return all
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to load all MB Heads for selection")
+    },
+  })
+}
