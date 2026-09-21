@@ -63,9 +63,11 @@ function normalizeGraphForSave(graph: unknown): unknown {
 export async function GET(request: NextRequest, { params }: { params: Promise<{ headId: string }> }) {
   try {
     const { headId } = await params
+    const { searchParams } = new URL(request.url)
+    const includeNestedMb = searchParams.get("includeNestedMb") === "true"
     const metadata = createMetadataFromRequest(request)
     const client = getCostRouteClient()
-    const response = await client.getRouteGraph({ headId: Number(headId) }, metadata)
+    const response = await client.getRouteGraph({ headId: Number(headId), includeNestedMb }, metadata)
     return NextResponse.json({ base: response.base, data: response.data })
   } catch (error) {
     if (isGrpcError(error)) return handleGrpcError(error)

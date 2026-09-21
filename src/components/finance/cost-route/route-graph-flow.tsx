@@ -100,6 +100,9 @@ type StageNodeData = {
   /** Direct "+"-style affordance — opens the Add RM dialog for this seq
    * without going through the side edit panel first (post-ship fix 2). */
   onAddRm?: (seqIdx: number) => void
+  /** Set when this stage was spliced in from a nested MB's own route graph
+   * (GetRouteGraph?includeNestedMb=true) — renders a "from MB-X" badge. */
+  originProductCode?: string
   [key: string]: unknown
 }
 
@@ -139,8 +142,19 @@ const StageNode = ({ data }: NodeProps<Node<StageNodeData>>) => {
         L{data.level} · seq {data.seq}
         {data.isFG ? " · FG" : ""}
       </div>
-      <div className="text-sm font-medium text-foreground">
-        {data.productCode || "(no code)"}
+      <div className="flex items-center gap-1">
+        <div className="text-sm font-medium text-foreground">
+          {data.productCode || "(no code)"}
+        </div>
+        {data.originProductCode ? (
+          <Badge
+            variant="outline"
+            className="px-1 py-0 text-[9px] text-muted-foreground border-current/40"
+            title={`Flattened in from nested MB ${data.originProductCode}`}
+          >
+            from {data.originProductCode}
+          </Badge>
+        ) : null}
       </div>
       {data.productName ? (
         <div className="text-xs text-muted-foreground line-clamp-2">{data.productName}</div>
@@ -240,7 +254,9 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
     let fallbackSlot = 0
     list.forEach((s) => {
       const id = stageNodeId(s)
-      const hasPersistedPos = (s.positionX !== 0 || s.positionY !== 0)
+      // Spliced-in nested-MB stages never have a persisted position of their
+      // own (they don't exist as a row under this head) — always auto-layout.
+      const hasPersistedPos = !s.originHeadId && (s.positionX !== 0 || s.positionY !== 0)
       let x: number
       let y: number
       if (hasPersistedPos) {
@@ -276,6 +292,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
           isFG: s.routeLevel === 1,
           seqIdx: seqIdxByUid.get(s.uid) ?? 0,
           onAddRm,
+          originProductCode: s.originProductCode,
         } satisfies StageNodeData,
       })
 
@@ -303,7 +320,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
           id: `e-${rm.rmType.toLowerCase()}-${rm.uid}`,
           source: rmId,
           target: id,
-          label: `×${rm.routeRmRatio}`,
+          label: `×${rm.effectiveRatio ?? rm.routeRmRatio}`,
           labelStyle: { fontSize: 10 },
           animated: false,
           data: { rmUid: rm.uid, rmType: rm.rmType } satisfies EdgeData,
@@ -320,7 +337,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
           id: `e-product-${rm.uid}`,
           source: upstreamId,
           target: id,
-          label: `×${rm.routeRmRatio}`,
+          label: `×${rm.effectiveRatio ?? rm.routeRmRatio}`,
           labelStyle: { fontSize: 10, fontWeight: 600 },
           animated: true,
           style: { stroke: "#10b981", strokeWidth: 1.5 },

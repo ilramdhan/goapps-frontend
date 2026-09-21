@@ -47,6 +47,14 @@ export interface CostRouteRm {
   // Persisted free node position for ITEM/GROUP RM nodes (0 = auto-layout).
   positionX?: number
   positionY?: number
+  // Display-only nested-MB flatten annotations (see GetRouteGraphRequest.includeNestedMb).
+  // Undefined/0 for every row native to the requested head. originHeadId set means this
+  // row was spliced in from a nested MB's own route graph.
+  originHeadId?: number
+  effectiveRatio?: number
+  nestDepth?: number
+  originProductCode?: string
+  originProductName?: string
 }
 
 export interface CostRouteSeq {
@@ -66,6 +74,10 @@ export interface CostRouteSeq {
   positionX: number
   positionY: number
   rms: CostRouteRm[]
+  // Display-only nested-MB flatten annotations — see CostRouteRm above.
+  originHeadId?: number
+  originProductCode?: string
+  nestDepth?: number
 }
 
 export interface RouteGraph {
@@ -127,6 +139,13 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
     notes: str(raw.notes) || undefined,
     positionX: Number(raw.positionX ?? raw.position_x ?? 0),
     positionY: Number(raw.positionY ?? raw.position_y ?? 0),
+    originHeadId: numOpt(raw.originHeadId ?? raw.origin_head_id),
+    effectiveRatio: Number(
+      raw.effectiveRatio ?? raw.effective_ratio ?? raw.routeRmRatio ?? raw.route_rm_ratio ?? 1,
+    ),
+    nestDepth: numOpt(raw.nestDepth ?? raw.nest_depth),
+    originProductCode: str(raw.originProductCode ?? raw.origin_product_code) || undefined,
+    originProductName: str(raw.originProductName ?? raw.origin_product_name) || undefined,
   }
 }
 
@@ -148,6 +167,9 @@ export function normalizeCostRouteSeq(raw: Record<string, unknown>): CostRouteSe
     positionX: Number(raw.positionX ?? raw.position_x ?? 0),
     positionY: Number(raw.positionY ?? raw.position_y ?? 0),
     rms: rms.map((r) => normalizeCostRouteRm(r as Record<string, unknown>)),
+    originHeadId: numOpt(raw.originHeadId ?? raw.origin_head_id),
+    originProductCode: str(raw.originProductCode ?? raw.origin_product_code) || undefined,
+    nestDepth: numOpt(raw.nestDepth ?? raw.nest_depth),
   }
 }
 

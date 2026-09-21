@@ -103,6 +103,12 @@ export interface CostRouteSeq {
   positionY: number;
   /** RMs that feed this stage (rendered inline on graph fetch). */
   rms: CostRouteRm[];
+  /** Head ID of the nested MB this stage was spliced in from (0 = native to the requested head). */
+  originHeadId: number;
+  /** Product code of the nested MB this stage was spliced in from (empty = native). */
+  originProductCode: string;
+  /** Flattening depth of this stage (0 = native to the requested head). */
+  nestDepth: number;
 }
 
 /**
@@ -133,6 +139,16 @@ export interface CostRouteRm {
   positionY: number;
   /** RM group display name (read-time join on rm_group_code). */
   rmGroupName: string;
+  /** Head ID of the nested MB this row was flattened in from (0 = native to the requested head). */
+  originHeadId: number;
+  /** Ratio compounded down through nested-MB flattening (equals route_rm_ratio when native). */
+  effectiveRatio: number;
+  /** Flattening depth of this row (0 = native to the requested head). */
+  nestDepth: number;
+  /** Product code of the nested MB this row was flattened in from (empty = native). */
+  originProductCode: string;
+  /** Product name of the nested MB this row was flattened in from (empty = native). */
+  originProductName: string;
 }
 
 /** RouteGraph bundles the head + all seqs (with rms inline). */
@@ -152,6 +168,8 @@ export interface GetRouteByProductResponse {
 
 export interface GetRouteGraphRequest {
   headId: number;
+  /** When true, recursively flattens nested-MB composition into the returned graph (display-only, read-time). */
+  includeNestedMb: boolean;
 }
 
 export interface GetRouteGraphResponse {
@@ -668,6 +686,9 @@ function createBaseCostRouteSeq(): CostRouteSeq {
     positionX: 0,
     positionY: 0,
     rms: [],
+    originHeadId: 0,
+    originProductCode: "",
+    nestDepth: 0,
   };
 }
 
@@ -714,6 +735,15 @@ export const CostRouteSeq: MessageFns<CostRouteSeq> = {
     }
     for (const v of message.rms) {
       CostRouteRm.encode(v!, writer.uint32(114).fork()).join();
+    }
+    if (message.originHeadId !== 0) {
+      writer.uint32(120).int64(message.originHeadId);
+    }
+    if (message.originProductCode !== "") {
+      writer.uint32(130).string(message.originProductCode);
+    }
+    if (message.nestDepth !== 0) {
+      writer.uint32(136).int32(message.nestDepth);
     }
     return writer;
   },
@@ -837,6 +867,30 @@ export const CostRouteSeq: MessageFns<CostRouteSeq> = {
           message.rms.push(CostRouteRm.decode(reader, reader.uint32()));
           continue;
         }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.originHeadId = longToNumber(reader.int64());
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.originProductCode = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.nestDepth = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -916,6 +970,21 @@ export const CostRouteSeq: MessageFns<CostRouteSeq> = {
       rms: globalThis.Array.isArray(object?.rms)
         ? object.rms.map((e: any) => CostRouteRm.fromJSON(e))
         : [],
+      originHeadId: isSet(object.originHeadId)
+        ? globalThis.Number(object.originHeadId)
+        : isSet(object.origin_head_id)
+        ? globalThis.Number(object.origin_head_id)
+        : 0,
+      originProductCode: isSet(object.originProductCode)
+        ? globalThis.String(object.originProductCode)
+        : isSet(object.origin_product_code)
+        ? globalThis.String(object.origin_product_code)
+        : "",
+      nestDepth: isSet(object.nestDepth)
+        ? globalThis.Number(object.nestDepth)
+        : isSet(object.nest_depth)
+        ? globalThis.Number(object.nest_depth)
+        : 0,
     };
   },
 
@@ -963,6 +1032,15 @@ export const CostRouteSeq: MessageFns<CostRouteSeq> = {
     if (message.rms?.length) {
       obj.rms = message.rms.map((e) => CostRouteRm.toJSON(e));
     }
+    if (message.originHeadId !== 0) {
+      obj.originHeadId = Math.round(message.originHeadId);
+    }
+    if (message.originProductCode !== "") {
+      obj.originProductCode = message.originProductCode;
+    }
+    if (message.nestDepth !== 0) {
+      obj.nestDepth = Math.round(message.nestDepth);
+    }
     return obj;
   },
 
@@ -985,6 +1063,9 @@ export const CostRouteSeq: MessageFns<CostRouteSeq> = {
     message.positionX = object.positionX ?? 0;
     message.positionY = object.positionY ?? 0;
     message.rms = object.rms?.map((e) => CostRouteRm.fromPartial(e)) || [];
+    message.originHeadId = object.originHeadId ?? 0;
+    message.originProductCode = object.originProductCode ?? "";
+    message.nestDepth = object.nestDepth ?? 0;
     return message;
   },
 };
@@ -1009,6 +1090,11 @@ function createBaseCostRouteRm(): CostRouteRm {
     positionX: 0,
     positionY: 0,
     rmGroupName: "",
+    originHeadId: 0,
+    effectiveRatio: 0,
+    nestDepth: 0,
+    originProductCode: "",
+    originProductName: "",
   };
 }
 
@@ -1067,6 +1153,21 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     }
     if (message.rmGroupName !== "") {
       writer.uint32(146).string(message.rmGroupName);
+    }
+    if (message.originHeadId !== 0) {
+      writer.uint32(152).int64(message.originHeadId);
+    }
+    if (message.effectiveRatio !== 0) {
+      writer.uint32(161).double(message.effectiveRatio);
+    }
+    if (message.nestDepth !== 0) {
+      writer.uint32(168).int32(message.nestDepth);
+    }
+    if (message.originProductCode !== "") {
+      writer.uint32(178).string(message.originProductCode);
+    }
+    if (message.originProductName !== "") {
+      writer.uint32(186).string(message.originProductName);
     }
     return writer;
   },
@@ -1222,6 +1323,46 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
           message.rmGroupName = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 152) {
+            break;
+          }
+
+          message.originHeadId = longToNumber(reader.int64());
+          continue;
+        }
+        case 20: {
+          if (tag !== 161) {
+            break;
+          }
+
+          message.effectiveRatio = reader.double();
+          continue;
+        }
+        case 21: {
+          if (tag !== 168) {
+            break;
+          }
+
+          message.nestDepth = reader.int32();
+          continue;
+        }
+        case 22: {
+          if (tag !== 178) {
+            break;
+          }
+
+          message.originProductCode = reader.string();
+          continue;
+        }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.originProductName = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1319,6 +1460,31 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
         : isSet(object.rm_group_name)
         ? globalThis.String(object.rm_group_name)
         : "",
+      originHeadId: isSet(object.originHeadId)
+        ? globalThis.Number(object.originHeadId)
+        : isSet(object.origin_head_id)
+        ? globalThis.Number(object.origin_head_id)
+        : 0,
+      effectiveRatio: isSet(object.effectiveRatio)
+        ? globalThis.Number(object.effectiveRatio)
+        : isSet(object.effective_ratio)
+        ? globalThis.Number(object.effective_ratio)
+        : 0,
+      nestDepth: isSet(object.nestDepth)
+        ? globalThis.Number(object.nestDepth)
+        : isSet(object.nest_depth)
+        ? globalThis.Number(object.nest_depth)
+        : 0,
+      originProductCode: isSet(object.originProductCode)
+        ? globalThis.String(object.originProductCode)
+        : isSet(object.origin_product_code)
+        ? globalThis.String(object.origin_product_code)
+        : "",
+      originProductName: isSet(object.originProductName)
+        ? globalThis.String(object.originProductName)
+        : isSet(object.origin_product_name)
+        ? globalThis.String(object.origin_product_name)
+        : "",
     };
   },
 
@@ -1378,6 +1544,21 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     if (message.rmGroupName !== "") {
       obj.rmGroupName = message.rmGroupName;
     }
+    if (message.originHeadId !== 0) {
+      obj.originHeadId = Math.round(message.originHeadId);
+    }
+    if (message.effectiveRatio !== 0) {
+      obj.effectiveRatio = message.effectiveRatio;
+    }
+    if (message.nestDepth !== 0) {
+      obj.nestDepth = Math.round(message.nestDepth);
+    }
+    if (message.originProductCode !== "") {
+      obj.originProductCode = message.originProductCode;
+    }
+    if (message.originProductName !== "") {
+      obj.originProductName = message.originProductName;
+    }
     return obj;
   },
 
@@ -1404,6 +1585,11 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     message.positionX = object.positionX ?? 0;
     message.positionY = object.positionY ?? 0;
     message.rmGroupName = object.rmGroupName ?? "";
+    message.originHeadId = object.originHeadId ?? 0;
+    message.effectiveRatio = object.effectiveRatio ?? 0;
+    message.nestDepth = object.nestDepth ?? 0;
+    message.originProductCode = object.originProductCode ?? "";
+    message.originProductName = object.originProductName ?? "";
     return message;
   },
 };
@@ -1631,13 +1817,16 @@ export const GetRouteByProductResponse: MessageFns<GetRouteByProductResponse> = 
 };
 
 function createBaseGetRouteGraphRequest(): GetRouteGraphRequest {
-  return { headId: 0 };
+  return { headId: 0, includeNestedMb: false };
 }
 
 export const GetRouteGraphRequest: MessageFns<GetRouteGraphRequest> = {
   encode(message: GetRouteGraphRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.headId !== 0) {
       writer.uint32(8).int64(message.headId);
+    }
+    if (message.includeNestedMb !== false) {
+      writer.uint32(16).bool(message.includeNestedMb);
     }
     return writer;
   },
@@ -1657,6 +1846,14 @@ export const GetRouteGraphRequest: MessageFns<GetRouteGraphRequest> = {
           message.headId = longToNumber(reader.int64());
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.includeNestedMb = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1673,6 +1870,11 @@ export const GetRouteGraphRequest: MessageFns<GetRouteGraphRequest> = {
         : isSet(object.head_id)
         ? globalThis.Number(object.head_id)
         : 0,
+      includeNestedMb: isSet(object.includeNestedMb)
+        ? globalThis.Boolean(object.includeNestedMb)
+        : isSet(object.include_nested_mb)
+        ? globalThis.Boolean(object.include_nested_mb)
+        : false,
     };
   },
 
@@ -1680,6 +1882,9 @@ export const GetRouteGraphRequest: MessageFns<GetRouteGraphRequest> = {
     const obj: any = {};
     if (message.headId !== 0) {
       obj.headId = Math.round(message.headId);
+    }
+    if (message.includeNestedMb !== false) {
+      obj.includeNestedMb = message.includeNestedMb;
     }
     return obj;
   },
@@ -1690,6 +1895,7 @@ export const GetRouteGraphRequest: MessageFns<GetRouteGraphRequest> = {
   fromPartial(object: DeepPartial<GetRouteGraphRequest>): GetRouteGraphRequest {
     const message = createBaseGetRouteGraphRequest();
     message.headId = object.headId ?? 0;
+    message.includeNestedMb = object.includeNestedMb ?? false;
     return message;
   },
 };
