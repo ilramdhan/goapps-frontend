@@ -125,6 +125,12 @@ export function RouteGraphEditor({ headId }: Props) {
   const locked = head?.routingStatus === "LOCKED"
   const complete = head?.routingStatus === "COMPLETE"
 
+  // Display-only: flattened nested-MB composition, fetched separately so it
+  // never enters `working`/`persisted` (the graph that SaveRouteGraph sends).
+  // Only fed to <RouteGraphFlow> when the route is LOCKED (read-only) — while
+  // editable, users must only see/interact with native rows.
+  const { data: flattenedForDisplay } = useRouteGraph(headId, { includeNestedMb: locked })
+
   const seqsByLevel = useMemo(() => {
     const groups = new Map<number, CostRouteSeq[]>()
     for (const s of seqs) {
@@ -582,7 +588,7 @@ export function RouteGraphEditor({ headId }: Props) {
       {view === "visual" && seqsByLevel.length > 0 && graph && (
         <div className="relative">
           <RouteGraphFlow
-            graph={graph}
+            graph={locked && flattenedForDisplay ? flattenedForDisplay : graph}
             locked={locked}
             onAddStage={!locked ? () => setStageDialogState({ open: true }) : undefined}
             onAddRm={!locked ? (seqIdx: number) => setRmDialog({ seqIdx }) : undefined}
