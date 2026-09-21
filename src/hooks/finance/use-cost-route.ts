@@ -14,7 +14,10 @@ import {
 const KEYS = {
   all: ["finance", "cost-route"] as const,
   list: (p: ListRoutesParams) => ["finance", "cost-route", "list", p] as const,
-  graph: (headId: number) => ["finance", "cost-route", "graph", headId] as const,
+  graph: (headId: number, includeNestedMb = false) =>
+    ["finance", "cost-route", "graph", headId, includeNestedMb] as const,
+  // Prefix key covering both includeNestedMb variants -- use for invalidation, not queryFn.
+  graphAll: (headId: number) => ["finance", "cost-route", "graph", headId] as const,
   byProduct: (productSysId: number) => ["finance", "cost-route", "by-product", productSysId] as const,
 }
 
@@ -110,13 +113,15 @@ export function useRouteCounts() {
 
 // ---------- graph ----------
 
-export function useRouteGraph(headId: number | undefined) {
+export function useRouteGraph(headId: number | undefined, options: { includeNestedMb?: boolean } = {}) {
+  const includeNestedMb = options.includeNestedMb ?? false
   return useQuery({
-    queryKey: KEYS.graph(headId ?? 0),
+    queryKey: KEYS.graph(headId ?? 0, includeNestedMb),
     enabled: !!headId,
     queryFn: async (): Promise<RouteGraph | null> => {
       if (!headId) return null
-      const res = await fetch(`/api/v1/finance/routes/${headId}/graph`)
+      const qs = includeNestedMb ? "?includeNestedMb=true" : ""
+      const res = await fetch(`/api/v1/finance/routes/${headId}/graph${qs}`)
       const json = (await res.json()) as BFFResponse<Record<string, unknown>>
       if (!json.base?.isSuccess) throw new Error(json.base?.message || "load graph failed")
       return normalizeRouteGraph(json.data ?? {})
@@ -155,7 +160,7 @@ export function useSaveRouteGraph() {
     },
     onSuccess: (_data, { headId }) => {
       toast.success("Route graph saved")
-      qc.invalidateQueries({ queryKey: KEYS.graph(headId) })
+      qc.invalidateQueries({ queryKey: KEYS.graphAll(headId) })
       qc.invalidateQueries({ queryKey: KEYS.all })
     },
     onError: (err: Error) => toast.error(err.message),
@@ -180,7 +185,7 @@ function makeTransition(path: "complete" | "lock" | "unlock", successMsg: string
       },
       onSuccess: (_data, { headId }) => {
         toast.success(successMsg)
-        qc.invalidateQueries({ queryKey: KEYS.graph(headId) })
+        qc.invalidateQueries({ queryKey: KEYS.graphAll(headId) })
         qc.invalidateQueries({ queryKey: KEYS.all })
       },
       onError: (err: Error) => toast.error(err.message),
