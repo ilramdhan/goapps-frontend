@@ -205,7 +205,11 @@ function rmNodeId(rm: CostRouteRm): string {
 // Edge data carries the rm uid so onEdgeClick can dispatch back.
 type EdgeData = { rmUid: string; rmType: "PRODUCT" | "ITEM" | "GROUP" }
 
-function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nodes: Node[]; edges: Edge[] } {
+function buildFlow(
+  graph: RouteGraph,
+  onAddRm?: (seqIdx: number) => void,
+  locked?: boolean,
+): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
   const edges: Edge[] = []
 
@@ -279,10 +283,20 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
         y = candidate.y
         fallbackSlot += 1
       }
+      // Spliced-in nested-MB stages (originHeadId set) belong to a DIFFERENT
+      // route's own graph — they're additive/synthetic display data only (see
+      // route-graph-editor.tsx's flattenedForDisplay comment). Letting a user
+      // "drag" one gives false confidence that the reposition is saved: the
+      // position-change handlers key on uid and only ever look it up in this
+      // route's own working/persisted graph, so a synthetic row's drag would
+      // silently no-op. Keep it read-only instead of silently discarding the
+      // gesture.
+      const stageDraggable = !locked && !s.originHeadId
       nodes.push({
         id,
         type: "stage",
         position: { x, y },
+        draggable: stageDraggable,
         data: {
           uid: s.uid,
           level: s.routeLevel,
@@ -304,12 +318,16 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
         // Use the RM's persisted free position when set (>0), else auto-layout
         // beside the stage as the default starting point.
         const hasRmPos = (rm.positionX ?? 0) !== 0 || (rm.positionY ?? 0) !== 0
+        // Same read-only rule as stage nodes above — a spliced-in nested-MB RM
+        // row (originHeadId set) belongs to another route.
+        const rmDraggable = !locked && !rm.originHeadId
         nodes.push({
           id: rmId,
           type: "rm",
           position: hasRmPos
             ? { x: rm.positionX ?? 0, y: rm.positionY ?? 0 }
             : { x: x - (RM_W + RM_GAP_X), y: y + rmIdx * RM_GAP_Y },
+          draggable: rmDraggable,
           data: {
             uid: rm.uid,
             label: rmLabel(rm),
@@ -391,7 +409,7 @@ export function RouteGraphFlow({
   onDropOnPane,
 }: Props) {
   const { nodes, edges } = useMemo(
-    () => buildFlow(graph, !locked ? onAddRm : undefined),
+    () => buildFlow(graph, !locked ? onAddRm : undefined, locked),
     [graph, locked, onAddRm],
   )
   const { resolvedTheme } = useTheme()

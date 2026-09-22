@@ -125,9 +125,22 @@ const numOpt = (v: unknown): number | undefined => {
 }
 
 export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm {
+  const rmIdNum = num(raw.rmId ?? raw.rm_id)
   return {
-    uid: newUid(),
-    rmId: num(raw.rmId ?? raw.rm_id),
+    // Derive uid from the stable DB id (crm_rm_id is a global BIGSERIAL, unique
+    // across every head) so the SAME persisted row gets the SAME client uid no
+    // matter which query fetched it. This matters because a route's editable
+    // graph (`useRouteGraph(headId)`) and its display-only flattened graph
+    // (`useRouteGraph(headId, { includeNestedMb: true })`) are two independent
+    // TanStack Query cache entries — before this fix, a fresh random uid was
+    // minted on every parse, so the same native row got two DIFFERENT uids
+    // depending on which query produced it. That desync broke drag-to-save:
+    // onRmPositionChange fired with the flattened graph's uid, which never
+    // matched anything in `working`/`persisted`, so the position update
+    // silently no-opped. Falling back to newUid() only for unsaved rows
+    // (rmId === 0) preserves existing new-row behavior.
+    uid: rmIdNum > 0 ? `r${rmIdNum}` : newUid(),
+    rmId: rmIdNum,
     seqId: num(raw.seqId ?? raw.seq_id),
     parentProductSysId: num(raw.parentProductSysId ?? raw.parent_product_sys_id),
     rmType: (str(raw.rmType ?? raw.rm_type) || "ITEM") as RmRefType,
@@ -159,9 +172,14 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
 
 export function normalizeCostRouteSeq(raw: Record<string, unknown>): CostRouteSeq {
   const rms = (raw.rms as unknown[]) ?? []
+  const seqIdNum = num(raw.seqId ?? raw.seq_id)
   return {
-    uid: newUid(),
-    seqId: num(raw.seqId ?? raw.seq_id),
+    // See the matching comment in normalizeCostRouteRm — crs_seq_id is a
+    // global BIGSERIAL, so deriving uid from it keeps the same persisted seq
+    // stably identified across the editable-graph fetch and the display-only
+    // flattened-graph fetch (two independent TanStack Query cache entries).
+    uid: seqIdNum > 0 ? `s${seqIdNum}` : newUid(),
+    seqId: seqIdNum,
     headId: num(raw.headId ?? raw.head_id),
     productSysId: num(raw.productSysId ?? raw.product_sys_id),
     productCode: str(raw.productCode ?? raw.product_code) || undefined,
