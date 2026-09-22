@@ -3260,7 +3260,10 @@ export interface CreateMbCompositionRequest {
   mbhId: string;
   /** Display sequence number within the head. */
   seqNo: number;
-  /** Referenced RM group head UUID. */
+  /**
+   * Referenced RM group head UUID. Required (and validated as a UUID) only when
+   * source_type is GROUP; empty for MB/CARRIER rows, so it is ignored when unset.
+   */
   groupHeadId: string;
   /** Composition percentage. */
   compositionPct: string;
@@ -3288,7 +3291,10 @@ export interface UpdateMbCompositionRequest {
   mbcmId: string;
   /** Updated composition percentage. */
   compositionPct: string;
-  /** Updated referenced RM group head UUID. */
+  /**
+   * Updated referenced RM group head UUID. Required (and validated as a UUID) only
+   * when source_type is GROUP; empty for MB/CARRIER rows, so it is ignored when unset.
+   */
   groupHeadId: string;
   /** Updated source type: GROUP/MB/CARRIER. */
   sourceType: string;

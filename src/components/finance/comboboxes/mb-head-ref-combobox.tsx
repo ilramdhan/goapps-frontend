@@ -20,6 +20,23 @@ interface MbHeadRefComboboxProps {
   className?: string
 }
 
+// Builds the display label for one MB head option: the MB's own name always comes
+// first, with shade code/name appended after a dash when present. Falls back to the
+// dev code / batch cost code / ID so the item is never rendered with no text at all
+// (some MBs have neither shade code nor shade name).
+function formatMbHeadRefLabel(h: {
+  mbhMgtName: string
+  devCode: string
+  mbhMbCosting: string
+  mbhId: string
+  shadeCode: string
+  shadeName: string
+}): string {
+  const name = h.mbhMgtName || h.devCode || h.mbhMbCosting || h.mbhId
+  const shadePart = [h.shadeCode, h.shadeName].filter(Boolean).join(" / ")
+  return shadePart ? `${name} - ${shadePart}` : name
+}
+
 export function MbHeadRefCombobox({
   value, onChange, excludeMbhId, placeholder = "Select MB head…", disabled, className,
 }: MbHeadRefComboboxProps) {
@@ -44,9 +61,7 @@ export function MbHeadRefCombobox({
           className={cn("w-full justify-between font-normal", className)}
         >
           {selected ? (
-            <span className="truncate">
-              <span className="text-muted-foreground">{selected.devCode}</span> — {selected.shadeName || selected.shadeCode}
-            </span>
+            <span className="truncate">{formatMbHeadRefLabel(selected)}</span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
@@ -67,19 +82,14 @@ export function MbHeadRefCombobox({
               {filtered.map((h) => (
                 <CommandItem
                   key={h.mbhId}
-                  value={`${h.devCode} ${h.shadeCode} ${h.shadeName}`}
+                  value={`${h.mbhMgtName} ${h.devCode} ${h.shadeCode} ${h.shadeName}`}
                   onSelect={() => {
                     onChange(h.mbhId, h.devCode, h.shadeName)
                     setOpen(false)
                   }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", value === h.mbhId ? "opacity-100" : "opacity-0")} />
-                  <div className="flex flex-col">
-                    <div>
-                      <span className="font-mono text-xs mr-2 text-muted-foreground">{h.devCode}</span>
-                      <span>{h.shadeName || h.shadeCode}</span>
-                    </div>
-                  </div>
+                  <span className="truncate">{formatMbHeadRefLabel(h)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
