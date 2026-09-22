@@ -124,12 +124,25 @@ export function RouteGraphEditor({ headId }: Props) {
   const seqs = graph?.seqs ?? []
   const locked = head?.routingStatus === "LOCKED"
   const complete = head?.routingStatus === "COMPLETE"
+  // Any status past DRAFT (COMPLETE or LOCKED) is "settled enough" to show the
+  // nested-MB-flattened view for. This matters for MB Recipe auto-generated
+  // routes (see mb_autogen_repository.go's mbInsertRouteHead): those are
+  // created straight into COMPLETE and, unlike routes linked to a product
+  // request, are never routed through the CPR lock/unlock flow that would
+  // otherwise flip them to LOCKED — so gating solely on LOCKED meant their
+  // nested MB Reference composition never rendered in the Visual tab at all.
+  const showFlattened = locked || complete
 
   // Display-only: flattened nested-MB composition, fetched separately so it
   // never enters `working`/`persisted` (the graph that SaveRouteGraph sends).
-  // Only fed to <RouteGraphFlow> when the route is LOCKED (read-only) — while
-  // editable, users must only see/interact with native rows.
-  const { data: flattenedForDisplay } = useRouteGraph(headId, { includeNestedMb: locked })
+  // Only fed to <RouteGraphFlow> once the route is past DRAFT (read-only-ish —
+  // COMPLETE still allows edits via the native-row controls below, but the
+  // flattened graph is additive/synthetic display data only; edit callbacks
+  // look up their target by uid in `working`/`persisted` and silently no-op
+  // for a spliced-in row that has no such uid, so this can never corrupt the
+  // editable graph). While still DRAFT, users must only see/interact with
+  // native rows.
+  const { data: flattenedForDisplay } = useRouteGraph(headId, { includeNestedMb: showFlattened })
 
   const seqsByLevel = useMemo(() => {
     const groups = new Map<number, CostRouteSeq[]>()
@@ -588,7 +601,7 @@ export function RouteGraphEditor({ headId }: Props) {
       {view === "visual" && seqsByLevel.length > 0 && graph && (
         <div className="relative">
           <RouteGraphFlow
-            graph={locked && flattenedForDisplay ? flattenedForDisplay : graph}
+            graph={showFlattened && flattenedForDisplay ? flattenedForDisplay : graph}
             locked={locked}
             onAddStage={!locked ? () => setStageDialogState({ open: true }) : undefined}
             onAddRm={!locked ? (seqIdx: number) => setRmDialog({ seqIdx }) : undefined}
@@ -704,7 +717,9 @@ export function RouteGraphEditor({ headId }: Props) {
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="truncate font-mono">
-                                {rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || "—"}
+                                {rm.rmType === "PRODUCT"
+                                  ? rm.rmProductName || rm.rmProductCode || rm.routeRmName || "—"
+                                  : rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || "—"}
                               </div>
                               <div className="text-[10px] text-muted-foreground">×{rm.routeRmRatio}</div>
                             </div>

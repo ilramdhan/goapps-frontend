@@ -149,6 +149,16 @@ export interface CostRouteRm {
   originProductCode: string;
   /** Product name of the nested MB this row was flattened in from (empty = native). */
   originProductName: string;
+  /**
+   * Product code of the referenced product (read-time join on rm_product_sys_id).
+   * Populated only for PRODUCT-type rows; empty for ITEM/GROUP rows.
+   */
+  rmProductCode: string;
+  /**
+   * Product name of the referenced product (read-time join on rm_product_sys_id).
+   * Populated only for PRODUCT-type rows; empty for ITEM/GROUP rows.
+   */
+  rmProductName: string;
 }
 
 /** RouteGraph bundles the head + all seqs (with rms inline). */
@@ -1095,6 +1105,8 @@ function createBaseCostRouteRm(): CostRouteRm {
     nestDepth: 0,
     originProductCode: "",
     originProductName: "",
+    rmProductCode: "",
+    rmProductName: "",
   };
 }
 
@@ -1168,6 +1180,12 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     }
     if (message.originProductName !== "") {
       writer.uint32(186).string(message.originProductName);
+    }
+    if (message.rmProductCode !== "") {
+      writer.uint32(194).string(message.rmProductCode);
+    }
+    if (message.rmProductName !== "") {
+      writer.uint32(202).string(message.rmProductName);
     }
     return writer;
   },
@@ -1363,6 +1381,22 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
           message.originProductName = reader.string();
           continue;
         }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.rmProductCode = reader.string();
+          continue;
+        }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.rmProductName = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1485,6 +1519,16 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
         : isSet(object.origin_product_name)
         ? globalThis.String(object.origin_product_name)
         : "",
+      rmProductCode: isSet(object.rmProductCode)
+        ? globalThis.String(object.rmProductCode)
+        : isSet(object.rm_product_code)
+        ? globalThis.String(object.rm_product_code)
+        : "",
+      rmProductName: isSet(object.rmProductName)
+        ? globalThis.String(object.rmProductName)
+        : isSet(object.rm_product_name)
+        ? globalThis.String(object.rm_product_name)
+        : "",
     };
   },
 
@@ -1559,6 +1603,12 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     if (message.originProductName !== "") {
       obj.originProductName = message.originProductName;
     }
+    if (message.rmProductCode !== "") {
+      obj.rmProductCode = message.rmProductCode;
+    }
+    if (message.rmProductName !== "") {
+      obj.rmProductName = message.rmProductName;
+    }
     return obj;
   },
 
@@ -1590,6 +1640,8 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     message.nestDepth = object.nestDepth ?? 0;
     message.originProductCode = object.originProductCode ?? "";
     message.originProductName = object.originProductName ?? "";
+    message.rmProductCode = object.rmProductCode ?? "";
+    message.rmProductName = object.rmProductName ?? "";
     return message;
   },
 };
