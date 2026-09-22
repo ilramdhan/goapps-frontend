@@ -192,13 +192,18 @@ export function FormulaFormDialog({
     sortOrder: "asc",
   })
 
-  // Result param pool = CALCULATED + INPUT. INPUT params can also be formula outputs
-  // (e.g. AX_WT is INPUT category but is the result of F_YARN_AX_WT_FROM_MKT).
-  // This matches Oracle's design where FROM_MARKETING formulas write to INPUT params.
+  // Result param pool = CALCULATED + RATE. INPUT params are exclusively for the Input
+  // Parameter side of a formula and must NEVER be selectable as a Result Parameter —
+  // per product clarification, a formula cannot output to an INPUT-category parameter.
+  // RATE params can also be formula outputs (e.g. RM_RATE is the result of F_YARN_RM_RATE,
+  // an RM_LOOKUP-type formula) — confirmed against backend seed data. Omitting RATE here
+  // made such formulas' Result Parameter field render blank on edit even though
+  // result_param_id was set correctly. MASTER_LOOKUP is intentionally excluded — those
+  // params are populated by the fill-group lookup mechanism, never by a formula.
   const resultParamPool = useMemo(() => [
     ...(calculatedParamData?.data || []),
-    ...(inputParamData?.data || []),
-  ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [calculatedParamData, inputParamData])
+    ...(rateParamData?.data || []),
+  ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [calculatedParamData, rateParamData])
 
   const calculatedParams = useMemo(() => calculatedParamData?.data || [], [calculatedParamData])
   // Input picker = INPUT + RATE + CALCULATED + MASTER_LOOKUP. A CALCULATED param IS a valid
@@ -451,7 +456,7 @@ export function FormulaFormDialog({
                 )}
               />
 
-              {/* Result Parameter — CALCULATED + INPUT params (INPUT params can also be formula outputs) */}
+              {/* Result Parameter — CALCULATED + INPUT + RATE params (INPUT and RATE params can also be formula outputs) */}
               <FormField
                 control={form.control}
                 name="resultParamId"
@@ -479,7 +484,7 @@ export function FormulaFormDialog({
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Calculated and Input category parameters can be formula outputs.
+                      Calculated and Rate category parameters can be formula outputs.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
