@@ -55,6 +55,12 @@ export interface CostRouteRm {
   nestDepth?: number
   originProductCode?: string
   originProductName?: string
+  // Product code/name of the referenced product for PRODUCT-type rows (read-time
+  // join on rm_product_sys_id — see cost_route.proto CostRouteRm.rm_product_code/
+  // rm_product_name). Empty for ITEM/GROUP rows. Fixes the Cards view showing "—"
+  // for MB-reference composition rows, which previously had no display name at all.
+  rmProductCode?: string
+  rmProductName?: string
 }
 
 export interface CostRouteSeq {
@@ -146,6 +152,8 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
     nestDepth: numOpt(raw.nestDepth ?? raw.nest_depth),
     originProductCode: str(raw.originProductCode ?? raw.origin_product_code) || undefined,
     originProductName: str(raw.originProductName ?? raw.origin_product_name) || undefined,
+    rmProductCode: str(raw.rmProductCode ?? raw.rm_product_code) || undefined,
+    rmProductName: str(raw.rmProductName ?? raw.rm_product_name) || undefined,
   }
 }
 
