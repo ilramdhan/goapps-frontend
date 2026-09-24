@@ -3037,7 +3037,16 @@ export interface ListMasterOptionsRequest {
    * default (200 — see LookupMasterRepository.ListMasterOptions) instead of
    * returning the whole table.
    */
-  limit?: number | undefined;
+  limit?:
+    | number
+    | undefined;
+  /**
+   * Optional product context (cost_product_master product_sys_id). Only honored
+   * by master_code "RM_GROUP_OIL": when set and the product's type has an oil
+   * class, options are restricted to the oil groups allowed for that product
+   * type. Ignored by every other master; absent/0 means no product filter.
+   */
+  productSysId?: number | undefined;
 }
 
 /** ListMasterOptionsResponse is the response for ListMasterOptions. */
@@ -26749,7 +26758,7 @@ export const MasterOption: MessageFns<MasterOption> = {
 };
 
 function createBaseListMasterOptionsRequest(): ListMasterOptionsRequest {
-  return { masterCode: "", search: undefined, limit: undefined };
+  return { masterCode: "", search: undefined, limit: undefined, productSysId: undefined };
 }
 
 export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
@@ -26762,6 +26771,9 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
     }
     if (message.limit !== undefined) {
       writer.uint32(24).int32(message.limit);
+    }
+    if (message.productSysId !== undefined) {
+      writer.uint32(32).int64(message.productSysId);
     }
     return writer;
   },
@@ -26797,6 +26809,14 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
           message.limit = reader.int32();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -26815,6 +26835,11 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
         : "",
       search: isSet(object.search) ? globalThis.String(object.search) : undefined,
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : undefined,
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : undefined,
     };
   },
 
@@ -26829,6 +26854,9 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
     if (message.limit !== undefined) {
       obj.limit = Math.round(message.limit);
     }
+    if (message.productSysId !== undefined) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
     return obj;
   },
 
@@ -26840,6 +26868,7 @@ export const ListMasterOptionsRequest: MessageFns<ListMasterOptionsRequest> = {
     message.masterCode = object.masterCode ?? "";
     message.search = object.search ?? undefined;
     message.limit = object.limit ?? undefined;
+    message.productSysId = object.productSysId ?? undefined;
     return message;
   },
 };

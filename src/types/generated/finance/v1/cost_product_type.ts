@@ -17,6 +17,11 @@ export interface CostProductType {
   typeCode: string;
   typeName: string;
   isActive: boolean;
+  /**
+   * Oil class of the product type: "" (no oil), "PTY", "POY" or "SUPERBA".
+   * Drives IS_PTY/IS_POY/IS_SUPERBA flags and OIL_RATE resolution in costing.
+   */
+  oilClass: string;
   audit: AuditInfo | undefined;
 }
 
@@ -100,8 +105,62 @@ export interface DownloadCostProductTypeTemplateResponse {
   fileName: string;
 }
 
+/** CostProductTypeOilGroup is one oil RM group allowed for a product type. */
+export interface CostProductTypeOilGroup {
+  /** RM group code (cst_rm_group_head.group_code; must be an oil group). */
+  groupCode: string;
+  /** RM group display name (read-only; ignored on Set). */
+  groupName: string;
+  /** True for the default oil group of the type (exactly one when groups non-empty). */
+  isDefault: boolean;
+}
+
+/** GetCostProductTypeOilConfigRequest fetches the oil class + allowed oil groups of a type. */
+export interface GetCostProductTypeOilConfigRequest {
+  /** Product type id. */
+  typeId: number;
+}
+
+/** GetCostProductTypeOilConfigResponse returns the oil config of a type. */
+export interface GetCostProductTypeOilConfigResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Product type id. */
+  typeId: number;
+  /** Oil class: "", "PTY", "POY" or "SUPERBA". */
+  oilClass: string;
+  /** Allowed oil groups (one flagged default). */
+  groups: CostProductTypeOilGroup[];
+}
+
+/** SetCostProductTypeOilConfigRequest replaces the oil class + allowed oil groups of a type. */
+export interface SetCostProductTypeOilConfigRequest {
+  /** Product type id. */
+  typeId: number;
+  /** Oil class: "" clears it (then groups must be empty), else PTY/POY/SUPERBA. */
+  oilClass: string;
+  /** Full replacement set of allowed oil groups (max 20; exactly one default when non-empty). */
+  groups: CostProductTypeOilGroup[];
+}
+
+/** SetCostProductTypeOilConfigResponse returns the saved oil config. */
+export interface SetCostProductTypeOilConfigResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Product type id. */
+  typeId: number;
+  /** Oil class after save. */
+  oilClass: string;
+  /** Allowed oil groups after save. */
+  groups: CostProductTypeOilGroup[];
+}
+
 function createBaseCostProductType(): CostProductType {
-  return { typeId: 0, typeCode: "", typeName: "", isActive: false, audit: undefined };
+  return { typeId: 0, typeCode: "", typeName: "", isActive: false, oilClass: "", audit: undefined };
 }
 
 export const CostProductType: MessageFns<CostProductType> = {
@@ -117,6 +176,9 @@ export const CostProductType: MessageFns<CostProductType> = {
     }
     if (message.isActive !== false) {
       writer.uint32(32).bool(message.isActive);
+    }
+    if (message.oilClass !== "") {
+      writer.uint32(42).string(message.oilClass);
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
@@ -163,6 +225,14 @@ export const CostProductType: MessageFns<CostProductType> = {
           message.isActive = reader.bool();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.oilClass = reader.string();
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -202,6 +272,11 @@ export const CostProductType: MessageFns<CostProductType> = {
         : isSet(object.is_active)
         ? globalThis.Boolean(object.is_active)
         : false,
+      oilClass: isSet(object.oilClass)
+        ? globalThis.String(object.oilClass)
+        : isSet(object.oil_class)
+        ? globalThis.String(object.oil_class)
+        : "",
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
     };
   },
@@ -220,6 +295,9 @@ export const CostProductType: MessageFns<CostProductType> = {
     if (message.isActive !== false) {
       obj.isActive = message.isActive;
     }
+    if (message.oilClass !== "") {
+      obj.oilClass = message.oilClass;
+    }
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
@@ -235,6 +313,7 @@ export const CostProductType: MessageFns<CostProductType> = {
     message.typeCode = object.typeCode ?? "";
     message.typeName = object.typeName ?? "";
     message.isActive = object.isActive ?? false;
+    message.oilClass = object.oilClass ?? "";
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;
@@ -1543,6 +1622,516 @@ export const DownloadCostProductTypeTemplateResponse: MessageFns<DownloadCostPro
   },
 };
 
+function createBaseCostProductTypeOilGroup(): CostProductTypeOilGroup {
+  return { groupCode: "", groupName: "", isDefault: false };
+}
+
+export const CostProductTypeOilGroup: MessageFns<CostProductTypeOilGroup> = {
+  encode(message: CostProductTypeOilGroup, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupCode !== "") {
+      writer.uint32(10).string(message.groupCode);
+    }
+    if (message.groupName !== "") {
+      writer.uint32(18).string(message.groupName);
+    }
+    if (message.isDefault !== false) {
+      writer.uint32(24).bool(message.isDefault);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CostProductTypeOilGroup {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCostProductTypeOilGroup();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupCode = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.groupName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.isDefault = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CostProductTypeOilGroup {
+    return {
+      groupCode: isSet(object.groupCode)
+        ? globalThis.String(object.groupCode)
+        : isSet(object.group_code)
+        ? globalThis.String(object.group_code)
+        : "",
+      groupName: isSet(object.groupName)
+        ? globalThis.String(object.groupName)
+        : isSet(object.group_name)
+        ? globalThis.String(object.group_name)
+        : "",
+      isDefault: isSet(object.isDefault)
+        ? globalThis.Boolean(object.isDefault)
+        : isSet(object.is_default)
+        ? globalThis.Boolean(object.is_default)
+        : false,
+    };
+  },
+
+  toJSON(message: CostProductTypeOilGroup): unknown {
+    const obj: any = {};
+    if (message.groupCode !== "") {
+      obj.groupCode = message.groupCode;
+    }
+    if (message.groupName !== "") {
+      obj.groupName = message.groupName;
+    }
+    if (message.isDefault !== false) {
+      obj.isDefault = message.isDefault;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CostProductTypeOilGroup>): CostProductTypeOilGroup {
+    return CostProductTypeOilGroup.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CostProductTypeOilGroup>): CostProductTypeOilGroup {
+    const message = createBaseCostProductTypeOilGroup();
+    message.groupCode = object.groupCode ?? "";
+    message.groupName = object.groupName ?? "";
+    message.isDefault = object.isDefault ?? false;
+    return message;
+  },
+};
+
+function createBaseGetCostProductTypeOilConfigRequest(): GetCostProductTypeOilConfigRequest {
+  return { typeId: 0 };
+}
+
+export const GetCostProductTypeOilConfigRequest: MessageFns<GetCostProductTypeOilConfigRequest> = {
+  encode(message: GetCostProductTypeOilConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.typeId !== 0) {
+      writer.uint32(8).int32(message.typeId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCostProductTypeOilConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCostProductTypeOilConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.typeId = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetCostProductTypeOilConfigRequest {
+    return {
+      typeId: isSet(object.typeId)
+        ? globalThis.Number(object.typeId)
+        : isSet(object.type_id)
+        ? globalThis.Number(object.type_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: GetCostProductTypeOilConfigRequest): unknown {
+    const obj: any = {};
+    if (message.typeId !== 0) {
+      obj.typeId = Math.round(message.typeId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetCostProductTypeOilConfigRequest>): GetCostProductTypeOilConfigRequest {
+    return GetCostProductTypeOilConfigRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetCostProductTypeOilConfigRequest>): GetCostProductTypeOilConfigRequest {
+    const message = createBaseGetCostProductTypeOilConfigRequest();
+    message.typeId = object.typeId ?? 0;
+    return message;
+  },
+};
+
+function createBaseGetCostProductTypeOilConfigResponse(): GetCostProductTypeOilConfigResponse {
+  return { base: undefined, typeId: 0, oilClass: "", groups: [] };
+}
+
+export const GetCostProductTypeOilConfigResponse: MessageFns<GetCostProductTypeOilConfigResponse> = {
+  encode(message: GetCostProductTypeOilConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.typeId !== 0) {
+      writer.uint32(16).int32(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      writer.uint32(26).string(message.oilClass);
+    }
+    for (const v of message.groups) {
+      CostProductTypeOilGroup.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCostProductTypeOilConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCostProductTypeOilConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.typeId = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.oilClass = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.groups.push(CostProductTypeOilGroup.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetCostProductTypeOilConfigResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      typeId: isSet(object.typeId)
+        ? globalThis.Number(object.typeId)
+        : isSet(object.type_id)
+        ? globalThis.Number(object.type_id)
+        : 0,
+      oilClass: isSet(object.oilClass)
+        ? globalThis.String(object.oilClass)
+        : isSet(object.oil_class)
+        ? globalThis.String(object.oil_class)
+        : "",
+      groups: globalThis.Array.isArray(object?.groups)
+        ? object.groups.map((e: any) => CostProductTypeOilGroup.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: GetCostProductTypeOilConfigResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.typeId !== 0) {
+      obj.typeId = Math.round(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      obj.oilClass = message.oilClass;
+    }
+    if (message.groups?.length) {
+      obj.groups = message.groups.map((e) => CostProductTypeOilGroup.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetCostProductTypeOilConfigResponse>): GetCostProductTypeOilConfigResponse {
+    return GetCostProductTypeOilConfigResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetCostProductTypeOilConfigResponse>): GetCostProductTypeOilConfigResponse {
+    const message = createBaseGetCostProductTypeOilConfigResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.typeId = object.typeId ?? 0;
+    message.oilClass = object.oilClass ?? "";
+    message.groups = object.groups?.map((e) => CostProductTypeOilGroup.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSetCostProductTypeOilConfigRequest(): SetCostProductTypeOilConfigRequest {
+  return { typeId: 0, oilClass: "", groups: [] };
+}
+
+export const SetCostProductTypeOilConfigRequest: MessageFns<SetCostProductTypeOilConfigRequest> = {
+  encode(message: SetCostProductTypeOilConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.typeId !== 0) {
+      writer.uint32(8).int32(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      writer.uint32(18).string(message.oilClass);
+    }
+    for (const v of message.groups) {
+      CostProductTypeOilGroup.encode(v!, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetCostProductTypeOilConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetCostProductTypeOilConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.typeId = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.oilClass = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.groups.push(CostProductTypeOilGroup.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetCostProductTypeOilConfigRequest {
+    return {
+      typeId: isSet(object.typeId)
+        ? globalThis.Number(object.typeId)
+        : isSet(object.type_id)
+        ? globalThis.Number(object.type_id)
+        : 0,
+      oilClass: isSet(object.oilClass)
+        ? globalThis.String(object.oilClass)
+        : isSet(object.oil_class)
+        ? globalThis.String(object.oil_class)
+        : "",
+      groups: globalThis.Array.isArray(object?.groups)
+        ? object.groups.map((e: any) => CostProductTypeOilGroup.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: SetCostProductTypeOilConfigRequest): unknown {
+    const obj: any = {};
+    if (message.typeId !== 0) {
+      obj.typeId = Math.round(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      obj.oilClass = message.oilClass;
+    }
+    if (message.groups?.length) {
+      obj.groups = message.groups.map((e) => CostProductTypeOilGroup.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetCostProductTypeOilConfigRequest>): SetCostProductTypeOilConfigRequest {
+    return SetCostProductTypeOilConfigRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetCostProductTypeOilConfigRequest>): SetCostProductTypeOilConfigRequest {
+    const message = createBaseSetCostProductTypeOilConfigRequest();
+    message.typeId = object.typeId ?? 0;
+    message.oilClass = object.oilClass ?? "";
+    message.groups = object.groups?.map((e) => CostProductTypeOilGroup.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSetCostProductTypeOilConfigResponse(): SetCostProductTypeOilConfigResponse {
+  return { base: undefined, typeId: 0, oilClass: "", groups: [] };
+}
+
+export const SetCostProductTypeOilConfigResponse: MessageFns<SetCostProductTypeOilConfigResponse> = {
+  encode(message: SetCostProductTypeOilConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.typeId !== 0) {
+      writer.uint32(16).int32(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      writer.uint32(26).string(message.oilClass);
+    }
+    for (const v of message.groups) {
+      CostProductTypeOilGroup.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetCostProductTypeOilConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetCostProductTypeOilConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.typeId = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.oilClass = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.groups.push(CostProductTypeOilGroup.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetCostProductTypeOilConfigResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      typeId: isSet(object.typeId)
+        ? globalThis.Number(object.typeId)
+        : isSet(object.type_id)
+        ? globalThis.Number(object.type_id)
+        : 0,
+      oilClass: isSet(object.oilClass)
+        ? globalThis.String(object.oilClass)
+        : isSet(object.oil_class)
+        ? globalThis.String(object.oil_class)
+        : "",
+      groups: globalThis.Array.isArray(object?.groups)
+        ? object.groups.map((e: any) => CostProductTypeOilGroup.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: SetCostProductTypeOilConfigResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.typeId !== 0) {
+      obj.typeId = Math.round(message.typeId);
+    }
+    if (message.oilClass !== "") {
+      obj.oilClass = message.oilClass;
+    }
+    if (message.groups?.length) {
+      obj.groups = message.groups.map((e) => CostProductTypeOilGroup.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetCostProductTypeOilConfigResponse>): SetCostProductTypeOilConfigResponse {
+    return SetCostProductTypeOilConfigResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetCostProductTypeOilConfigResponse>): SetCostProductTypeOilConfigResponse {
+    const message = createBaseSetCostProductTypeOilConfigResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.typeId = object.typeId ?? 0;
+    message.oilClass = object.oilClass ?? "";
+    message.groups = object.groups?.map((e) => CostProductTypeOilGroup.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 /** CostProductTypeService — CRUD master for canonical product types. */
 export type CostProductTypeServiceDefinition = typeof CostProductTypeServiceDefinition;
 export const CostProductTypeServiceDefinition = {
@@ -1602,6 +2191,24 @@ export const CostProductTypeServiceDefinition = {
       requestType: DownloadCostProductTypeTemplateRequest,
       requestStream: false,
       responseType: DownloadCostProductTypeTemplateResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetCostProductTypeOilConfig returns the oil class + allowed oil groups (reuses view permission). */
+    getCostProductTypeOilConfig: {
+      name: "GetCostProductTypeOilConfig",
+      requestType: GetCostProductTypeOilConfigRequest,
+      requestStream: false,
+      responseType: GetCostProductTypeOilConfigResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** SetCostProductTypeOilConfig replaces the oil class + allowed oil groups (reuses update permission). */
+    setCostProductTypeOilConfig: {
+      name: "SetCostProductTypeOilConfig",
+      requestType: SetCostProductTypeOilConfigRequest,
+      requestStream: false,
+      responseType: SetCostProductTypeOilConfigResponse,
       responseStream: false,
       options: {},
     },
