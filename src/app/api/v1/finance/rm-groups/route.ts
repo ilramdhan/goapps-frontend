@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const metadata = createMetadataFromRequest(request)
     const client = getRmGroupClient()
 
+    const isOilGroupParam = searchParams.get("isOilGroup") ?? searchParams.get("is_oil_group")
+
     const response = await client.listRMGroups(
       {
         page: Number(searchParams.get("page")) || 1,
@@ -17,6 +19,7 @@ export async function GET(request: NextRequest) {
         activeFilter: Number(searchParams.get("activeFilter") || searchParams.get("active_filter")) || 0,
         sortBy: searchParams.get("sortBy") || searchParams.get("sort_by") || "",
         sortOrder: searchParams.get("sortOrder") || searchParams.get("sort_order") || "",
+        ...(isOilGroupParam !== null ? { isOilGroup: isOilGroupParam === "true" } : {}),
       },
       metadata
     )
@@ -44,6 +47,7 @@ export async function GET(request: NextRequest) {
       marketingDefaultValue: item.marketingDefaultValue ?? undefined,
       valuationFlag: item.valuationFlag ?? 0,
       marketingFlag: item.marketingFlag ?? 0,
+      isOilGroup: item.isOilGroup ?? false,
       audit: item.audit
         ? {
             createdAt: item.audit.createdAt || "",
@@ -120,6 +124,7 @@ export async function POST(request: NextRequest) {
           marketingDefaultValue: head.marketingDefaultValue ?? undefined,
           valuationFlag: head.valuationFlag ?? 0,
           marketingFlag: head.marketingFlag ?? 0,
+          isOilGroup: head.isOilGroup ?? false,
         }
       : undefined
 

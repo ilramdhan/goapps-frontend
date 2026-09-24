@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTablePagination } from "@/components/shared"
 import {
+  OilConfigDialog,
   ProductTypeFormDialog,
   ProductTypeTable,
 } from "@/components/finance/cost-product-type"
@@ -29,6 +30,8 @@ export default function ProductTypePageClient() {
   const [filters, setFilters] = useUrlState<ListCostProductTypesParams>({ defaultValues: defaultFilters })
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CostProductType | null>(null)
+  const [oilConfigOpen, setOilConfigOpen] = useState(false)
+  const [oilConfigTarget, setOilConfigTarget] = useState<CostProductType | null>(null)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useCostProductTypes(filters)
@@ -43,6 +46,10 @@ export default function ProductTypePageClient() {
   function openEdit(t: CostProductType) {
     setEditing(t)
     setFormOpen(true)
+  }
+  function openOilConfig(t: CostProductType) {
+    setOilConfigTarget(t)
+    setOilConfigOpen(true)
   }
 
   return (
@@ -89,7 +96,7 @@ export default function ProductTypePageClient() {
         </Select>
       </div>
 
-      <ProductTypeTable items={items} isLoading={isLoading} onEdit={openEdit} />
+      <ProductTypeTable items={items} isLoading={isLoading} onEdit={openEdit} onOilConfig={openOilConfig} />
 
       {totalItems > 0 && (
         <DataTablePagination
@@ -103,6 +110,7 @@ export default function ProductTypePageClient() {
       )}
 
       <ProductTypeFormDialog open={formOpen} onOpenChange={setFormOpen} productType={editing} />
+      <OilConfigDialog open={oilConfigOpen} onOpenChange={setOilConfigOpen} productType={oilConfigTarget} />
     </div>
   )
 }

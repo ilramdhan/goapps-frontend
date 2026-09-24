@@ -1,6 +1,6 @@
 "use client"
 
-import { Edit } from "lucide-react"
+import { Droplet, Edit } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,9 +11,10 @@ interface Props {
   items: CostProductType[]
   isLoading?: boolean
   onEdit: (t: CostProductType) => void
+  onOilConfig: (t: CostProductType) => void
 }
 
-export function ProductTypeTable({ items, isLoading, onEdit }: Props) {
+export function ProductTypeTable({ items, isLoading, onEdit, onOilConfig }: Props) {
   return (
     <div className="rounded-md border">
       <Table>
@@ -52,6 +53,9 @@ export function ProductTypeTable({ items, isLoading, onEdit }: Props) {
                 )}
               </TableCell>
               <TableCell className="text-right">
+                <Button size="icon" variant="ghost" onClick={() => onOilConfig(t)} title="Oil config">
+                  <Droplet className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => onEdit(t)} title="Edit">
                   <Edit className="h-4 w-4" />
                 </Button>

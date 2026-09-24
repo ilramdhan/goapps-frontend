@@ -81,6 +81,9 @@ const groupFormSchema = z.object({
   valuationFlag: z.nativeEnum(RMValuationFlag),
   marketingFlag: z.nativeEnum(RMMarketingFlag),
   isActive: z.boolean(),
+  // Global (head-level, not period-versioned) — marks this group as an
+  // OIL_NAME option for product types with a matching oil class (D2/D12).
+  isOilGroup: z.boolean(),
 })
 
 /** Convert decimal-stored value (0.05) → whole-percent UI value (5). */
@@ -111,6 +114,7 @@ const DEFAULT_VALUES: GroupFormValues = {
   valuationFlag: RMValuationFlag.RM_VALUATION_FLAG_UNSPECIFIED,
   marketingFlag: RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED,
   isActive: true,
+  isOilGroup: false,
 }
 
 interface GroupFormDialogProps {
@@ -156,6 +160,7 @@ export function GroupFormDialog({
           marketingFlag:
             (group.marketingFlag ?? RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED) as RMMarketingFlag,
           isActive: group.isActive ?? true,
+          isOilGroup: group.isOilGroup ?? false,
         })
       } else {
         form.reset(DEFAULT_VALUES)
@@ -189,6 +194,7 @@ export function GroupFormDialog({
           marketingDefaultValue: values.marketingDefaultValue ?? undefined,
           valuationFlag: values.valuationFlag,
           marketingFlag: values.marketingFlag,
+          isOilGroup: values.isOilGroup,
           // Clear flags so empty inputs become NULL on backend.
           clearMarketingFreightRate: values.marketingFreightRate === null,
           clearMarketingAntiDumpingPct: values.marketingAntiDumpingPct === null,
@@ -214,6 +220,7 @@ export function GroupFormDialog({
           marketingDefaultValue: values.marketingDefaultValue ?? undefined,
           valuationFlag: values.valuationFlag,
           marketingFlag: values.marketingFlag,
+          isOilGroup: values.isOilGroup,
         })
 
         const newId = created?.groupHeadId
@@ -551,6 +558,32 @@ export function GroupFormDialog({
                   />
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Oil group toggle — global (not per period); settable at create. */}
+              <FormField
+                control={form.control}
+                name="isOilGroup"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Oil Group</FormLabel>
+                      <FormDescription>
+                        Global (not per period). Enables this group as an OIL_NAME option for
+                        matching product types.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                        disabled={isPending}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
               {/* Active toggle (edit only) */}
               {isEditing && (

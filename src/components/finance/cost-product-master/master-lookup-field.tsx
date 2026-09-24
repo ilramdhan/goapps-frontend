@@ -30,6 +30,10 @@ interface MasterLookupFieldProps {
     fills: LookupFillValuesResponse | null
   ) => void
   disabled?: boolean
+  /** Product being costed — forwarded so the backend can restrict this
+   *  lookup's options to what's allowed for the product (e.g. RM_GROUP_OIL
+   *  filtered by the product type's oil class, D11). */
+  productSysId?: number
 }
 
 // ⭐ DIPERBARUI 2026-08-26 (perf: SP Code dropdown lag, server-side search) —
@@ -53,6 +57,7 @@ export function MasterLookupField({
   allEntries: _allEntries,
   onChangeLookup,
   disabled,
+  productSysId,
 }: MasterLookupFieldProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -72,13 +77,27 @@ export function MasterLookupField({
     entry.lookupMasterCode,
     open,
     search,
-    DISPLAY_LIMIT + 1
+    DISPLAY_LIMIT + 1,
+    productSysId
   )
 
   const currentValue = draft.valueText
 
   const visibleOptions = useMemo(() => options.slice(0, DISPLAY_LIMIT), [options])
   const hasMore = options.length > DISPLAY_LIMIT
+
+  // The backend restricts RM_GROUP_OIL options to the groups allowed for the
+  // product's type (oil-cost-rm-group D10/D11/D4 — reject-by-default, never
+  // loosened client-side). An empty result here — with no search text typed
+  // and a product context sent — almost always means the type simply has no
+  // Oil Config yet (or a lone group with no match for stale search text
+  // would look identical, hence the `!search` guard to avoid a misleading
+  // hint mid-search), not that the RM group master itself is empty. Surface
+  // that distinction instead of a generic "No results found."
+  const isEmptyOilGroupOptions =
+    entry.lookupMasterCode === "RM_GROUP_OIL" && !!productSysId && !search
+
+
 
   const handleSelect = useCallback(
     async (selectedKey: string) => {
@@ -196,7 +215,16 @@ export function MasterLookupField({
                 </div>
               )}
               {!optionsLoading && options.length === 0 && (
-                <CommandEmpty>No results found.</CommandEmpty>
+                <CommandEmpty>
+                  {isEmptyOilGroupOptions ? (
+                    <span className="block whitespace-normal px-1 text-left">
+                      Tipe produk ini belum punya Oil Config atau group belum
+                      diizinkan — atur di Master Product Type → Oil Config.
+                    </span>
+                  ) : (
+                    "No results found."
+                  )}
+                </CommandEmpty>
               )}
               <CommandGroup>
                 {visibleOptions.map((opt, index) => {

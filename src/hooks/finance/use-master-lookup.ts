@@ -20,20 +20,28 @@ import { useDebounce } from "@/lib/hooks/use-debounce"
 // shown" without a separate COUNT(*) can request one extra row over their
 // display cap (e.g. displayCap + 1) and compare the returned length —
 // `master-lookup-field.tsx` does this.
+// ⭐ DIPERBARUI 2026-09-24 (oil-cost-rm-group, D11) — added an optional
+// `productSysId` param, forwarded to the backend so it can restrict a
+// lookup master's options to what's allowed for that product (currently
+// only honored server-side for RM_GROUP_OIL, following the MB_SPIN
+// precedent). Included in the query key so different products' option
+// lists get their own cache entry.
 export function useMasterLookupOptions(
   lookupMasterCode: string | undefined,
   enabled = true,
   search = "",
-  limit?: number
+  limit?: number,
+  productSysId?: number
 ) {
   const debouncedSearch = useDebounce(search, 300)
 
   return useQuery<MasterOption[]>({
-    queryKey: ["finance", "master-lookup", "options", lookupMasterCode, debouncedSearch, limit],
+    queryKey: ["finance", "master-lookup", "options", lookupMasterCode, debouncedSearch, limit, productSysId],
     queryFn: async () => {
       const params = new URLSearchParams({ masterCode: lookupMasterCode! })
       if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim())
       if (limit) params.set("limit", String(limit))
+      if (productSysId !== undefined) params.set("productSysId", String(productSysId))
       const res = await fetch(`/api/v1/finance/lookup-master-options?${params.toString()}`)
       if (!res.ok) throw new Error(`Failed to fetch ${lookupMasterCode} options: ${res.status}`)
       const json = (await res.json()) as { data?: MasterOption[] }

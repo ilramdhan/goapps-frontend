@@ -299,8 +299,10 @@ export function ProductParametersTab({ productSysId, isLocked = false }: Paramet
                   onRemove={() => handleRemoveClick(entry)}
                   removing={removeM.isPending || previewLoading}
                   allEntries={data}
+                  allDrafts={drafts}
                   onLookupChange={handleLookupChange}
                   disabled={isLocked}
+                  productSysId={productSysId}
                 />
               )
             })}
@@ -344,11 +346,13 @@ interface ParamRowProps {
   removing: boolean
   onChange: (paramId: string, p: Partial<DraftValue>) => void
   allEntries?: RequiredParamEntry[]
+  allDrafts?: Record<string, DraftValue>
   onLookupChange?: (triggerParamId: string, selectedKey: string, fills: LookupFillValuesResponse | null) => void
   disabled?: boolean
+  productSysId?: number
 }
 
-function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLookupChange, disabled }: ParamRowProps) {
+function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, allDrafts, onLookupChange, disabled, productSysId }: ParamRowProps) {
   const mbSpinState = getMbSpinAmbiguityState(entry)
 
   return (
@@ -401,7 +405,9 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, onLo
           )}
         </div>
       </div>
-      <div className="col-span-6">{renderValueInput(entry, draft, onChange, allEntries, onLookupChange, disabled)}</div>
+      <div className="col-span-6">
+        {renderValueInput(entry, draft, onChange, allEntries, onLookupChange, disabled, productSysId, allDrafts)}
+      </div>
       <div className="col-span-1 text-right">
         {entry.lookupFillGroupCode ? (
           /* Child params are managed via their parent — no individual delete */
@@ -585,11 +591,35 @@ function renderValueInput(
   allEntries?: RequiredParamEntry[],
   onLookupChange?: (triggerParamId: string, selectedKey: string, fills: LookupFillValuesResponse | null) => void,
   disabled?: boolean,
+  productSysId?: number,
+  allDrafts?: Record<string, DraftValue>,
 ) {
   if (entry.paramCategory === "CALCULATED") {
     return (
       <div className="rounded border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         Calculated by engine — value is filled automatically during costing.
+      </div>
+    )
+  }
+
+  // OIL_RATE is a fill-group child of OIL_NAME, but unlike other auto-filled
+  // children its stored numeric value is stale by design (D5/D9/D14): the
+  // calc engine resolves the actual rate per period (CR → SR → PR cascade),
+  // so showing the last-saved number here would mislead the user into
+  // thinking it's live. Render a hint instead — never the numeric value.
+  if (entry.lookupFillGroupCode && entry.paramCode === "OIL_RATE") {
+    const oilNameEntry = allEntries?.find((e) => e.paramCode === "OIL_NAME")
+    const oilNameValue =
+      (oilNameEntry ? allDrafts?.[oilNameEntry.paramId]?.valueText : undefined) ||
+      oilNameEntry?.valueText ||
+      undefined
+    return (
+      <div className="flex h-9 w-full items-center rounded-md border border-dashed border-input bg-muted/40 px-3 text-xs text-muted-foreground">
+        Follows RM group{" "}
+        <span className="mx-1 font-mono font-medium text-foreground">
+          {oilNameValue || "(OIL_NAME not set)"}
+        </span>{" "}
+        per calc period (CR→SR→PR) — resolved by engine
       </div>
     )
   }
@@ -638,6 +668,7 @@ function renderValueInput(
           allEntries={allEntries}
           onChangeLookup={onLookupChange}
           disabled={disabled}
+          productSysId={productSysId}
         />
       )
     }

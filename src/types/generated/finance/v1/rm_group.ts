@@ -403,6 +403,12 @@ export interface RMGroupHead {
    * When UNSPECIFIED uses AUTO fallback SP→PP→FP.
    */
   marketingFlag: RMMarketingFlag;
+  /**
+   * Oil group flag (head-level, global — NOT period-versioned). When true the
+   * group is selectable as an OIL_NAME option (lookup master RM_GROUP_OIL) and
+   * its per-period rate drives OIL_RATE in the costing engine.
+   */
+  isOilGroup: boolean;
 }
 
 /** RMGroupDetail is one item's membership in an RM group. */
@@ -555,6 +561,8 @@ export interface CreateRMGroupRequest {
   valuationFlag: RMValuationFlag;
   /** V2: Marketing flag. */
   marketingFlag: RMMarketingFlag;
+  /** Mark the new group as an oil group (global, not per period). Defaults to false. */
+  isOilGroup: boolean;
 }
 
 /** Create response. */
@@ -676,6 +684,12 @@ export interface UpdateRMGroupRequest {
   clearMarketingDefaultValue: boolean;
   /** Period (YYYYMM) this update targets. */
   period: string;
+  /**
+   * New oil group flag (head-level, global — applies to all periods). Absent
+   * leaves it unchanged. Un-flagging a group still referenced by product
+   * OIL_NAME values is rejected by the backend (ErrOilGroupInUse).
+   */
+  isOilGroup?: boolean | undefined;
 }
 
 /** Update response. */
@@ -714,6 +728,11 @@ export interface ListRMGroupsRequest {
   sortBy: string;
   /** Sort order. */
   sortOrder: string;
+  /**
+   * Optional oil group filter. Absent = no filter; true = only oil groups;
+   * false = only non-oil groups.
+   */
+  isOilGroup?: boolean | undefined;
 }
 
 /** List response. */
@@ -1121,6 +1140,7 @@ function createBaseRMGroupHead(): RMGroupHead {
     marketingDefaultValue: undefined,
     valuationFlag: 0,
     marketingFlag: 0,
+    isOilGroup: false,
   };
 }
 
@@ -1188,6 +1208,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     }
     if (message.marketingFlag !== 0) {
       writer.uint32(168).int32(message.marketingFlag);
+    }
+    if (message.isOilGroup !== false) {
+      writer.uint32(176).bool(message.isOilGroup);
     }
     return writer;
   },
@@ -1367,6 +1390,14 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
           message.marketingFlag = reader.int32() as any;
           continue;
         }
+        case 22: {
+          if (tag !== 176) {
+            break;
+          }
+
+          message.isOilGroup = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1471,6 +1502,11 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
         : isSet(object.marketing_flag)
         ? rMMarketingFlagFromJSON(object.marketing_flag)
         : 0,
+      isOilGroup: isSet(object.isOilGroup)
+        ? globalThis.Boolean(object.isOilGroup)
+        : isSet(object.is_oil_group)
+        ? globalThis.Boolean(object.is_oil_group)
+        : false,
     };
   },
 
@@ -1539,6 +1575,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     if (message.marketingFlag !== 0) {
       obj.marketingFlag = rMMarketingFlagToJSON(message.marketingFlag);
     }
+    if (message.isOilGroup !== false) {
+      obj.isOilGroup = message.isOilGroup;
+    }
     return obj;
   },
 
@@ -1570,6 +1609,7 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     message.marketingDefaultValue = object.marketingDefaultValue ?? undefined;
     message.valuationFlag = object.valuationFlag ?? 0;
     message.marketingFlag = object.marketingFlag ?? 0;
+    message.isOilGroup = object.isOilGroup ?? false;
     return message;
   },
 };
@@ -2510,6 +2550,7 @@ function createBaseCreateRMGroupRequest(): CreateRMGroupRequest {
     marketingDefaultValue: undefined,
     valuationFlag: 0,
     marketingFlag: 0,
+    isOilGroup: false,
   };
 }
 
@@ -2550,6 +2591,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     }
     if (message.marketingFlag !== 0) {
       writer.uint32(96).int32(message.marketingFlag);
+    }
+    if (message.isOilGroup !== false) {
+      writer.uint32(104).bool(message.isOilGroup);
     }
     return writer;
   },
@@ -2657,6 +2701,14 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
           message.marketingFlag = reader.int32() as any;
           continue;
         }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.isOilGroup = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2720,6 +2772,11 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
         : isSet(object.marketing_flag)
         ? rMMarketingFlagFromJSON(object.marketing_flag)
         : 0,
+      isOilGroup: isSet(object.isOilGroup)
+        ? globalThis.Boolean(object.isOilGroup)
+        : isSet(object.is_oil_group)
+        ? globalThis.Boolean(object.is_oil_group)
+        : false,
     };
   },
 
@@ -2761,6 +2818,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     if (message.marketingFlag !== 0) {
       obj.marketingFlag = rMMarketingFlagToJSON(message.marketingFlag);
     }
+    if (message.isOilGroup !== false) {
+      obj.isOilGroup = message.isOilGroup;
+    }
     return obj;
   },
 
@@ -2781,6 +2841,7 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     message.marketingDefaultValue = object.marketingDefaultValue ?? undefined;
     message.valuationFlag = object.valuationFlag ?? 0;
     message.marketingFlag = object.marketingFlag ?? 0;
+    message.isOilGroup = object.isOilGroup ?? false;
     return message;
   },
 };
@@ -3053,6 +3114,7 @@ function createBaseUpdateRMGroupRequest(): UpdateRMGroupRequest {
     clearMarketingAntiDumpingPct: false,
     clearMarketingDefaultValue: false,
     period: "",
+    isOilGroup: undefined,
   };
 }
 
@@ -3135,6 +3197,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     }
     if (message.period !== "") {
       writer.uint32(210).string(message.period);
+    }
+    if (message.isOilGroup !== undefined) {
+      writer.uint32(216).bool(message.isOilGroup);
     }
     return writer;
   },
@@ -3354,6 +3419,14 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
           message.period = reader.string();
           continue;
         }
+        case 27: {
+          if (tag !== 216) {
+            break;
+          }
+
+          message.isOilGroup = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3483,6 +3556,11 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
         ? globalThis.Boolean(object.clear_marketing_default_value)
         : false,
       period: isSet(object.period) ? globalThis.String(object.period) : "",
+      isOilGroup: isSet(object.isOilGroup)
+        ? globalThis.Boolean(object.isOilGroup)
+        : isSet(object.is_oil_group)
+        ? globalThis.Boolean(object.is_oil_group)
+        : undefined,
     };
   },
 
@@ -3566,6 +3644,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     if (message.period !== "") {
       obj.period = message.period;
     }
+    if (message.isOilGroup !== undefined) {
+      obj.isOilGroup = message.isOilGroup;
+    }
     return obj;
   },
 
@@ -3600,6 +3681,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     message.clearMarketingAntiDumpingPct = object.clearMarketingAntiDumpingPct ?? false;
     message.clearMarketingDefaultValue = object.clearMarketingDefaultValue ?? false;
     message.period = object.period ?? "";
+    message.isOilGroup = object.isOilGroup ?? undefined;
     return message;
   },
 };
@@ -3809,7 +3891,7 @@ export const DeleteRMGroupResponse: MessageFns<DeleteRMGroupResponse> = {
 };
 
 function createBaseListRMGroupsRequest(): ListRMGroupsRequest {
-  return { page: 0, pageSize: 0, search: "", activeFilter: 0, sortBy: "", sortOrder: "" };
+  return { page: 0, pageSize: 0, search: "", activeFilter: 0, sortBy: "", sortOrder: "", isOilGroup: undefined };
 }
 
 export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
@@ -3831,6 +3913,9 @@ export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
     }
     if (message.sortOrder !== "") {
       writer.uint32(50).string(message.sortOrder);
+    }
+    if (message.isOilGroup !== undefined) {
+      writer.uint32(56).bool(message.isOilGroup);
     }
     return writer;
   },
@@ -3890,6 +3975,14 @@ export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
           message.sortOrder = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.isOilGroup = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3923,6 +4016,11 @@ export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
         : isSet(object.sort_order)
         ? globalThis.String(object.sort_order)
         : "",
+      isOilGroup: isSet(object.isOilGroup)
+        ? globalThis.Boolean(object.isOilGroup)
+        : isSet(object.is_oil_group)
+        ? globalThis.Boolean(object.is_oil_group)
+        : undefined,
     };
   },
 
@@ -3946,6 +4044,9 @@ export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
     if (message.sortOrder !== "") {
       obj.sortOrder = message.sortOrder;
     }
+    if (message.isOilGroup !== undefined) {
+      obj.isOilGroup = message.isOilGroup;
+    }
     return obj;
   },
 
@@ -3960,6 +4061,7 @@ export const ListRMGroupsRequest: MessageFns<ListRMGroupsRequest> = {
     message.activeFilter = object.activeFilter ?? 0;
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
+    message.isOilGroup = object.isOilGroup ?? undefined;
     return message;
   },
 };

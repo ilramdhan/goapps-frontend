@@ -122,6 +122,8 @@ export interface ListRMGroupsParams {
   activeFilter?: ActiveFilter
   sortBy?: string
   sortOrder?: string
+  /** Filter to only oil groups (true) or non-oil groups (false); omit for all. */
+  isOilGroup?: boolean
 }
 
 /** Grouping monitor scope. UNGROUPED = items not in any active group;
