@@ -26,8 +26,12 @@ import {
 import { useMasterLookupOptions } from "@/hooks/finance/use-master-lookup"
 import type { CostProductType } from "@/types/finance/cost-product-type"
 
+// Radix Select forbids an empty-string item value, so "no oil class" uses a
+// sentinel in the Select and maps back to "" in the form state / payload.
+const NO_OIL_CLASS = "NONE"
+
 const OIL_CLASS_OPTIONS = [
-  { value: "", label: "Not an oil product type" },
+  { value: NO_OIL_CLASS, label: "Not an oil product type" },
   { value: "PTY", label: "PTY" },
   { value: "POY", label: "POY" },
   { value: "SUPERBA", label: "SUPERBA" },
@@ -157,10 +161,11 @@ export function OilConfigDialog({ open, onOpenChange, productType }: Props) {
           <div className="space-y-1.5">
             <Label>Oil class</Label>
             <Select
-              value={oilClass}
+              value={oilClass || NO_OIL_CLASS}
               onValueChange={(v) => {
-                form.setValue("oilClass", v as OilConfigFormValues["oilClass"], { shouldValidate: true })
-                if (!v) form.setValue("groups", [], { shouldValidate: true })
+                const next = (v === NO_OIL_CLASS ? "" : v) as OilConfigFormValues["oilClass"]
+                form.setValue("oilClass", next, { shouldValidate: true })
+                if (!next) form.setValue("groups", [], { shouldValidate: true })
               }}
             >
               <SelectTrigger>
@@ -168,7 +173,7 @@ export function OilConfigDialog({ open, onOpenChange, productType }: Props) {
               </SelectTrigger>
               <SelectContent>
                 {OIL_CLASS_OPTIONS.map((o) => (
-                  <SelectItem key={o.value || "none"} value={o.value}>
+                  <SelectItem key={o.value} value={o.value}>
                     {o.label}
                   </SelectItem>
                 ))}
