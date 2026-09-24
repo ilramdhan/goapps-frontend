@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")
     const limitParam = searchParams.get("limit")
     const limit = limitParam !== null ? Number(limitParam) : undefined
+    // ⭐ DIPERBARUI 2026-09-24 (oil-cost-rm-group, D11) — optional product
+    // filter, currently honored server-side only for RM_GROUP_OIL.
+    const productSysIdParam = searchParams.get("productSysId")
+    const productSysId = productSysIdParam !== null ? Number(productSysIdParam) : undefined
 
     const metadata = createMetadataFromRequest(request)
     const response = await getLookupMasterClient().listMasterOptions(
@@ -28,6 +32,7 @@ export async function GET(request: NextRequest) {
         masterCode,
         ...(search ? { search } : {}),
         ...(limit !== undefined && Number.isFinite(limit) ? { limit } : {}),
+        ...(productSysId !== undefined && Number.isFinite(productSysId) ? { productSysId } : {}),
       },
       metadata,
     )

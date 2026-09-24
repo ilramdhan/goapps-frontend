@@ -30,6 +30,10 @@ interface MasterLookupFieldProps {
     fills: LookupFillValuesResponse | null
   ) => void
   disabled?: boolean
+  /** Product being costed — forwarded so the backend can restrict this
+   *  lookup's options to what's allowed for the product (e.g. RM_GROUP_OIL
+   *  filtered by the product type's oil class, D11). */
+  productSysId?: number
 }
 
 // ⭐ DIPERBARUI 2026-08-26 (perf: SP Code dropdown lag, server-side search) —
@@ -53,6 +57,7 @@ export function MasterLookupField({
   allEntries: _allEntries,
   onChangeLookup,
   disabled,
+  productSysId,
 }: MasterLookupFieldProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -72,7 +77,8 @@ export function MasterLookupField({
     entry.lookupMasterCode,
     open,
     search,
-    DISPLAY_LIMIT + 1
+    DISPLAY_LIMIT + 1,
+    productSysId
   )
 
   const currentValue = draft.valueText
