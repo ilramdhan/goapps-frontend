@@ -99,6 +99,19 @@ export function GroupTable({ data, isLoading, onEdit, onDelete, onView }: GroupT
       ),
     },
     {
+      id: "isOilGroup",
+      header: "Oil",
+      width: "w-[70px]",
+      cell: (row) =>
+        row.isOilGroup ? (
+          <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">
+            Oil
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       id: "isActive",
       header: "Status",
       width: "w-[90px]",

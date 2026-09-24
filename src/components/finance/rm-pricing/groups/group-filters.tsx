@@ -42,6 +42,14 @@ export function GroupFilters({ filters, onFiltersChange }: GroupFiltersProps) {
     onFiltersChange({ ...filters, sortBy, sortOrder })
   }
 
+  const handleOilFilterChange = (value: string) => {
+    onFiltersChange({
+      ...filters,
+      isOilGroup: value === "all" ? undefined : value === "oil",
+      page: 1,
+    })
+  }
+
   const handleClearFilters = () => {
     onFiltersChange({
       page: 1,
@@ -50,12 +58,14 @@ export function GroupFilters({ filters, onFiltersChange }: GroupFiltersProps) {
       activeFilter: ActiveFilter.ACTIVE_FILTER_UNSPECIFIED,
       sortBy: "code",
       sortOrder: "asc",
+      isOilGroup: undefined,
     })
   }
 
   const hasActiveFilters =
     filters.search ||
-    (filters.activeFilter !== undefined && filters.activeFilter !== ActiveFilter.ACTIVE_FILTER_UNSPECIFIED)
+    (filters.activeFilter !== undefined && filters.activeFilter !== ActiveFilter.ACTIVE_FILTER_UNSPECIFIED) ||
+    filters.isOilGroup !== undefined
 
   const currentSort = `${filters.sortBy || "code"}-${filters.sortOrder || "asc"}`
 
@@ -83,6 +93,20 @@ export function GroupFilters({ filters, onFiltersChange }: GroupFiltersProps) {
                 {option.label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filters.isOilGroup === undefined ? "all" : filters.isOilGroup ? "oil" : "non-oil"}
+          onValueChange={handleOilFilterChange}
+        >
+          <SelectTrigger className="w-[110px]">
+            <SelectValue placeholder="Oil" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Groups</SelectItem>
+            <SelectItem value="oil">Oil Only</SelectItem>
+            <SelectItem value="non-oil">Non-Oil</SelectItem>
           </SelectContent>
         </Select>
 
