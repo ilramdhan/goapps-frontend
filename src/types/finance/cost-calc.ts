@@ -304,6 +304,16 @@ export interface CostResult {
   calculatedBy: string
   verifiedAt: string | null
   verifiedBy: string
+  // Resolved ERP item / shade / primary RM (additive fields — see
+  // finance/v1/cost_calc.proto CostResult). primaryRmCode/Name may be empty
+  // when the product has no RM detail; rmCount is 0 in that case.
+  itemCode: string
+  itemName: string
+  shadeCode: string
+  shadeName: string
+  primaryRmCode: string
+  primaryRmName: string
+  rmCount: number
 }
 
 export interface LevelBreakdown {
@@ -451,6 +461,13 @@ export function normalizeCostResult(raw: Record<string, unknown>): CostResult {
     calculatedBy: fieldStr(raw, "calculatedBy", "calculated_by"),
     verifiedAt: fieldDate(raw, "verifiedAt", "verified_at"),
     verifiedBy: fieldStr(raw, "verifiedBy", "verified_by"),
+    itemCode: fieldStr(raw, "itemCode", "item_code"),
+    itemName: fieldStr(raw, "itemName", "item_name"),
+    shadeCode: fieldStr(raw, "shadeCode", "shade_code"),
+    shadeName: fieldStr(raw, "shadeName", "shade_name"),
+    primaryRmCode: fieldStr(raw, "primaryRmCode", "primary_rm_code"),
+    primaryRmName: fieldStr(raw, "primaryRmName", "primary_rm_name"),
+    rmCount: fieldNum(raw, "rmCount", "rm_count"),
   }
 }
 

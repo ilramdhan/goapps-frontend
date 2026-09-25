@@ -596,6 +596,27 @@ export interface CostResult {
   productTypeId: number;
   /** Resolved product type code (never the raw id in the UI). */
   productTypeCode: string;
+  /**
+   * Resolved ERP item code (from cost_erp_item, matched via
+   * cost_product_master.cpm_erp_item_code; falls back to the denormalized
+   * cpm_erp_item_code when no cost_erp_item row matches).
+   */
+  itemCode: string;
+  /** Resolved ERP item name (from cost_erp_item.cei_item_name). */
+  itemName: string;
+  /** Shade code (from cost_product_master.cpm_shade_code). */
+  shadeCode: string;
+  /** Shade name (from cost_product_master.cpm_shade_name). */
+  shadeName: string;
+  /**
+   * Reference code of the raw material with the highest contribution among
+   * cpc_rm_cost_detail entries.
+   */
+  primaryRmCode: string;
+  /** Resolved display label of the primary raw material. */
+  primaryRmName: string;
+  /** Count of raw material entries in cpc_rm_cost_detail. */
+  rmCount: number;
 }
 
 /** CostBreakdown is the full drill-down for one CostResult. */
@@ -897,6 +918,16 @@ export interface ListCostResultsRequest {
    * area.
    */
   sortOrder: string;
+  /**
+   * Shade code filter (empty = no filter). Matches
+   * cost_product_master.cpm_shade_code.
+   */
+  shadeCode: string;
+  /**
+   * Raw material search (empty = no filter). Matches ref_code or ref_label of
+   * any entry in cpc_rm_cost_detail.
+   */
+  rawMaterial: string;
 }
 
 /** ListCostResultsResponse returns a page of cost results across products. */
@@ -2693,6 +2724,13 @@ function createBaseCostResult(): CostResult {
     verifiedBy: "",
     productTypeId: 0,
     productTypeCode: "",
+    itemCode: "",
+    itemName: "",
+    shadeCode: "",
+    shadeName: "",
+    primaryRmCode: "",
+    primaryRmName: "",
+    rmCount: 0,
   };
 }
 
@@ -2766,6 +2804,27 @@ export const CostResult: MessageFns<CostResult> = {
     }
     if (message.productTypeCode !== "") {
       writer.uint32(186).string(message.productTypeCode);
+    }
+    if (message.itemCode !== "") {
+      writer.uint32(194).string(message.itemCode);
+    }
+    if (message.itemName !== "") {
+      writer.uint32(202).string(message.itemName);
+    }
+    if (message.shadeCode !== "") {
+      writer.uint32(210).string(message.shadeCode);
+    }
+    if (message.shadeName !== "") {
+      writer.uint32(218).string(message.shadeName);
+    }
+    if (message.primaryRmCode !== "") {
+      writer.uint32(226).string(message.primaryRmCode);
+    }
+    if (message.primaryRmName !== "") {
+      writer.uint32(234).string(message.primaryRmName);
+    }
+    if (message.rmCount !== 0) {
+      writer.uint32(240).int32(message.rmCount);
     }
     return writer;
   },
@@ -2961,6 +3020,62 @@ export const CostResult: MessageFns<CostResult> = {
           message.productTypeCode = reader.string();
           continue;
         }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.itemCode = reader.string();
+          continue;
+        }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.itemName = reader.string();
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.shadeCode = reader.string();
+          continue;
+        }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.shadeName = reader.string();
+          continue;
+        }
+        case 28: {
+          if (tag !== 226) {
+            break;
+          }
+
+          message.primaryRmCode = reader.string();
+          continue;
+        }
+        case 29: {
+          if (tag !== 234) {
+            break;
+          }
+
+          message.primaryRmName = reader.string();
+          continue;
+        }
+        case 30: {
+          if (tag !== 240) {
+            break;
+          }
+
+          message.rmCount = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3075,6 +3190,41 @@ export const CostResult: MessageFns<CostResult> = {
         : isSet(object.product_type_code)
         ? globalThis.String(object.product_type_code)
         : "",
+      itemCode: isSet(object.itemCode)
+        ? globalThis.String(object.itemCode)
+        : isSet(object.item_code)
+        ? globalThis.String(object.item_code)
+        : "",
+      itemName: isSet(object.itemName)
+        ? globalThis.String(object.itemName)
+        : isSet(object.item_name)
+        ? globalThis.String(object.item_name)
+        : "",
+      shadeCode: isSet(object.shadeCode)
+        ? globalThis.String(object.shadeCode)
+        : isSet(object.shade_code)
+        ? globalThis.String(object.shade_code)
+        : "",
+      shadeName: isSet(object.shadeName)
+        ? globalThis.String(object.shadeName)
+        : isSet(object.shade_name)
+        ? globalThis.String(object.shade_name)
+        : "",
+      primaryRmCode: isSet(object.primaryRmCode)
+        ? globalThis.String(object.primaryRmCode)
+        : isSet(object.primary_rm_code)
+        ? globalThis.String(object.primary_rm_code)
+        : "",
+      primaryRmName: isSet(object.primaryRmName)
+        ? globalThis.String(object.primaryRmName)
+        : isSet(object.primary_rm_name)
+        ? globalThis.String(object.primary_rm_name)
+        : "",
+      rmCount: isSet(object.rmCount)
+        ? globalThis.Number(object.rmCount)
+        : isSet(object.rm_count)
+        ? globalThis.Number(object.rm_count)
+        : 0,
     };
   },
 
@@ -3149,6 +3299,27 @@ export const CostResult: MessageFns<CostResult> = {
     if (message.productTypeCode !== "") {
       obj.productTypeCode = message.productTypeCode;
     }
+    if (message.itemCode !== "") {
+      obj.itemCode = message.itemCode;
+    }
+    if (message.itemName !== "") {
+      obj.itemName = message.itemName;
+    }
+    if (message.shadeCode !== "") {
+      obj.shadeCode = message.shadeCode;
+    }
+    if (message.shadeName !== "") {
+      obj.shadeName = message.shadeName;
+    }
+    if (message.primaryRmCode !== "") {
+      obj.primaryRmCode = message.primaryRmCode;
+    }
+    if (message.primaryRmName !== "") {
+      obj.primaryRmName = message.primaryRmName;
+    }
+    if (message.rmCount !== 0) {
+      obj.rmCount = Math.round(message.rmCount);
+    }
     return obj;
   },
 
@@ -3180,6 +3351,13 @@ export const CostResult: MessageFns<CostResult> = {
     message.verifiedBy = object.verifiedBy ?? "";
     message.productTypeId = object.productTypeId ?? 0;
     message.productTypeCode = object.productTypeCode ?? "";
+    message.itemCode = object.itemCode ?? "";
+    message.itemName = object.itemName ?? "";
+    message.shadeCode = object.shadeCode ?? "";
+    message.shadeName = object.shadeName ?? "";
+    message.primaryRmCode = object.primaryRmCode ?? "";
+    message.primaryRmName = object.primaryRmName ?? "";
+    message.rmCount = object.rmCount ?? 0;
     return message;
   },
 };
@@ -5654,6 +5832,8 @@ function createBaseListCostResultsRequest(): ListCostResultsRequest {
     productTypeIds: [],
     sortBy: "",
     sortOrder: "",
+    shadeCode: "",
+    rawMaterial: "",
   };
 }
 
@@ -5682,6 +5862,12 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     }
     if (message.sortOrder !== "") {
       writer.uint32(66).string(message.sortOrder);
+    }
+    if (message.shadeCode !== "") {
+      writer.uint32(74).string(message.shadeCode);
+    }
+    if (message.rawMaterial !== "") {
+      writer.uint32(82).string(message.rawMaterial);
     }
     return writer;
   },
@@ -5767,6 +5953,22 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
           message.sortOrder = reader.string();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.shadeCode = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.rawMaterial = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5802,6 +6004,16 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
         : isSet(object.sort_order)
         ? globalThis.String(object.sort_order)
         : "",
+      shadeCode: isSet(object.shadeCode)
+        ? globalThis.String(object.shadeCode)
+        : isSet(object.shade_code)
+        ? globalThis.String(object.shade_code)
+        : "",
+      rawMaterial: isSet(object.rawMaterial)
+        ? globalThis.String(object.rawMaterial)
+        : isSet(object.raw_material)
+        ? globalThis.String(object.raw_material)
+        : "",
     };
   },
 
@@ -5831,6 +6043,12 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     if (message.sortOrder !== "") {
       obj.sortOrder = message.sortOrder;
     }
+    if (message.shadeCode !== "") {
+      obj.shadeCode = message.shadeCode;
+    }
+    if (message.rawMaterial !== "") {
+      obj.rawMaterial = message.rawMaterial;
+    }
     return obj;
   },
 
@@ -5849,6 +6067,8 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
+    message.shadeCode = object.shadeCode ?? "";
+    message.rawMaterial = object.rawMaterial ?? "";
     return message;
   },
 };
