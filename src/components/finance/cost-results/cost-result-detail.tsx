@@ -142,6 +142,22 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {(result.itemCode || result.itemName || result.shadeCode || result.shadeName) && (
+                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                  <Field label="Item Code">
+                    <span className="font-mono text-sm">{result.itemCode || "—"}</span>
+                  </Field>
+                  <Field label="Item Name">
+                    <span className="text-sm">{result.itemName || "—"}</span>
+                  </Field>
+                  <Field label="Shade Code">
+                    <span className="font-mono text-sm">{result.shadeCode || "—"}</span>
+                  </Field>
+                  <Field label="Shade Name">
+                    <span className="text-sm">{result.shadeName || "—"}</span>
+                  </Field>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                 <Field label="Cost per unit">
                   <span className="text-xl font-semibold tabular-nums">
