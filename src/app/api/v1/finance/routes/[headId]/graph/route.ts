@@ -39,6 +39,15 @@ function normalizeGraphForSave(graph: unknown): unknown {
             routeSeq: n0(s.routeSeq),
             positionX: n0(s.positionX),
             positionY: n0(s.positionY),
+            // Display-only nested-MB flatten annotations (see CostRouteSeq in
+            // types/finance/cost-route.ts). The browser normalizer's numOpt()
+            // turns 0/missing into `undefined` for these on every native row,
+            // which throws the same BigInt(undefined) crash as the int64
+            // fields above once it reaches CostRouteSeq.encode(). Rows saved
+            // back to this head are always native to it, so 0 is correct.
+            originHeadId: n0(s.originHeadId),
+            nestDepth: n0(s.nestDepth),
+            originProductCode: typeof s.originProductCode === "string" ? s.originProductCode : "",
             rms: rms.map((rawRm) => {
               const r = (rawRm ?? {}) as RawObj
               return {
@@ -52,6 +61,12 @@ function normalizeGraphForSave(graph: unknown): unknown {
                 // double position fields — undefined throws in ts-proto BinaryWriter.
                 positionX: n0(r.positionX),
                 positionY: n0(r.positionY),
+                // Same display-only nested-MB annotations as CostRouteSeq above.
+                originHeadId: n0(r.originHeadId),
+                nestDepth: n0(r.nestDepth),
+                effectiveRatio: n0(r.effectiveRatio) || n0(r.routeRmRatio) || 1,
+                originProductCode: typeof r.originProductCode === "string" ? r.originProductCode : "",
+                originProductName: typeof r.originProductName === "string" ? r.originProductName : "",
               }
             }),
           }

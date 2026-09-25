@@ -23,6 +23,7 @@ import {
   type RowAction,
 } from "@/components/shared"
 import { ProductTypeMultiCombobox } from "@/components/finance/comboboxes"
+import { ShadeCombobox } from "@/components/finance/shade"
 import {
   useCostResultsList,
   useCostResultPeriods,
@@ -41,6 +42,8 @@ interface FiltersState {
   status: string
   search: string
   productTypeIds: number[]
+  shadeCode: string
+  rawMaterial: string
   sortBy: string
   sortOrder: "asc" | "desc" | undefined
   page: number
@@ -63,6 +66,8 @@ const defaultFilters: FiltersState = {
   status: "",
   search: "",
   productTypeIds: [],
+  shadeCode: "",
+  rawMaterial: "",
   sortBy: "",
   sortOrder: undefined,
   page: 1,
@@ -128,6 +133,8 @@ export function CostResultsPageClient() {
     status: filters.status || undefined,
     search: filters.search || undefined,
     productTypeIds: filters.productTypeIds,
+    shadeCode: filters.shadeCode || undefined,
+    rawMaterial: filters.rawMaterial || undefined,
     sortBy: filters.sortBy || undefined,
     sortOrder: filters.sortOrder,
     page: filters.page,
@@ -230,6 +237,46 @@ export function CostResultsPageClient() {
         cell: (r) => <span className="text-sm">{r.productName || "—"}</span>,
       },
       {
+        id: "itemCode",
+        header: "Item Code",
+        cell: (r) => <span className="font-mono text-sm">{r.itemCode || "—"}</span>,
+      },
+      {
+        id: "itemName",
+        header: "Item Name",
+        defaultHidden: true,
+        cell: (r) => <span className="text-sm">{r.itemName || "—"}</span>,
+      },
+      {
+        id: "shadeCode",
+        header: "Shade Code",
+        cell: (r) => <span className="font-mono text-sm">{r.shadeCode || "—"}</span>,
+      },
+      {
+        id: "shadeName",
+        header: "Shade Name",
+        defaultHidden: true,
+        cell: (r) => <span className="text-sm">{r.shadeName || "—"}</span>,
+      },
+      {
+        id: "rawMaterial",
+        header: "Raw Material",
+        hideOnMobile: true,
+        cell: (r) =>
+          r.rmCount === 0 ? (
+            <span className="text-sm text-muted-foreground">—</span>
+          ) : (
+            <span className="text-sm">
+              {r.primaryRmName || r.primaryRmCode || "—"}
+              {r.rmCount > 1 && (
+                <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  +{r.rmCount - 1}
+                </span>
+              )}
+            </span>
+          ),
+      },
+      {
         id: "period",
         header: "Period",
         sortKey: "period",
@@ -312,7 +359,9 @@ export function CostResultsPageClient() {
     filters.calcType !== defaultFilters.calcType ||
     filters.status !== defaultFilters.status ||
     filters.search !== defaultFilters.search ||
-    filters.productTypeIds.length > 0
+    filters.productTypeIds.length > 0 ||
+    filters.shadeCode !== defaultFilters.shadeCode ||
+    filters.rawMaterial !== defaultFilters.rawMaterial
   // exportJobId intentionally excluded from hasActiveFilters — it's not a
   // list filter, so it shouldn't show the "Clear filters" button on its own.
 
@@ -387,7 +436,7 @@ export function CostResultsPageClient() {
               className="h-9"
               value={filters.search}
               onValueChange={(search) => setFilters({ ...filters, search, page: 1 })}
-              placeholder="Search product code or name…"
+              placeholder="Search product, item, shade, or raw material…"
             />
             <Select
               value={filters.period || "ALL"}
@@ -413,6 +462,21 @@ export function CostResultsPageClient() {
               onChange={(productTypeIds) => setFilters({ ...filters, productTypeIds, page: 1 })}
               placeholder="All product types"
               className="h-9 w-[220px]"
+            />
+            <ShadeCombobox
+              code={filters.shadeCode || undefined}
+              name={undefined}
+              onSelect={(shadeCode) => setFilters({ ...filters, shadeCode, page: 1 })}
+              placeholder="All shades"
+              className="h-9 w-[180px]"
+            />
+            <DebouncedSearchInput
+              containerClassName="w-[200px]"
+              className="h-9"
+              value={filters.rawMaterial}
+              onValueChange={(rawMaterial) => setFilters({ ...filters, rawMaterial, page: 1 })}
+              placeholder="Raw material code or name…"
+              showIcon={false}
             />
             <Select
               value={filters.calcType || "ALL"}

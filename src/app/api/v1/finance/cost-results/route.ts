@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
         status: toCostResultStatus(sp.get("status")),
         search: sp.get("search") || "",
         productTypeIds: parseIdList(sp.get("productTypeIds")),
+        shadeCode: sp.get("shadeCode") || "",
+        rawMaterial: sp.get("rawMaterial") || "",
         sortBy: sp.get("sortBy") || "",
         sortOrder: sp.get("sortOrder") || "",
       },

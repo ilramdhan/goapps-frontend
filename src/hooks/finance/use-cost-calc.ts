@@ -358,6 +358,8 @@ export interface ListCostResultsParams {
   status?: string
   search?: string
   productTypeIds?: number[]
+  shadeCode?: string
+  rawMaterial?: string
   sortBy?: string
   sortOrder?: "asc" | "desc"
   page?: number
@@ -387,6 +389,8 @@ export function useCostResultsList(params: ListCostResultsParams = {}) {
       if (params.productTypeIds && params.productTypeIds.length > 0) {
         qs.set("productTypeIds", params.productTypeIds.join(","))
       }
+      if (params.shadeCode) qs.set("shadeCode", params.shadeCode)
+      if (params.rawMaterial) qs.set("rawMaterial", params.rawMaterial)
       if (params.sortBy) qs.set("sortBy", params.sortBy)
       if (params.sortOrder) qs.set("sortOrder", params.sortOrder)
       qs.set("page", String(params.page ?? 1))
