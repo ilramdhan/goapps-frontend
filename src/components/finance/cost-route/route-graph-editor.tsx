@@ -144,6 +144,34 @@ export function RouteGraphEditor({ headId }: Props) {
   // native rows.
   const { data: flattenedForDisplay } = useRouteGraph(headId, { includeNestedMb: showFlattened })
 
+  // Merged display graph — native seqs/rms ALWAYS come from `graph` (working
+  // ?? persisted) so drag / auto-arrange / save keep operating on real,
+  // mutable state for BOTH DRAFT and COMPLETE routes alike (only LOCKED
+  // disables interaction, via `nodesDraggable={!locked}` inside
+  // RouteGraphFlow). Only EXTRA synthetic nested-MB rows from
+  // `flattenedForDisplay` are spliced in for display, matched by the
+  // persisted seqId/rmId — never by `uid`, since normalizeCostRouteSeq/Rm
+  // mint a fresh random uid on every fetch, so the same native row fetched
+  // via two separate useRouteGraph calls never shares one. Previously this
+  // swapped the ENTIRE graph fed to <RouteGraphFlow> for `flattenedForDisplay`
+  // whenever `showFlattened` was true, disconnecting the rendered nodes from
+  // `working` and making drag/auto-arrange appear stuck for COMPLETE routes.
+  const displayGraph = useMemo(() => {
+    if (!graph) return null
+    if (!showFlattened || !flattenedForDisplay) return graph
+    const syntheticSeqs = flattenedForDisplay.seqs.filter((s) => !!s.originHeadId)
+    const mergedNativeSeqs = graph.seqs.map((nativeSeq) => {
+      if (!nativeSeq.seqId) return nativeSeq
+      const flatMatch = flattenedForDisplay.seqs.find(
+        (fs) => !fs.originHeadId && fs.seqId === nativeSeq.seqId,
+      )
+      const syntheticRms = flatMatch ? flatMatch.rms.filter((r) => !!r.originHeadId) : []
+      if (syntheticRms.length === 0) return nativeSeq
+      return { ...nativeSeq, rms: [...nativeSeq.rms, ...syntheticRms] }
+    })
+    return { head: graph.head, seqs: [...mergedNativeSeqs, ...syntheticSeqs] }
+  }, [graph, flattenedForDisplay, showFlattened])
+
   const seqsByLevel = useMemo(() => {
     const groups = new Map<number, CostRouteSeq[]>()
     for (const s of seqs) {
@@ -305,57 +333,113 @@ export function RouteGraphEditor({ headId }: Props) {
     setDirty(true)
   }
 
+  // ---------- position autosave (drag / auto-arrange) ----------
+  // Layout changes must persist without a manual "Save draft" click, for
+  // DRAFT and COMPLETE alike (only LOCKED blocks edits). Position-only edits
+  // (drag-stop, auto-arrange) autosave through the same mutation the manual
+  // button uses, so error toasts keep working via useSaveRouteGraph's
+  // onError. The manual "Save draft" button stays for non-position edits
+  // (stages, RM ratios, notes, etc).
+  const isSavingRef = useRef(false)
+  useEffect(() => {
+    isSavingRef.current = saveM.isPending
+  }, [saveM.isPending])
+
+  const positionAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const triggerPositionAutosave = useCallback(() => {
+    if (locked) return
+    const current = workingRef.current
+    if (!current) return
+    if (isSavingRef.current) {
+      // A save is already in flight — skip this tick. The next position
+      // change re-marks dirty and re-schedules, so nothing is lost, just
+      // deferred to the next change instead of racing the in-flight save.
+      return
+    }
+    saveM.mutate({ headId, graph: current })
+  }, [locked, headId, saveM])
+
+  // Debounced trigger for drag-stop — coalesces rapid multi-node drags into a
+  // single save ~700ms after the last position change.
+  const schedulePositionAutosave = useCallback(() => {
+    if (locked) return
+    if (positionAutosaveTimer.current) clearTimeout(positionAutosaveTimer.current)
+    positionAutosaveTimer.current = setTimeout(() => {
+      positionAutosaveTimer.current = null
+      triggerPositionAutosave()
+    }, 700)
+  }, [locked, triggerPositionAutosave])
+
+  useEffect(() => {
+    return () => {
+      if (positionAutosaveTimer.current) clearTimeout(positionAutosaveTimer.current)
+    }
+  }, [])
+
   // ---------- React Flow native actions ----------
 
-  // Persist a stage's drag position (keyed on the client uid).
+  // Persist a stage's drag position (keyed on the client uid). `autosave`
+  // defaults to true (debounced) — auto-arrange passes false per-call and
+  // triggers one immediate save itself once every position is written.
   const updateSeqPosition = useCallback(
-    (seqUid: string, x: number, y: number) => {
+    (seqUid: string, x: number, y: number, opts?: { autosave?: boolean }) => {
+      let changed = false
       setWorking((prev) => {
         const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
         if (!base) return prev
         const seq = base.seqs.find((s) => s.uid === seqUid)
         if (!seq) return base
         if (seq.positionX === x && seq.positionY === y) return base
+        changed = true
         // Pure updater — replace the target seq, never mutate `prev` in place.
         return {
           ...base,
           seqs: base.seqs.map((s) => (s.uid === seqUid ? { ...s, positionX: x, positionY: y } : s)),
         }
       })
+      if (!changed) return
       setDirty(true)
+      if (opts?.autosave !== false) schedulePositionAutosave()
     },
-    [persisted],
+    [persisted, schedulePositionAutosave],
   )
 
   // Persist an ITEM/GROUP RM's drag position (keyed on the client uid).
   const updateRmPosition = useCallback(
-    (rmUid: string, x: number, y: number) => {
+    (rmUid: string, x: number, y: number, opts?: { autosave?: boolean }) => {
+      let changed = false
       setWorking((prev) => {
         const base = prev ?? (persisted ? (JSON.parse(JSON.stringify(persisted)) as RouteGraph) : null)
         if (!base) return prev
-        let changed = false
+        let localChanged = false
         const seqs = base.seqs.map((seq) => {
           const idx = (seq.rms ?? []).findIndex((r) => r.uid === rmUid)
           if (idx < 0) return seq
           const rm = seq.rms[idx]
           if (rm.positionX === x && rm.positionY === y) return seq
-          changed = true
+          localChanged = true
           const rms = [...seq.rms]
           rms[idx] = { ...rm, positionX: x, positionY: y }
           return { ...seq, rms }
         })
-        if (!changed) return base
+        if (!localChanged) return base
+        changed = true
         return { ...base, seqs }
       })
+      if (!changed) return
       setDirty(true)
+      if (opts?.autosave !== false) schedulePositionAutosave()
     },
-    [persisted],
+    [persisted, schedulePositionAutosave],
   )
 
   // Auto-arrange (post-ship fix 4c) — explicit user action only, recomputes
   // EVERY seq/RM position via the same shared grid function buildFlow()
   // uses for its fallback layout, and writes them all back through the
   // existing position setters. Never runs automatically on render/change.
+  // Skips the per-call debounce (autosave: false) and instead saves once,
+  // immediately, after React has flushed every position update above.
   const handleAutoArrange = useCallback(() => {
     if (locked || !graph) return
     const byLevel = new Map<number, CostRouteSeq[]>()
@@ -370,14 +454,21 @@ export function RouteGraphEditor({ headId }: Props) {
       const list = (byLevel.get(level) ?? []).slice().sort((a, b) => a.routeSeq - b.routeSeq)
       list.forEach((s, idx) => {
         const { x, y } = computeGridPosition(level, idx, maxLevel)
-        updateSeqPosition(s.uid, x, y)
+        updateSeqPosition(s.uid, x, y, { autosave: false })
         const localRms = (s.rms ?? []).filter((r) => r.rmType !== "PRODUCT")
         localRms.forEach((rm, rmIdx) => {
-          updateRmPosition(rm.uid, x - (RM_W + RM_GAP_X), y + rmIdx * RM_GAP_Y)
+          updateRmPosition(rm.uid, x - (RM_W + RM_GAP_X), y + rmIdx * RM_GAP_Y, { autosave: false })
         })
       })
     }
-  }, [locked, graph, updateSeqPosition, updateRmPosition])
+    if (positionAutosaveTimer.current) {
+      clearTimeout(positionAutosaveTimer.current)
+      positionAutosaveTimer.current = null
+    }
+    // Defer one frame so the position setState updates above have flushed
+    // into `workingRef` before we read it for the save payload.
+    requestAnimationFrame(() => triggerPositionAutosave())
+  }, [locked, graph, updateSeqPosition, updateRmPosition, triggerPositionAutosave])
 
   // Add a PRODUCT-RM by drawing an edge from upstream → downstream stage
   // (keyed on client uids so newly-added, unsaved stages can be linked).
@@ -601,7 +692,7 @@ export function RouteGraphEditor({ headId }: Props) {
       {view === "visual" && seqsByLevel.length > 0 && graph && (
         <div className="relative">
           <RouteGraphFlow
-            graph={showFlattened && flattenedForDisplay ? flattenedForDisplay : graph}
+            graph={displayGraph ?? graph}
             locked={locked}
             onAddStage={!locked ? () => setStageDialogState({ open: true }) : undefined}
             onAddRm={!locked ? (seqIdx: number) => setRmDialog({ seqIdx }) : undefined}

@@ -12,8 +12,17 @@
 // the top — production flows downward. Within a level, stages are spaced
 // left-to-right by their position index in that level.
 export const STAGE_W = 220
-export const STAGE_GAP_X = 80
-export const LEVEL_GAP_Y = 180
+// Must be >= RM_W + RM_GAP_X (210): each stage's local RM nodes render to its
+// LEFT at `x - (RM_W + RM_GAP_X)` (see route-graph-flow.tsx). If the gap
+// between same-level stages is smaller than that offset, a stage's RM column
+// lands on top of the previous stage's box — the "kabel/garis numpuk" overlap
+// bug. Kept with a margin above the strict minimum for breathing room.
+export const STAGE_GAP_X = 240
+// Must comfortably exceed a stage's local RM stack height (RM_GAP_Y per RM,
+// stacked downward from the stage's own y) so a stage with several RM inputs
+// doesn't spill into the next level's row below it — MB stages in particular
+// can have many RM lines.
+export const LEVEL_GAP_Y = 260
 // Approximate node height, used only for the bounding-box collision check
 // (fix 4b) — not a rendered dimension, the actual node auto-sizes to content.
 export const STAGE_H = 90
