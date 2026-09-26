@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ColumnVisibilityMenu,
   DataTable,
@@ -22,8 +23,11 @@ import {
   type ColumnDef,
   type RowAction,
 } from "@/components/shared"
-import { ProductTypeMultiCombobox } from "@/components/finance/comboboxes"
-import { ShadeCombobox } from "@/components/finance/shade"
+import {
+  ProductTypeMultiCombobox,
+  ShadeMultiCombobox,
+  RmGroupMultiCombobox,
+} from "@/components/finance/comboboxes"
 import {
   useCostResultsList,
   useCostResultPeriods,
@@ -36,14 +40,63 @@ import { CALC_TYPE_LABELS, formatNumeric } from "./format"
 import { ExportCostSheetButton } from "./export-cost-sheet-button"
 import { RecentExportsPopover } from "./recent-exports-popover"
 
+// Compact "Raw Material" cell: shows the top RM line + a "+N" badge for the
+// rest, with a hover tooltip listing every rmDetails line (now correctly
+// populated for RM-group / product-type RM rows by the backend fix). Falls
+// back to a bare count if rmDetails is empty but rmCount > 0 (stale data).
+function RawMaterialCell({ result }: { result: CostResult }) {
+  const details = result.rmDetails ?? []
+
+  if (result.rmCount === 0 && details.length === 0) {
+    return <span className="text-sm text-muted-foreground">—</span>
+  }
+
+  const primary = details[0]
+  const primaryLabel = primary?.refLabel || primary?.refCode || result.primaryRmName || result.primaryRmCode
+  const extraCount = Math.max(result.rmCount, details.length) - 1
+
+  const cellBody = (
+    <span className="text-sm">
+      {primaryLabel || "—"}
+      {extraCount > 0 && (
+        <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          +{extraCount}
+        </span>
+      )}
+    </span>
+  )
+
+  if (details.length === 0) {
+    // Stale-data edge case: rmCount > 0 but no line detail available.
+    return cellBody
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-default">{cellBody}</span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <div className="space-y-0.5">
+          {details.map((d, i) => (
+            <div key={i} className="text-xs">
+              {d.rmType || "—"} · {d.refCode || "—"} — {d.refLabel || "—"}
+            </div>
+          ))}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 interface FiltersState {
   period: string
   calcType: string
   status: string
   search: string
   productTypeIds: number[]
-  shadeCode: string
-  rawMaterial: string
+  shadeCodes: string[]
+  rmGroupCodes: string[]
   sortBy: string
   sortOrder: "asc" | "desc" | undefined
   page: number
@@ -58,16 +111,17 @@ interface FiltersState {
 
 // calcType defaults to "" ("All Calculation") — pinning it to ACTUAL made the
 // All-Calculation option un-selectable, since the URL state fell straight back
-// to the default. sortBy/sortOrder/productTypeIds/exportJobId must be listed
-// here too: useUrlState only tracks keys present in defaultValues.
+// to the default. sortBy/sortOrder/productTypeIds/shadeCodes/rmGroupCodes/
+// exportJobId must be listed here too: useUrlState only tracks keys present
+// in defaultValues.
 const defaultFilters: FiltersState = {
   period: "",
   calcType: "",
   status: "",
   search: "",
   productTypeIds: [],
-  shadeCode: "",
-  rawMaterial: "",
+  shadeCodes: [],
+  rmGroupCodes: [],
   sortBy: "",
   sortOrder: undefined,
   page: 1,
@@ -97,6 +151,9 @@ function serializeFilters(key: FilterKey, value: FilterValue): string | undefine
   if (key === "productTypeIds") {
     return Array.isArray(value) && value.length > 0 ? value.join(",") : undefined
   }
+  if (key === "shadeCodes" || key === "rmGroupCodes") {
+    return Array.isArray(value) && value.length > 0 ? value.join(",") : undefined
+  }
   if (value === undefined || value === null || value === "") return undefined
   return String(value)
 }
@@ -108,6 +165,13 @@ function deserializeFilters(key: FilterKey, value: string | null, defaultValue: 
       .split(",")
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isInteger(n) && n > 0)
+  }
+  if (key === "shadeCodes" || key === "rmGroupCodes") {
+    if (!value) return defaultValue
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
   }
   if (value === null) return defaultValue
   if (typeof defaultValue === "number") {
@@ -133,8 +197,8 @@ export function CostResultsPageClient() {
     status: filters.status || undefined,
     search: filters.search || undefined,
     productTypeIds: filters.productTypeIds,
-    shadeCode: filters.shadeCode || undefined,
-    rawMaterial: filters.rawMaterial || undefined,
+    shadeCodes: filters.shadeCodes,
+    rmGroupCodes: filters.rmGroupCodes,
     sortBy: filters.sortBy || undefined,
     sortOrder: filters.sortOrder,
     page: filters.page,
@@ -262,19 +326,7 @@ export function CostResultsPageClient() {
         id: "rawMaterial",
         header: "Raw Material",
         hideOnMobile: true,
-        cell: (r) =>
-          r.rmCount === 0 ? (
-            <span className="text-sm text-muted-foreground">—</span>
-          ) : (
-            <span className="text-sm">
-              {r.primaryRmName || r.primaryRmCode || "—"}
-              {r.rmCount > 1 && (
-                <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                  +{r.rmCount - 1}
-                </span>
-              )}
-            </span>
-          ),
+        cell: (r) => <RawMaterialCell result={r} />,
       },
       {
         id: "period",
@@ -360,8 +412,8 @@ export function CostResultsPageClient() {
     filters.status !== defaultFilters.status ||
     filters.search !== defaultFilters.search ||
     filters.productTypeIds.length > 0 ||
-    filters.shadeCode !== defaultFilters.shadeCode ||
-    filters.rawMaterial !== defaultFilters.rawMaterial
+    filters.shadeCodes.length > 0 ||
+    filters.rmGroupCodes.length > 0
   // exportJobId intentionally excluded from hasActiveFilters — it's not a
   // list filter, so it shouldn't show the "Clear filters" button on its own.
 
@@ -463,20 +515,17 @@ export function CostResultsPageClient() {
               placeholder="All product types"
               className="h-9 w-[220px]"
             />
-            <ShadeCombobox
-              code={filters.shadeCode || undefined}
-              name={undefined}
-              onSelect={(shadeCode) => setFilters({ ...filters, shadeCode, page: 1 })}
+            <ShadeMultiCombobox
+              value={filters.shadeCodes}
+              onChange={(shadeCodes) => setFilters({ ...filters, shadeCodes, page: 1 })}
               placeholder="All shades"
               className="h-9 w-[180px]"
             />
-            <DebouncedSearchInput
-              containerClassName="w-[200px]"
-              className="h-9"
-              value={filters.rawMaterial}
-              onValueChange={(rawMaterial) => setFilters({ ...filters, rawMaterial, page: 1 })}
-              placeholder="Raw material code or name…"
-              showIcon={false}
+            <RmGroupMultiCombobox
+              value={filters.rmGroupCodes}
+              onChange={(rmGroupCodes) => setFilters({ ...filters, rmGroupCodes, page: 1 })}
+              placeholder="All RM groups"
+              className="h-9 w-[200px]"
             />
             <Select
               value={filters.calcType || "ALL"}

@@ -14,6 +14,16 @@ function parseIdList(raw: string | null): number[] {
     .filter((n) => Number.isInteger(n) && n > 0)
 }
 
+// parseCodeList turns a CSV query param (shadeCodes / rmGroupCodes) into a
+// trimmed, non-empty string list — same CSV convention as productTypeIds.
+function parseCodeList(raw: string | null): string[] {
+  if (!raw) return []
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams
@@ -30,8 +40,8 @@ export async function GET(request: NextRequest) {
         status: toCostResultStatus(sp.get("status")),
         search: sp.get("search") || "",
         productTypeIds: parseIdList(sp.get("productTypeIds")),
-        shadeCode: sp.get("shadeCode") || "",
-        rawMaterial: sp.get("rawMaterial") || "",
+        shadeCodes: parseCodeList(sp.get("shadeCodes")),
+        rmGroupCodes: parseCodeList(sp.get("rmGroupCodes")),
         sortBy: sp.get("sortBy") || "",
         sortOrder: sp.get("sortOrder") || "",
       },
