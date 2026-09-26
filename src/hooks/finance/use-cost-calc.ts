@@ -445,6 +445,8 @@ export interface RequestCostSheetExportInput {
   productTypeIds?: number[]
   search?: string
   status?: string
+  shadeCodes?: string[]
+  rmGroupCodes?: string[]
   // Explicit selection; when non-empty the filters above are ignored server-side.
   productSysIds?: number[]
 }

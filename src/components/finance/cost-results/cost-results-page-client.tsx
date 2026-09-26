@@ -236,8 +236,18 @@ export function CostResultsPageClient() {
       productTypeIds: filters.productTypeIds,
       search: filters.search || undefined,
       status: filters.status || undefined,
+      shadeCodes: filters.shadeCodes,
+      rmGroupCodes: filters.rmGroupCodes,
     }),
-    [filters.period, filters.calcType, filters.productTypeIds, filters.search, filters.status],
+    [
+      filters.period,
+      filters.calcType,
+      filters.productTypeIds,
+      filters.search,
+      filters.status,
+      filters.shadeCodes,
+      filters.rmGroupCodes,
+    ],
   )
 
   // RowAction.onClick is sync/void, so the mutation lives here and is fired

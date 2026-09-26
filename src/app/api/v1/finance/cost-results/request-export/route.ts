@@ -21,6 +21,20 @@ function toIdList(raw: unknown): number[] {
     .filter((n) => Number.isInteger(n) && n > 0)
 }
 
+// toCodeList coerces a JSON array (or CSV string) of codes into a trimmed,
+// non-empty string list, defaulting to [] when absent — same convention as
+// the list route's parseCodeList.
+function toCodeList(raw: unknown): string[] {
+  const parts = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(",")
+      : []
+  return parts
+    .map((v) => (typeof v === "string" ? v.trim() : String(v)))
+    .filter((s) => s.length > 0)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -35,6 +49,8 @@ export async function POST(request: NextRequest) {
         search: body.search ?? "",
         status: toCostResultStatus(body.status),
         productSysIds: toIdList(body.productSysIds),
+        shadeCodes: toCodeList(body.shadeCodes),
+        rmGroupCodes: toCodeList(body.rmGroupCodes),
       },
       metadata,
     )

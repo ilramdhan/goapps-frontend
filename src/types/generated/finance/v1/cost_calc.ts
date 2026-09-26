@@ -1070,6 +1070,13 @@ export interface RequestProductCostSheetExportRequest {
    * handler. Keep the two numbers in sync.
    */
   productSysIds: number[];
+  /** Shade code filter (empty = all shades). */
+  shadeCodes: string[];
+  /**
+   * Raw-material group code filter, matched against GROUP-type RM lines
+   * (empty = all raw materials).
+   */
+  rmGroupCodes: string[];
 }
 
 /** RequestProductCostSheetExportResponse acknowledges the queued job. */
@@ -7061,7 +7068,16 @@ export const GetRouteCostSheetResponse: MessageFns<GetRouteCostSheetResponse> = 
 };
 
 function createBaseRequestProductCostSheetExportRequest(): RequestProductCostSheetExportRequest {
-  return { period: "", calculationType: 0, productTypeIds: [], search: "", status: 0, productSysIds: [] };
+  return {
+    period: "",
+    calculationType: 0,
+    productTypeIds: [],
+    search: "",
+    status: 0,
+    productSysIds: [],
+    shadeCodes: [],
+    rmGroupCodes: [],
+  };
 }
 
 export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCostSheetExportRequest> = {
@@ -7083,6 +7099,12 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     }
     for (const v of message.productSysIds) {
       writer.uint32(48).int64(v!);
+    }
+    for (const v of message.shadeCodes) {
+      writer.uint32(58).string(v!);
+    }
+    for (const v of message.rmGroupCodes) {
+      writer.uint32(66).string(v!);
     }
     return writer;
   },
@@ -7162,6 +7184,22 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
 
           break;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.shadeCodes.push(reader.string());
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.rmGroupCodes.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7191,6 +7229,16 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
         : globalThis.Array.isArray(object?.product_sys_ids)
         ? object.product_sys_ids.map((e: any) => globalThis.Number(e))
         : [],
+      shadeCodes: globalThis.Array.isArray(object?.shadeCodes)
+        ? object.shadeCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.shade_codes)
+        ? object.shade_codes.map((e: any) => globalThis.String(e))
+        : [],
+      rmGroupCodes: globalThis.Array.isArray(object?.rmGroupCodes)
+        ? object.rmGroupCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.rm_group_codes)
+        ? object.rm_group_codes.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -7214,6 +7262,12 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     if (message.productSysIds?.length) {
       obj.productSysIds = message.productSysIds.map((e) => Math.round(e));
     }
+    if (message.shadeCodes?.length) {
+      obj.shadeCodes = message.shadeCodes;
+    }
+    if (message.rmGroupCodes?.length) {
+      obj.rmGroupCodes = message.rmGroupCodes;
+    }
     return obj;
   },
 
@@ -7228,6 +7282,8 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     message.search = object.search ?? "";
     message.status = object.status ?? 0;
     message.productSysIds = object.productSysIds?.map((e) => e) || [];
+    message.shadeCodes = object.shadeCodes?.map((e) => e) || [];
+    message.rmGroupCodes = object.rmGroupCodes?.map((e) => e) || [];
     return message;
   },
 };
