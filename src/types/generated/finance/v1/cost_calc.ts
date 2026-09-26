@@ -617,6 +617,12 @@ export interface CostResult {
   primaryRmName: string;
   /** Count of raw material entries in cpc_rm_cost_detail. */
   rmCount: number;
+  /**
+   * Full raw material breakdown (every cpc_rm_cost_detail line, ordered by
+   * contribution descending), so a UI can show more than just the primary
+   * contributor. Reuses CostRMDetail (already defined for CostBreakdown).
+   */
+  rmDetails: CostRMDetail[];
 }
 
 /** CostBreakdown is the full drill-down for one CostResult. */
@@ -919,15 +925,18 @@ export interface ListCostResultsRequest {
    */
   sortOrder: string;
   /**
-   * Shade code filter (empty = no filter). Matches
-   * cost_product_master.cpm_shade_code.
+   * Shade code multi-select filter (empty = no filter). A result matches when
+   * cost_product_master.cpm_shade_code is one of the given codes.
    */
-  shadeCode: string;
+  shadeCodes: string[];
   /**
-   * Raw material search (empty = no filter). Matches ref_code or ref_label of
-   * any entry in cpc_rm_cost_detail.
+   * RM group multi-select filter (empty = no filter). A result matches when
+   * any cpc_rm_cost_detail entry has rm_type = "GROUP" and its group
+   * reference code (ref_code, matching cst_rm_group_head.group_code) is one
+   * of the given codes. Free-text RM search across all RM kinds (GROUP,
+   * ITEM, PRODUCT) stays covered by the `search` field above.
    */
-  rawMaterial: string;
+  rmGroupCodes: string[];
 }
 
 /** ListCostResultsResponse returns a page of cost results across products. */
@@ -1061,6 +1070,13 @@ export interface RequestProductCostSheetExportRequest {
    * handler. Keep the two numbers in sync.
    */
   productSysIds: number[];
+  /** Shade code filter (empty = all shades). */
+  shadeCodes: string[];
+  /**
+   * Raw-material group code filter, matched against GROUP-type RM lines
+   * (empty = all raw materials).
+   */
+  rmGroupCodes: string[];
 }
 
 /** RequestProductCostSheetExportResponse acknowledges the queued job. */
@@ -2731,6 +2747,7 @@ function createBaseCostResult(): CostResult {
     primaryRmCode: "",
     primaryRmName: "",
     rmCount: 0,
+    rmDetails: [],
   };
 }
 
@@ -2825,6 +2842,9 @@ export const CostResult: MessageFns<CostResult> = {
     }
     if (message.rmCount !== 0) {
       writer.uint32(240).int32(message.rmCount);
+    }
+    for (const v of message.rmDetails) {
+      CostRMDetail.encode(v!, writer.uint32(250).fork()).join();
     }
     return writer;
   },
@@ -3076,6 +3096,14 @@ export const CostResult: MessageFns<CostResult> = {
           message.rmCount = reader.int32();
           continue;
         }
+        case 31: {
+          if (tag !== 250) {
+            break;
+          }
+
+          message.rmDetails.push(CostRMDetail.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3225,6 +3253,11 @@ export const CostResult: MessageFns<CostResult> = {
         : isSet(object.rm_count)
         ? globalThis.Number(object.rm_count)
         : 0,
+      rmDetails: globalThis.Array.isArray(object?.rmDetails)
+        ? object.rmDetails.map((e: any) => CostRMDetail.fromJSON(e))
+        : globalThis.Array.isArray(object?.rm_details)
+        ? object.rm_details.map((e: any) => CostRMDetail.fromJSON(e))
+        : [],
     };
   },
 
@@ -3320,6 +3353,9 @@ export const CostResult: MessageFns<CostResult> = {
     if (message.rmCount !== 0) {
       obj.rmCount = Math.round(message.rmCount);
     }
+    if (message.rmDetails?.length) {
+      obj.rmDetails = message.rmDetails.map((e) => CostRMDetail.toJSON(e));
+    }
     return obj;
   },
 
@@ -3358,6 +3394,7 @@ export const CostResult: MessageFns<CostResult> = {
     message.primaryRmCode = object.primaryRmCode ?? "";
     message.primaryRmName = object.primaryRmName ?? "";
     message.rmCount = object.rmCount ?? 0;
+    message.rmDetails = object.rmDetails?.map((e) => CostRMDetail.fromPartial(e)) || [];
     return message;
   },
 };
@@ -5832,8 +5869,8 @@ function createBaseListCostResultsRequest(): ListCostResultsRequest {
     productTypeIds: [],
     sortBy: "",
     sortOrder: "",
-    shadeCode: "",
-    rawMaterial: "",
+    shadeCodes: [],
+    rmGroupCodes: [],
   };
 }
 
@@ -5863,11 +5900,11 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     if (message.sortOrder !== "") {
       writer.uint32(66).string(message.sortOrder);
     }
-    if (message.shadeCode !== "") {
-      writer.uint32(74).string(message.shadeCode);
+    for (const v of message.shadeCodes) {
+      writer.uint32(74).string(v!);
     }
-    if (message.rawMaterial !== "") {
-      writer.uint32(82).string(message.rawMaterial);
+    for (const v of message.rmGroupCodes) {
+      writer.uint32(82).string(v!);
     }
     return writer;
   },
@@ -5958,7 +5995,7 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
             break;
           }
 
-          message.shadeCode = reader.string();
+          message.shadeCodes.push(reader.string());
           continue;
         }
         case 10: {
@@ -5966,7 +6003,7 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
             break;
           }
 
-          message.rawMaterial = reader.string();
+          message.rmGroupCodes.push(reader.string());
           continue;
         }
       }
@@ -6004,16 +6041,16 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
         : isSet(object.sort_order)
         ? globalThis.String(object.sort_order)
         : "",
-      shadeCode: isSet(object.shadeCode)
-        ? globalThis.String(object.shadeCode)
-        : isSet(object.shade_code)
-        ? globalThis.String(object.shade_code)
-        : "",
-      rawMaterial: isSet(object.rawMaterial)
-        ? globalThis.String(object.rawMaterial)
-        : isSet(object.raw_material)
-        ? globalThis.String(object.raw_material)
-        : "",
+      shadeCodes: globalThis.Array.isArray(object?.shadeCodes)
+        ? object.shadeCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.shade_codes)
+        ? object.shade_codes.map((e: any) => globalThis.String(e))
+        : [],
+      rmGroupCodes: globalThis.Array.isArray(object?.rmGroupCodes)
+        ? object.rmGroupCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.rm_group_codes)
+        ? object.rm_group_codes.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -6043,11 +6080,11 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     if (message.sortOrder !== "") {
       obj.sortOrder = message.sortOrder;
     }
-    if (message.shadeCode !== "") {
-      obj.shadeCode = message.shadeCode;
+    if (message.shadeCodes?.length) {
+      obj.shadeCodes = message.shadeCodes;
     }
-    if (message.rawMaterial !== "") {
-      obj.rawMaterial = message.rawMaterial;
+    if (message.rmGroupCodes?.length) {
+      obj.rmGroupCodes = message.rmGroupCodes;
     }
     return obj;
   },
@@ -6067,8 +6104,8 @@ export const ListCostResultsRequest: MessageFns<ListCostResultsRequest> = {
     message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
-    message.shadeCode = object.shadeCode ?? "";
-    message.rawMaterial = object.rawMaterial ?? "";
+    message.shadeCodes = object.shadeCodes?.map((e) => e) || [];
+    message.rmGroupCodes = object.rmGroupCodes?.map((e) => e) || [];
     return message;
   },
 };
@@ -7031,7 +7068,16 @@ export const GetRouteCostSheetResponse: MessageFns<GetRouteCostSheetResponse> = 
 };
 
 function createBaseRequestProductCostSheetExportRequest(): RequestProductCostSheetExportRequest {
-  return { period: "", calculationType: 0, productTypeIds: [], search: "", status: 0, productSysIds: [] };
+  return {
+    period: "",
+    calculationType: 0,
+    productTypeIds: [],
+    search: "",
+    status: 0,
+    productSysIds: [],
+    shadeCodes: [],
+    rmGroupCodes: [],
+  };
 }
 
 export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCostSheetExportRequest> = {
@@ -7053,6 +7099,12 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     }
     for (const v of message.productSysIds) {
       writer.uint32(48).int64(v!);
+    }
+    for (const v of message.shadeCodes) {
+      writer.uint32(58).string(v!);
+    }
+    for (const v of message.rmGroupCodes) {
+      writer.uint32(66).string(v!);
     }
     return writer;
   },
@@ -7132,6 +7184,22 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
 
           break;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.shadeCodes.push(reader.string());
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.rmGroupCodes.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7161,6 +7229,16 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
         : globalThis.Array.isArray(object?.product_sys_ids)
         ? object.product_sys_ids.map((e: any) => globalThis.Number(e))
         : [],
+      shadeCodes: globalThis.Array.isArray(object?.shadeCodes)
+        ? object.shadeCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.shade_codes)
+        ? object.shade_codes.map((e: any) => globalThis.String(e))
+        : [],
+      rmGroupCodes: globalThis.Array.isArray(object?.rmGroupCodes)
+        ? object.rmGroupCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.rm_group_codes)
+        ? object.rm_group_codes.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -7184,6 +7262,12 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     if (message.productSysIds?.length) {
       obj.productSysIds = message.productSysIds.map((e) => Math.round(e));
     }
+    if (message.shadeCodes?.length) {
+      obj.shadeCodes = message.shadeCodes;
+    }
+    if (message.rmGroupCodes?.length) {
+      obj.rmGroupCodes = message.rmGroupCodes;
+    }
     return obj;
   },
 
@@ -7198,6 +7282,8 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     message.search = object.search ?? "";
     message.status = object.status ?? 0;
     message.productSysIds = object.productSysIds?.map((e) => e) || [];
+    message.shadeCodes = object.shadeCodes?.map((e) => e) || [];
+    message.rmGroupCodes = object.rmGroupCodes?.map((e) => e) || [];
     return message;
   },
 };
