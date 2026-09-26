@@ -30,6 +30,7 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
             <TableHead className="w-24">Type</TableHead>
             <TableHead>Reference</TableHead>
             <TableHead>Shade</TableHead>
+            <TableHead className="w-20 text-right">Level</TableHead>
             <TableHead className="text-right">Unit cost</TableHead>
             <TableHead className="text-right">Ratio</TableHead>
             <TableHead className="text-right">Contribution</TableHead>
@@ -45,10 +46,13 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
               </TableCell>
               <TableCell>
                 <p className="font-mono text-xs text-muted-foreground">{r.refCode}</p>
-                <p className="text-sm">{r.refLabel}</p>
+                <p className="text-sm">{r.refLabel || "—"}</p>
               </TableCell>
               <TableCell className="font-mono text-xs text-muted-foreground">
                 {r.shadeCode || "—"}
+              </TableCell>
+              <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                {r.routeLevel || "—"}
               </TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatNumeric(r.unitCost)}

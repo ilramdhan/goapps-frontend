@@ -314,6 +314,11 @@ export interface CostResult {
   primaryRmCode: string
   primaryRmName: string
   rmCount: number
+  // Full RM breakdown (every cpc_rm_cost_detail line, ordered by contribution
+  // descending) — populated on both list rows and single-result fetches now
+  // that the backend RM-detail bug is fixed. Empty array if the product has
+  // no RM detail (rmCount will also be 0 in that case).
+  rmDetails: CostRmDetail[]
 }
 
 export interface LevelBreakdown {
@@ -333,6 +338,9 @@ export interface CostRmDetail {
   unitCost: string
   ratio: string
   contribution: string
+  // Route level this RM edge feeds (1 = FG; 2..N upstream). Newly populated
+  // by the backend — previously always 0/blank.
+  routeLevel: number
 }
 
 export interface FormulaEval {
@@ -468,6 +476,9 @@ export function normalizeCostResult(raw: Record<string, unknown>): CostResult {
     primaryRmCode: fieldStr(raw, "primaryRmCode", "primary_rm_code"),
     primaryRmName: fieldStr(raw, "primaryRmName", "primary_rm_name"),
     rmCount: fieldNum(raw, "rmCount", "rm_count"),
+    rmDetails: arr<Record<string, unknown>>(raw.rmDetails ?? raw.rm_details).map(
+      normalizeCostRmDetail,
+    ),
   }
 }
 
@@ -491,6 +502,7 @@ export function normalizeCostRmDetail(raw: Record<string, unknown>): CostRmDetai
     unitCost: fieldStr(raw, "unitCost", "unit_cost", "0"),
     ratio: fieldStr(raw, "ratio", "ratio", "0"),
     contribution: fieldStr(raw, "contribution", "contribution", "0"),
+    routeLevel: fieldNum(raw, "routeLevel", "route_level"),
   }
 }
 

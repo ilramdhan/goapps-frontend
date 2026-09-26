@@ -20,6 +20,7 @@ import type { CalculationType } from "@/types/finance/cost-calc"
 // the shell — sheet chrome, data fetching, tab wiring — and nothing else.
 import {
   ByLevelTab,
+  Field,
   FormulaTraceTab,
   RmTab,
   SummaryTab,
@@ -61,24 +62,43 @@ export function CostBreakdownModal({
         className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl"
       >
         {/* ── Sticky header ── same structure as FillParamDrawer */}
-        <div className="flex shrink-0 items-start gap-3 border-b bg-background px-6 py-4">
-          <div className="min-w-0 flex-1 space-y-1">
-            <SheetTitle className="text-base font-semibold leading-tight">
-              {productName || productCode}
-            </SheetTitle>
-            <SheetDescription className="text-xs text-muted-foreground">
-              {productName ? `${productCode}  ·  ` : ""}Period {period} · {calcType}
-              {s?.version !== undefined ? ` · v${s.version}` : ""}
-            </SheetDescription>
+        <div className="flex shrink-0 flex-col gap-3 border-b bg-background px-6 py-4">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1 space-y-1">
+              <SheetTitle className="text-base font-semibold leading-tight">
+                {productName || productCode}
+              </SheetTitle>
+              <SheetDescription className="text-xs text-muted-foreground">
+                {productName ? `${productCode}  ·  ` : ""}Period {period} · {calcType}
+                {s?.version !== undefined ? ` · v${s.version}` : ""}
+              </SheetDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </Button>
+              </SheetClose>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </Button>
-            </SheetClose>
-          </div>
+
+          {s && (s.itemCode || s.itemName || s.shadeCode || s.shadeName) && (
+            <div className="grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-4">
+              <Field label="Item Code">
+                <span className="font-mono text-sm">{s.itemCode || "—"}</span>
+              </Field>
+              <Field label="Item Name">
+                <span className="text-sm">{s.itemName || "—"}</span>
+              </Field>
+              <Field label="Shade Code">
+                <span className="font-mono text-sm">{s.shadeCode || "—"}</span>
+              </Field>
+              <Field label="Shade Name">
+                <span className="text-sm">{s.shadeName || "—"}</span>
+              </Field>
+            </div>
+          )}
         </div>
 
         {/* ── Loading ── */}
