@@ -73,15 +73,22 @@ export function MasterLookupField({
   // `limit: DISPLAY_LIMIT + 1` asks for one row past what we display so we
   // can still show an honest "there may be more — refine your search" notice
   // without a separate COUNT(*) round trip.
+  const currentValue = draft.valueText
+
+  // ⭐ FIX (2026-09-28) — a row that already has a saved value must resolve
+  // its label on first paint, not only after the user opens the popover.
+  // The lazy-fetch-on-open behavior above is still preserved for EMPTY rows
+  // (no perf regression for the common case of unset lookups), but a row
+  // with `currentValue` needs its options fetched immediately so
+  // `selectedOption` below can match and render the real label instead of
+  // silently falling back to the placeholder until clicked.
   const { data: options = [], isLoading: optionsLoading } = useMasterLookupOptions(
     entry.lookupMasterCode,
-    open,
+    open || !!currentValue,
     search,
     DISPLAY_LIMIT + 1,
     productSysId
   )
-
-  const currentValue = draft.valueText
 
   const visibleOptions = useMemo(() => options.slice(0, DISPLAY_LIMIT), [options])
   const hasMore = options.length > DISPLAY_LIMIT
