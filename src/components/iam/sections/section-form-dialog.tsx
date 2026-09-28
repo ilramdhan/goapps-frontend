@@ -27,17 +27,26 @@ import { CompanyCombobox } from "@/components/iam/company-combobox"
 import { DivisionCombobox } from "@/components/iam/division-combobox"
 import { DepartmentCombobox } from "@/components/iam/department-combobox"
 
-const schema = z.object({
+const baseSectionFormFields = {
     companyId: z.string().min(1, "Company is required"),
     divisionId: z.string().min(1, "Division is required"),
     departmentId: z.string().min(1, "Department is required"),
-    sectionCode: z.string().min(1, "Code is required").max(20).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
     sectionName: z.string().min(1, "Name is required").max(100),
     description: z.string().max(500).optional(),
     isActive: z.boolean(),
+}
+
+const createSchema = z.object({
+    sectionCode: z.string().min(1, "Code is required").max(20).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
+    ...baseSectionFormFields,
 })
 
-type FormValues = z.infer<typeof schema>
+const updateSchema = z.object({
+    sectionCode: z.string().min(1, "Code is required"),
+    ...baseSectionFormFields,
+})
+
+type FormValues = z.infer<typeof createSchema>
 
 interface Props {
     open: boolean
@@ -52,7 +61,7 @@ export function SectionFormDialog({ open, onOpenChange, section, onSuccess }: Pr
     const updateMutation = useUpdateSection()
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema) as never,
+        resolver: zodResolver(isEditing ? updateSchema : createSchema) as never,
         defaultValues: { companyId: "", divisionId: "", departmentId: "", sectionCode: "", sectionName: "", description: "", isActive: true },
     })
 

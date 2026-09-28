@@ -33,7 +33,15 @@ import {
   useUpdateEmployeeGroup,
 } from "@/hooks/iam/use-employee-group"
 
-const employeeGroupFormSchema = z.object({
+const baseEmployeeGroupFormFields = {
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(100, "Name must be at most 100 characters"),
+  isActive: z.boolean(),
+}
+
+const createEmployeeGroupFormSchema = z.object({
   code: z
     .string()
     .min(1, "Code is required")
@@ -42,14 +50,15 @@ const employeeGroupFormSchema = z.object({
       /^[A-Z][A-Z0-9]*$/,
       "Code must start with an uppercase letter and contain only uppercase letters and numbers"
     ),
-  name: z
-    .string()
-    .min(1, "Name is required")
-    .max(100, "Name must be at most 100 characters"),
-  isActive: z.boolean(),
+  ...baseEmployeeGroupFormFields,
 })
 
-type EmployeeGroupFormValues = z.infer<typeof employeeGroupFormSchema>
+const updateEmployeeGroupFormSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  ...baseEmployeeGroupFormFields,
+})
+
+type EmployeeGroupFormValues = z.infer<typeof createEmployeeGroupFormSchema>
 
 interface EmployeeGroupFormDialogProps {
   open: boolean
@@ -69,7 +78,7 @@ export function EmployeeGroupFormDialog({
   const updateMutation = useUpdateEmployeeGroup()
 
   const form = useForm<EmployeeGroupFormValues>({
-    resolver: zodResolver(employeeGroupFormSchema) as never,
+    resolver: zodResolver(isEditing ? updateEmployeeGroupFormSchema : createEmployeeGroupFormSchema) as never,
     defaultValues: {
       code: "",
       name: "",

@@ -41,16 +41,8 @@ import type { CMSSection } from "@/types/iam/cms-section"
 import { CMSSectionType, SECTION_TYPE_OPTIONS } from "@/types/iam/cms-section"
 import { useCreateCMSSection, useUpdateCMSSection, useUploadCMSImage } from "@/hooks/iam/use-cms-section"
 
-const cmsSectionFormSchema = z.object({
+const sharedCmsSectionFields = {
   sectionType: z.coerce.number(),
-  sectionKey: z
-    .string()
-    .min(1, "Key is required")
-    .max(100, "Key must be at most 100 characters")
-    .regex(
-      /^[a-z][a-z0-9_]*$/,
-      "Key must start with a lowercase letter and contain only lowercase letters, numbers, and underscores"
-    ),
   title: z.string().max(200, "Title must be at most 200 characters"),
   subtitle: z.string().max(500, "Subtitle must be at most 500 characters"),
   content: z.string(),
@@ -61,9 +53,31 @@ const cmsSectionFormSchema = z.object({
   sortOrder: z.coerce.number().int().min(0),
   isPublished: z.boolean(),
   metadata: z.string(),
+}
+
+// Create: sectionKey is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  sectionKey: z
+    .string()
+    .min(1, "Key is required")
+    .max(100, "Key must be at most 100 characters")
+    .regex(
+      /^[a-z][a-z0-9_]*$/,
+      "Key must start with a lowercase letter and contain only lowercase letters, numbers, and underscores"
+    ),
+  ...sharedCmsSectionFields,
 })
 
-type CMSSectionFormValues = z.infer<typeof cmsSectionFormSchema>
+// Update: sectionKey is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise saving legacy data that predates the format rule would be
+// blocked. Still required as a non-empty string so the form/type stays sane.
+const updateFormSchema = z.object({
+  sectionKey: z.string().min(1),
+  ...sharedCmsSectionFields,
+})
+
+type CMSSectionFormValues = z.infer<typeof createFormSchema>
 
 interface CMSSectionFormDialogProps {
   open: boolean
@@ -85,7 +99,9 @@ export function CMSSectionFormDialog({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<CMSSectionFormValues>({
-    resolver: zodResolver(cmsSectionFormSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       sectionType: CMSSectionType.CMS_SECTION_TYPE_CUSTOM,
       sectionKey: "",

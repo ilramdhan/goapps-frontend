@@ -56,15 +56,7 @@ interface EmployeeLevelFormValues {
   isActive: boolean
 }
 
-const employeeLevelFormSchema = z.object({
-  code: z
-    .string()
-    .min(1, "Code is required")
-    .max(20, "Code must be at most 20 characters")
-    .regex(
-      /^[A-Z][A-Z0-9-]*$/,
-      "Code must start with an uppercase letter and contain only uppercase letters, numbers, and hyphens"
-    ),
+const baseEmployeeLevelFormFields = {
   name: z
     .string()
     .min(1, "Name is required")
@@ -91,6 +83,23 @@ const employeeLevelFormSchema = z.object({
       { message: "Workflow is required" }
     ),
   isActive: z.boolean(),
+}
+
+const createEmployeeLevelFormSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Code is required")
+    .max(20, "Code must be at most 20 characters")
+    .regex(
+      /^[A-Z][A-Z0-9-]*$/,
+      "Code must start with an uppercase letter and contain only uppercase letters, numbers, and hyphens"
+    ),
+  ...baseEmployeeLevelFormFields,
+})
+
+const updateEmployeeLevelFormSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  ...baseEmployeeLevelFormFields,
 })
 
 interface EmployeeLevelFormDialogProps {
@@ -111,7 +120,7 @@ export function EmployeeLevelFormDialog({
   const updateMutation = useUpdateEmployeeLevel()
 
   const form = useForm<EmployeeLevelFormValues>({
-    resolver: zodResolver(employeeLevelFormSchema) as never,
+    resolver: zodResolver(isEditing ? updateEmployeeLevelFormSchema : createEmployeeLevelFormSchema) as never,
     defaultValues: {
       code: "",
       name: "",

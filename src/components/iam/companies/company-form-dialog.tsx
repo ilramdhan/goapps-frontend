@@ -34,18 +34,27 @@ import { Switch } from "@/components/ui/switch"
 import type { Company } from "@/types/iam/company"
 import { useCreateCompany, useUpdateCompany } from "@/hooks/iam/use-company"
 
-const schema = z.object({
+const baseCompanyFormFields = {
+    companyName: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).optional(),
+    isActive: z.boolean(),
+}
+
+const createSchema = z.object({
     companyCode: z
         .string()
         .min(1, "Code is required")
         .max(20, "Max 20 characters")
         .regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase letters, digits, hyphen"),
-    companyName: z.string().min(1, "Name is required").max(100),
-    description: z.string().max(500).optional(),
-    isActive: z.boolean(),
+    ...baseCompanyFormFields,
 })
 
-type FormValues = z.infer<typeof schema>
+const updateSchema = z.object({
+    companyCode: z.string().min(1, "Code is required"),
+    ...baseCompanyFormFields,
+})
+
+type FormValues = z.infer<typeof createSchema>
 
 interface CompanyFormDialogProps {
     open: boolean
@@ -60,7 +69,7 @@ export function CompanyFormDialog({ open, onOpenChange, company, onSuccess }: Co
     const updateMutation = useUpdateCompany()
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema) as never,
+        resolver: zodResolver(isEditing ? updateSchema : createSchema) as never,
         defaultValues: { companyCode: "", companyName: "", description: "", isActive: true },
     })
 

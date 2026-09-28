@@ -40,15 +40,7 @@ interface CMSPageFormValues {
   sortOrder: number
 }
 
-const cmsPageFormSchema = z.object({
-  pageSlug: z
-    .string()
-    .min(1, "Slug is required")
-    .max(100, "Slug must be at most 100 characters")
-    .regex(
-      /^[a-z][a-z0-9-]*$/,
-      "Slug must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens"
-    ),
+const sharedCmsPageFields = {
   pageTitle: z
     .string()
     .min(1, "Title is required")
@@ -57,6 +49,28 @@ const cmsPageFormSchema = z.object({
   metaDescription: z.string().max(500, "Meta description must be at most 500 characters"),
   isPublished: z.boolean(),
   sortOrder: z.coerce.number().int().min(0),
+}
+
+// Create: pageSlug is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  pageSlug: z
+    .string()
+    .min(1, "Slug is required")
+    .max(100, "Slug must be at most 100 characters")
+    .regex(
+      /^[a-z][a-z0-9-]*$/,
+      "Slug must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens"
+    ),
+  ...sharedCmsPageFields,
+})
+
+// Update: pageSlug is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise saving legacy data that predates the format rule would be
+// blocked. Still required as a non-empty string so the form/type stays sane.
+const updateFormSchema = z.object({
+  pageSlug: z.string().min(1),
+  ...sharedCmsPageFields,
 })
 
 interface CMSPageFormDialogProps {
@@ -77,7 +91,9 @@ export function CMSPageFormDialog({
   const updateMutation = useUpdateCMSPage()
 
   const form = useForm<CMSPageFormValues>({
-    resolver: zodResolver(cmsPageFormSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       pageSlug: "",
       pageTitle: "",
