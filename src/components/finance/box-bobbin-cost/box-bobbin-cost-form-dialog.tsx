@@ -33,15 +33,20 @@ import {
   useUpdateBoxBobbinCost,
 } from "@/hooks/finance/use-box-bobbin-cost"
 
-const formSchema = z.object({
-  bbcCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(50, "Code must be at most 50 characters")
-    .regex(
-      /^[A-Z][A-Z0-9_]*$/,
-      "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
-    ),
+// `bbcCode` is the primary key: editable only at creation time. The field is
+// rendered `disabled` on update, and its value is intentionally excluded
+// from the update mutation payload below (see onSubmit) — so on update this
+// schema must not re-validate the format of pre-existing/legacy codes.
+const bbcCodeFormatSchema = z
+  .string()
+  .min(1, "Code is required")
+  .max(50, "Code must be at most 50 characters")
+  .regex(
+    /^[A-Z][A-Z0-9_]*$/,
+    "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
+  )
+
+const sharedBoxBobbinCostFields = {
   bbcName: z
     .string()
     .min(1, "Name is required")
@@ -58,9 +63,24 @@ const formSchema = z.object({
   bobinCost:    z.coerce.number().min(0).optional().nullable(),
   boxCostVal:   z.coerce.number().min(0).optional().nullable(),
   bobinCostVal: z.coerce.number().min(0).optional().nullable(),
+}
+
+// Create: bbcCode is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  bbcCode: bbcCodeFormatSchema,
+  ...sharedBoxBobbinCostFields,
 })
 
-type FormValues = z.infer<typeof formSchema>
+// Update: bbcCode is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise saving legacy data that predates the format rule would be
+// blocked. Still required as a non-empty string so the form/type stays sane.
+const updateFormSchema = z.object({
+  bbcCode: z.string().min(1),
+  ...sharedBoxBobbinCostFields,
+})
+
+type FormValues = z.infer<typeof createFormSchema>
 
 interface BoxBobbinCostFormDialogProps {
   open: boolean
@@ -80,7 +100,9 @@ export function BoxBobbinCostFormDialog({
   const updateMutation = useUpdateBoxBobbinCost()
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       bbcCode: "",
       bbcName: "",
@@ -284,7 +306,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -305,7 +327,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -326,7 +348,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -347,7 +369,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -368,7 +390,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -389,7 +411,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -410,7 +432,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
@@ -431,7 +453,7 @@ export function BoxBobbinCostFormDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.000001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}

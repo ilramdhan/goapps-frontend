@@ -73,15 +73,7 @@ const validTypeValues = [
   FormulaType.FORMULA_TYPE_INITIAL_VALUE,
 ]
 
-const formulaFormSchema = z.object({
-  formulaCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(50, "Code must be at most 50 characters")
-    .regex(
-      /^[A-Z][A-Z0-9_]*$/,
-      "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
-    ),
+const baseFormulaFormFields = {
   formulaName: z
     .string()
     .min(1, "Name is required")
@@ -102,7 +94,9 @@ const formulaFormSchema = z.object({
   inputParamIds: z.array(z.string()),
   description: z.string().max(1000, "Description must be at most 1000 characters"),
   isActive: z.boolean(),
-}).superRefine((data, ctx) => {
+}
+
+function superRefineFormula(data: { formulaType: number; resultParamId: string; inputParamIds: string[] }, ctx: z.RefinementCtx) {
   if (
     data.formulaType === FormulaType.FORMULA_TYPE_CALCULATION &&
     data.inputParamIds.length === 0
@@ -124,7 +118,24 @@ const formulaFormSchema = z.object({
       path: ["inputParamIds"],
     })
   }
-})
+}
+
+const createFormulaFormSchema = z.object({
+  formulaCode: z
+    .string()
+    .min(1, "Code is required")
+    .max(50, "Code must be at most 50 characters")
+    .regex(
+      /^[A-Z][A-Z0-9_]*$/,
+      "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
+    ),
+  ...baseFormulaFormFields,
+}).superRefine(superRefineFormula)
+
+const updateFormulaFormSchema = z.object({
+  formulaCode: z.string().min(1, "Code is required"),
+  ...baseFormulaFormFields,
+}).superRefine(superRefineFormula)
 
 interface FormulaFormDialogProps {
   open: boolean
@@ -219,7 +230,7 @@ export function FormulaFormDialog({
   ].sort((a, b) => (a.paramCode || "").localeCompare(b.paramCode || "")), [inputParamData, rateParamData, calculatedParamData, masterLookupParamData])
 
   const form = useForm<FormulaFormValues>({
-    resolver: zodResolver(formulaFormSchema) as never,
+    resolver: zodResolver(isEditing ? updateFormulaFormSchema : createFormulaFormSchema) as never,
     defaultValues: {
       formulaCode: "",
       formulaName: "",

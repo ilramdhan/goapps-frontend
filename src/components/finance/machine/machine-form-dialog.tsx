@@ -30,12 +30,27 @@ import { Switch } from "@/components/ui/switch"
 import type { Machine } from "@/types/finance/machine"
 import { useCreateMachine, useUpdateMachine } from "@/hooks/finance/use-machine"
 
-const formSchema = z.object({
-  machineCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(30)
-    .regex(/^[A-Z][A-Z0-9_-]*$/, "Uppercase, digits, hyphens or underscores"),
+// Numeric fields share one schema fragment so precision rules stay consistent
+// across every field in this form. Legacy bulk-imported data can carry more
+// decimal places than the UI ever asks a user to type (e.g. power/day =
+// 1792.8718), so validation only bounds the *range*, never the *precision* —
+// precision is a UI/input concern (see the `step="any"` inputs below), not a
+// data-integrity one. Do NOT reintroduce a `.multipleOf()`/step-like zod
+// constraint here without checking legacy data first.
+const optionalNonNegativeNumber = z.coerce.number().min(0).optional().nullable()
+
+// `machineCode` is the primary key: editable only at creation time. The
+// field is rendered `disabled` on update, and its value is intentionally
+// excluded from the update mutation payload below (see onSubmit) — so on
+// update this schema must not re-validate the format of pre-existing/legacy
+// codes (some legacy codes, e.g. "E Line", predate the uppercase/kebab rule).
+const machineCodeFormatSchema = z
+  .string()
+  .min(1, "Code is required")
+  .max(30)
+  .regex(/^[A-Z][A-Z0-9_-]*$/, "Uppercase, digits, hyphens or underscores")
+
+const sharedMachineFields = {
   machineName: z.string().min(1, "Name is required").max(100),
   mcType: z.string().max(30).optional(),
   mcLocation: z.string().max(100).optional(),
@@ -43,28 +58,44 @@ const formSchema = z.object({
   noOfEnd: z.coerce.number().int().min(1).default(1),
   mcSpeed: z.coerce.number().min(0).default(0),
   mcEfficiency: z.coerce.number().min(0).max(100).default(95),
-  machineRpm: z.coerce.number().min(0).optional().nullable(),
-  powerPerDay: z.coerce.number().min(0).optional().nullable(),
-  mpPerDay: z.coerce.number().min(0).optional().nullable(),
-  ohsPerDay: z.coerce.number().min(0).optional().nullable(),
-  sparesPerDay: z.coerce.number().min(0).optional().nullable(),
-  kgsLostChange: z.coerce.number().min(0).optional().nullable(),
-  mcPoyBobbinWeight: z.coerce.number().min(0).optional().nullable(),
-  mcTotFxdCst: z.coerce.number().min(0).optional().nullable(),
-  mcBobbinPerTrolly: z.coerce.number().min(0).optional().nullable(),
-  mcBoxCost: z.coerce.number().min(0).optional().nullable(),
-  mcCaptivePerBobbin: z.coerce.number().min(0).optional().nullable(),
-  mcWeightage: z.coerce.number().min(0).optional().nullable(),
-  vb1Qty: z.coerce.number().min(0).optional().nullable(),
-  vb2Qty: z.coerce.number().min(0).optional().nullable(),
-  vb3Qty: z.coerce.number().min(0).optional().nullable(),
-  vb4Qty: z.coerce.number().min(0).optional().nullable(),
-  vb5Qty: z.coerce.number().min(0).optional().nullable(),
+  machineRpm: optionalNonNegativeNumber,
+  powerPerDay: optionalNonNegativeNumber,
+  mpPerDay: optionalNonNegativeNumber,
+  ohsPerDay: optionalNonNegativeNumber,
+  sparesPerDay: optionalNonNegativeNumber,
+  kgsLostChange: optionalNonNegativeNumber,
+  mcPoyBobbinWeight: optionalNonNegativeNumber,
+  mcTotFxdCst: optionalNonNegativeNumber,
+  mcBobbinPerTrolly: optionalNonNegativeNumber,
+  mcBoxCost: optionalNonNegativeNumber,
+  mcCaptivePerBobbin: optionalNonNegativeNumber,
+  mcWeightage: optionalNonNegativeNumber,
+  vb1Qty: optionalNonNegativeNumber,
+  vb2Qty: optionalNonNegativeNumber,
+  vb3Qty: optionalNonNegativeNumber,
+  vb4Qty: optionalNonNegativeNumber,
+  vb5Qty: optionalNonNegativeNumber,
   notes: z.string().max(500).optional(),
   isActive: z.boolean(),
+}
+
+// Create: machineCode is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  machineCode: machineCodeFormatSchema,
+  ...sharedMachineFields,
 })
 
-type FormValues = z.infer<typeof formSchema>
+// Update: machineCode is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise saving legacy data that predates the format rule (or simply
+// re-saving the form unchanged) would be blocked. Still required as a
+// non-empty string so the form/type stays sane, just not format-checked.
+const updateFormSchema = z.object({
+  machineCode: z.string().min(1),
+  ...sharedMachineFields,
+})
+
+type FormValues = z.infer<typeof createFormSchema>
 
 interface MachineFormDialogProps {
   open: boolean
@@ -79,7 +110,10 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
   const updateMutation = useUpdateMachine()
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips (this dialog instance is reused for both add/edit —
+    // see machine-page-client.tsx) picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       machineCode: "", machineName: "", mcType: "", mcLocation: "",
       noOfPosition: 0, noOfEnd: 1, mcSpeed: 0, mcEfficiency: 95,
@@ -317,7 +351,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Speed (m/min)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" min="0" step="0.01" disabled={isPending} />
+                      <Input {...field} type="number" min="0" step="any" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -330,7 +364,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Efficiency (%)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" min="0" max="100" step="0.1" disabled={isPending} />
+                      <Input {...field} type="number" min="0" max="100" step="any" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -347,7 +381,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                         {...field}
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         placeholder="e.g., 3000"
                         disabled={isPending}
                         value={field.value ?? ""}
@@ -369,7 +403,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                         {...field}
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         placeholder="e.g., 120.00"
                         disabled={isPending}
                         value={field.value ?? ""}
@@ -390,7 +424,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Manpower / Day (USD)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.0001" value={field.value ?? ""} placeholder="e.g. 85.00" disabled={isPending} />
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="e.g. 85.00" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -399,7 +433,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Overhead / Head / Day (USD)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.0001" value={field.value ?? ""} placeholder="e.g. 12.50" disabled={isPending} />
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="e.g. 12.50" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -408,7 +442,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Spares / Day (USD)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.0001" value={field.value ?? ""} placeholder="e.g. 5.00" disabled={isPending} />
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="e.g. 5.00" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -417,7 +451,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Change-Over Loss (kg)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.001" value={field.value ?? ""} placeholder="e.g. 2.5" disabled={isPending} />
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="e.g. 2.5" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -430,7 +464,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                     <FormItem>
                       <FormLabel>VB{i + 1}</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="1" value={field.value ?? ""} placeholder="0" disabled={isPending} />
+                        <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="0" disabled={isPending} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -447,7 +481,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>POY Bobbin Weight (kg) <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
@@ -457,7 +491,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Total Fixed Cost <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
@@ -467,7 +501,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Bobbin Per Trolley <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
@@ -477,7 +511,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Box Cost <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
@@ -487,7 +521,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Captive Per Bobbin <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
@@ -497,7 +531,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                   <FormItem>
                     <FormLabel>Weightage <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.000001" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
+                      <Input {...field} type="number" step="any" value={field.value ?? ""} placeholder="Optional" disabled={isPending}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} />
                     </FormControl>
                     <FormMessage />
