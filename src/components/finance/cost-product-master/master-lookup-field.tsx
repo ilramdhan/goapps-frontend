@@ -14,7 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useMasterLookupOptions } from "@/hooks/finance/use-master-lookup"
+import { useMasterLookupOptions, useMasterLookupResolveValue } from "@/hooks/finance/use-master-lookup"
 import type { LookupFillValuesResponse } from "@/types/finance/yarn-master"
 import type { RequiredParamEntry } from "@/types/finance/cost-product-parameter"
 import type { DraftValue } from "./parameters-tab"
@@ -73,18 +73,58 @@ export function MasterLookupField({
   // `limit: DISPLAY_LIMIT + 1` asks for one row past what we display so we
   // can still show an honest "there may be more — refine your search" notice
   // without a separate COUNT(*) round trip.
+  const currentValue = draft.valueText
+
+  // ⭐ FIX (2026-09-28) — a row that already has a saved value must resolve
+  // its label on first paint, not only after the user opens the popover.
+  // The lazy-fetch-on-open behavior above is still preserved for EMPTY rows
+  // (no perf regression for the common case of unset lookups), but a row
+  // with `currentValue` needs its options fetched immediately so
+  // `selectedOption` below can match and render the real label instead of
+  // silently falling back to the placeholder until clicked.
   const { data: options = [], isLoading: optionsLoading } = useMasterLookupOptions(
     entry.lookupMasterCode,
-    open,
+    open || !!currentValue,
     search,
     DISPLAY_LIMIT + 1,
     productSysId
   )
 
-  const currentValue = draft.valueText
-
   const visibleOptions = useMemo(() => options.slice(0, DISPLAY_LIMIT), [options])
   const hasMore = options.length > DISPLAY_LIMIT
+
+  // ⭐ FIX (2026-09-28) — BUG-2's known limitation (see the long comment on
+  // `selectedOption` below): for large masters (MB_SPIN, ~2700 rows) a saved
+  // value can legitimately fall outside the top-DISPLAY_LIMIT default batch,
+  // so it's never found here no matter how eagerly we fetch. Once the default
+  // batch has loaded and genuinely doesn't contain `currentValue`, fire one
+  // small targeted fetch (`search=<currentValue>`, limit 5) purely to resolve
+  // that single row's label — never to repopulate the visible dropdown list.
+  // `enabled` gates on `!optionsLoading` so this only runs after we actually
+  // know the default batch is missing it (no redundant race), and it stays
+  // off once `options` itself contains the value (e.g. a fresh, in-range
+  // selection) so it never fires for the common case.
+  const defaultMatch = options.find((o) => o.value === currentValue)
+  const needsResolve = !!currentValue && !optionsLoading && !defaultMatch
+  const { data: resolvedOptions = [] } = useMasterLookupResolveValue(
+    entry.lookupMasterCode,
+    currentValue,
+    needsResolve,
+    productSysId
+  )
+
+  // The resolve fetch is a substring ILIKE search (see the hook's own
+  // comment), so it can legitimately return rows OTHER than `currentValue`
+  // (e.g. another code containing it as a substring). Only merge an exact
+  // `value` match — never trust the fuzzy match as-is. Merged as an EXTRA
+  // entry, appended after the existing top-N list, so it never disturbs
+  // `visibleOptions`/`hasMore`/search UX — it exists solely so
+  // `selectedOption` below can find it for label display.
+  const mergedOptions = useMemo(() => {
+    const exactMatch = resolvedOptions.find((o) => o.value === currentValue)
+    if (!exactMatch || options.some((o) => o.value === currentValue)) return options
+    return [...options, exactMatch]
+  }, [options, resolvedOptions, currentValue])
 
   // The backend restricts RM_GROUP_OIL options to the groups allowed for the
   // product's type (oil-cost-rm-group D10/D11/D4 — reject-by-default, never
@@ -129,7 +169,7 @@ export function MasterLookupField({
     [entry.paramId, entry.paramCode, entry.lookupMasterCode, currentValue, onChangeLookup]
   )
 
-  const selectedOption = options.find((o) => o.value === currentValue)
+  const selectedOption = mergedOptions.find((o) => o.value === currentValue)
 
   // ⭐ BUG-2 fix (2026-08-27) — `selectedOption` only exists while `currentValue`
   // happens to be present in the CURRENTLY LOADED `options` page. That list is
@@ -138,6 +178,11 @@ export function MasterLookupField({
   // pagination, or the popover simply not having been reopened yet. When that
   // happens `selectedOption` is `undefined` and the previously-visible label
   // would vanish even though the stored value is unchanged.
+  //
+  // ⭐ FIX (2026-09-28) — `mergedOptions` (options + the single targeted-resolve
+  // match, see above) covers the remaining large-master gap: a value outside
+  // the top-DISPLAY_LIMIT default batch now still resolves here instead of
+  // falling through to the `knownLabel`/placeholder fallback below.
   //
   // Fix: remember the last label we positively matched against a fetched
   // option, tagged with the value it belongs to. It's used as a fallback ONLY

@@ -26,17 +26,26 @@ import { CompanyCombobox } from "@/components/iam/company-combobox"
 import { DivisionCombobox } from "@/components/iam/division-combobox"
 import { DepartmentCombobox } from "@/components/iam/department-combobox"
 
-const schema = z.object({
-    code: z.string().min(1, "Code is required").max(50).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
+const baseCompanyMappingFormFields = {
     name: z.string().min(1, "Name is required").max(200),
     companyId: z.string().min(1, "Company is required"),
     divisionId: z.string().min(1, "Division is required"),
     departmentId: z.string().min(1, "Department is required"),
     sectionId: z.string().optional(),
     isActive: z.boolean(),
+}
+
+const createSchema = z.object({
+    code: z.string().min(1, "Code is required").max(50).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
+    ...baseCompanyMappingFormFields,
 })
 
-type FormValues = z.infer<typeof schema>
+const updateSchema = z.object({
+    code: z.string().min(1, "Code is required"),
+    ...baseCompanyMappingFormFields,
+})
+
+type FormValues = z.infer<typeof createSchema>
 
 interface Props {
     open: boolean
@@ -50,7 +59,7 @@ export function CompanyMappingFormDialog({ open, onOpenChange, mapping, onSucces
     const createMutation = useCreateCompanyMapping()
     const updateMutation = useUpdateCompanyMapping()
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema) as never,
+        resolver: zodResolver(isEditing ? updateSchema : createSchema) as never,
         defaultValues: {
             code: "", name: "", companyId: "", divisionId: "", departmentId: "", sectionId: "", isActive: true,
         },

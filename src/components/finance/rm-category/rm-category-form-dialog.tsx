@@ -38,7 +38,16 @@ interface RMCategoryFormValues {
   isActive: boolean
 }
 
-const rmCategoryFormSchema = z.object({
+const baseRMCategoryFormFields = {
+  categoryName: z
+    .string()
+    .min(1, "Name is required")
+    .max(100, "Name must be at most 100 characters"),
+  description: z.string().max(500, "Description must be at most 500 characters"),
+  isActive: z.boolean(),
+}
+
+const createRMCategoryFormSchema = z.object({
   categoryCode: z
     .string()
     .min(1, "Code is required")
@@ -47,12 +56,12 @@ const rmCategoryFormSchema = z.object({
       /^[A-Z][A-Z0-9_]*$/,
       "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
     ),
-  categoryName: z
-    .string()
-    .min(1, "Name is required")
-    .max(100, "Name must be at most 100 characters"),
-  description: z.string().max(500, "Description must be at most 500 characters"),
-  isActive: z.boolean(),
+  ...baseRMCategoryFormFields,
+})
+
+const updateRMCategoryFormSchema = z.object({
+  categoryCode: z.string().min(1, "Code is required"),
+  ...baseRMCategoryFormFields,
 })
 
 interface RMCategoryFormDialogProps {
@@ -73,7 +82,7 @@ export function RMCategoryFormDialog({
   const updateMutation = useUpdateRMCategory()
 
   const form = useForm<RMCategoryFormValues>({
-    resolver: zodResolver(rmCategoryFormSchema) as never,
+    resolver: zodResolver(isEditing ? updateRMCategoryFormSchema : createRMCategoryFormSchema) as never,
     defaultValues: {
       categoryCode: "",
       categoryName: "",

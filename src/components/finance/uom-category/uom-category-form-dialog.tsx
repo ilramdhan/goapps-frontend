@@ -38,21 +38,40 @@ interface UOMCategoryFormValues {
   isActive: boolean
 }
 
-const uomCategoryFormSchema = z.object({
-  categoryCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(20, "Code must be at most 20 characters")
-    .regex(
-      /^[A-Z][A-Z0-9_]*$/,
-      "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
-    ),
+// `categoryCode` is the primary key: editable only at creation time. It is
+// rendered `disabled` on update and is never included in the update mutation
+// payload (see onSubmit), so the update schema must not re-validate its
+// format — otherwise saving a legacy/pre-existing code that predates this
+// regex would be blocked even though the field's value is never sent.
+const categoryCodeFormatSchema = z
+  .string()
+  .min(1, "Code is required")
+  .max(20, "Code must be at most 20 characters")
+  .regex(
+    /^[A-Z][A-Z0-9_]*$/,
+    "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
+  )
+
+const sharedUOMCategoryFields = {
   categoryName: z
     .string()
     .min(1, "Name is required")
     .max(100, "Name must be at most 100 characters"),
   description: z.string().max(500, "Description must be at most 500 characters"),
   isActive: z.boolean(),
+}
+
+// Create: categoryCode is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  categoryCode: categoryCodeFormatSchema,
+  ...sharedUOMCategoryFields,
+})
+
+// Update: categoryCode is read-only/disabled and never sent to the API, so it
+// must not be re-validated against the create-time regex.
+const updateFormSchema = z.object({
+  categoryCode: z.string().min(1),
+  ...sharedUOMCategoryFields,
 })
 
 interface UOMCategoryFormDialogProps {
@@ -73,7 +92,9 @@ export function UOMCategoryFormDialog({
   const updateMutation = useUpdateUOMCategory()
 
   const form = useForm<UOMCategoryFormValues>({
-    resolver: zodResolver(uomCategoryFormSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       categoryCode: "",
       categoryName: "",

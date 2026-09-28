@@ -36,27 +36,12 @@ import {
 } from "@/types/finance/spin-fixed-cost"
 import { useCreateSpinFixedCost, useUpdateSpinFixedCost } from "@/hooks/finance/use-spin-fixed-cost"
 
-interface SpinFixedCostFormValues {
-  period: string
-  commonPoyDenier: number
-  poyProduction: number
-  spinPowerMonth: number
-  spinManpowerMonth: number
-  spinOverheadsMonth: number
-  spinConssprsMonth: number
-  isActive: boolean
-}
-
 // commonPoyDenier and poyProduction are DIVISORS in the calc engine - a zero
 // there zeroes out the fixed cost of every POY product, so they must be > 0.
 const DIVISOR_MESSAGE =
   "Must be greater than 0 - this value is a divisor in the calc engine, and zero would zero out the fixed cost of every POY product."
 
-const spinFixedCostFormSchema = z.object({
-  period: z
-    .string()
-    .min(1, "Period is required")
-    .regex(PERIOD_PATTERN, "Period must be in YYYYMM format (e.g. 202604)"),
+const sharedSpinFixedCostFields = {
   commonPoyDenier: z.coerce.number().positive(DIVISOR_MESSAGE),
   poyProduction: z.coerce.number().positive(DIVISOR_MESSAGE),
   spinPowerMonth: z.coerce.number().min(0, "Must be 0 or greater"),
@@ -64,7 +49,28 @@ const spinFixedCostFormSchema = z.object({
   spinOverheadsMonth: z.coerce.number().min(0, "Must be 0 or greater"),
   spinConssprsMonth: z.coerce.number().min(0, "Must be 0 or greater"),
   isActive: z.boolean(),
+}
+
+// Create: period is user-entered, so the strict YYYYMM format rule still applies.
+const createFormSchema = z.object({
+  period: z
+    .string()
+    .min(1, "Period is required")
+    .regex(PERIOD_PATTERN, "Period must be in YYYYMM format (e.g. 202604)"),
+  ...sharedSpinFixedCostFields,
 })
+
+// Update: period is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise re-saving a legacy row whose period predates/violates the strict
+// format would be blocked. Still required as a non-empty string so the
+// form/type stays sane, just not format-checked.
+const updateFormSchema = z.object({
+  period: z.string().min(1),
+  ...sharedSpinFixedCostFields,
+})
+
+type SpinFixedCostFormValues = z.infer<typeof createFormSchema>
 
 const EMPTY_VALUES: SpinFixedCostFormValues = {
   period: "",
@@ -102,7 +108,10 @@ export function SpinFixedCostFormDialog({
   const updateMutation = useUpdateSpinFixedCost()
 
   const form = useForm<SpinFixedCostFormValues>({
-    resolver: zodResolver(spinFixedCostFormSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips (this dialog instance is reused for both add/edit)
+    // picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: EMPTY_VALUES,
   })
 

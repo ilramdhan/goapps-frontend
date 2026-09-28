@@ -33,19 +33,39 @@ import {
   useUpdateIntermingling,
 } from "@/hooks/finance/use-intermingling"
 
-const formSchema = z.object({
-  intmCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(20, "Code must be at most 20 characters")
-    .regex(/^[A-Z][A-Z0-9_]*$/, "Uppercase letters, digits, underscores only"),
+// `intmCode` is the primary key: editable only at creation time. The field
+// is rendered `disabled` on update, and its value is intentionally excluded
+// from the update mutation payload below (see onSubmit) — so on update this
+// schema must not re-validate the format of pre-existing/legacy codes.
+const intmCodeFormatSchema = z
+  .string()
+  .min(1, "Code is required")
+  .max(20, "Code must be at most 20 characters")
+  .regex(/^[A-Z][A-Z0-9_]*$/, "Uppercase letters, digits, underscores only")
+
+const sharedInterminglingFields = {
   intmName: z.string().min(1, "Name is required").max(100),
   intmCostPerKg: z.coerce.number().min(0, "Cost must not be negative"),
   notes: z.string().max(500).optional(),
   isActive: z.boolean(),
+}
+
+// Create: intmCode is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  intmCode: intmCodeFormatSchema,
+  ...sharedInterminglingFields,
 })
 
-type FormValues = z.infer<typeof formSchema>
+// Update: intmCode is read-only/disabled and never sent to the API (see
+// onSubmit), so it must not be re-validated against the create-time regex —
+// otherwise saving legacy data that predates the format rule would be
+// blocked. Still required as a non-empty string so the form/type stays sane.
+const updateFormSchema = z.object({
+  intmCode: z.string().min(1),
+  ...sharedInterminglingFields,
+})
+
+type FormValues = z.infer<typeof createFormSchema>
 
 interface InterminglingFormDialogProps {
   open: boolean
@@ -65,7 +85,9 @@ export function InterminglingFormDialog({
   const updateMutation = useUpdateIntermingling()
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: { intmCode: "", intmName: "", intmCostPerKg: 0, notes: "", isActive: true },
   })
 
@@ -168,7 +190,7 @@ export function InterminglingFormDialog({
                 <FormItem>
                   <FormLabel>Cost per kg (USD) <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.0001" min="0" placeholder="0.0000" disabled={isPending} />
+                    <Input {...field} type="number" step="any" min="0" placeholder="0.0000" disabled={isPending} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

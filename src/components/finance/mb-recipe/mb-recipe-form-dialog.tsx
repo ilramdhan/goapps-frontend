@@ -597,7 +597,10 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                             Denier <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
-                            <Input {...field} type="number" step="0.01" min="0" disabled={isPending} />
+                            {/* Denier is a genuinely fractional field (z.coerce.number(), no
+                                .int()); step="any" avoids blocking legacy values with more
+                                decimal places than a fixed step allows — see machine-form-dialog. */}
+                            <Input {...field} type="number" step="any" min="0" disabled={isPending} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

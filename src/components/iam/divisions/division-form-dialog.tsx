@@ -31,15 +31,24 @@ import type { Division } from "@/types/iam/division"
 import { useCreateDivision, useUpdateDivision } from "@/hooks/iam/use-division"
 import { CompanyCombobox } from "@/components/iam/company-combobox"
 
-const schema = z.object({
+const baseDivisionFormFields = {
     companyId: z.string().min(1, "Company is required"),
-    divisionCode: z.string().min(1, "Code is required").max(20).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
     divisionName: z.string().min(1, "Name is required").max(100),
     description: z.string().max(500).optional(),
     isActive: z.boolean(),
+}
+
+const createSchema = z.object({
+    divisionCode: z.string().min(1, "Code is required").max(20).regex(/^[A-Z][A-Z0-9-]*$/, "Uppercase, digits, hyphen"),
+    ...baseDivisionFormFields,
 })
 
-type FormValues = z.infer<typeof schema>
+const updateSchema = z.object({
+    divisionCode: z.string().min(1, "Code is required"),
+    ...baseDivisionFormFields,
+})
+
+type FormValues = z.infer<typeof createSchema>
 
 interface Props {
     open: boolean
@@ -54,7 +63,7 @@ export function DivisionFormDialog({ open, onOpenChange, division, onSuccess }: 
     const updateMutation = useUpdateDivision()
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema) as never,
+        resolver: zodResolver(isEditing ? updateSchema : createSchema) as never,
         defaultValues: { companyId: "", divisionCode: "", divisionName: "", description: "", isActive: true },
     })
 

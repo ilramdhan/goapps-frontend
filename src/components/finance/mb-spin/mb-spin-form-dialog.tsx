@@ -489,7 +489,10 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   <FormItem className="flex h-full flex-col">
                     <FormLabel>Denier</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" min="0" placeholder="Optional" disabled={isPending} />
+                      {/* Denier is a genuinely fractional field (z.coerce.number(), no
+                          .int()); step="any" avoids blocking legacy values with more
+                          decimal places than a fixed step allows — see machine-form-dialog. */}
+                      <Input {...field} type="number" step="any" min="0" placeholder="Optional" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

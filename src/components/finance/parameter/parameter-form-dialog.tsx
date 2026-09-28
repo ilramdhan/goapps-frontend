@@ -73,15 +73,21 @@ interface ParameterFormValues {
   approvalDisplayOrder: number
 }
 
-const parameterFormSchema = z.object({
-  paramCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(20, "Code must be at most 20 characters")
-    .regex(
-      /^[A-Z][A-Z0-9_]*$/,
-      "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
-    ),
+// `paramCode` is the primary key: editable only at creation time. It is
+// rendered `disabled` on update and is never included in the update mutation
+// payload (see onSubmit), so the update schema must not re-validate its
+// format — otherwise saving a legacy/pre-existing code that predates this
+// regex would be blocked even though the field's value is never sent.
+const paramCodeFormatSchema = z
+  .string()
+  .min(1, "Code is required")
+  .max(20, "Code must be at most 20 characters")
+  .regex(
+    /^[A-Z][A-Z0-9_]*$/,
+    "Code must start with uppercase letter and contain only uppercase letters, numbers, and underscores"
+  )
+
+const sharedParameterFields = {
   paramName: z
     .string()
     .min(1, "Name is required")
@@ -111,6 +117,19 @@ const parameterFormSchema = z.object({
   notes: z.string().max(500),
   isApprovalVisible: z.boolean(),
   approvalDisplayOrder: z.coerce.number().int().gte(0),
+}
+
+// Create: paramCode is user-entered, so the strict format rule still applies.
+const createFormSchema = z.object({
+  paramCode: paramCodeFormatSchema,
+  ...sharedParameterFields,
+})
+
+// Update: paramCode is read-only/disabled and never sent to the API, so it
+// must not be re-validated against the create-time regex.
+const updateFormSchema = z.object({
+  paramCode: z.string().min(1),
+  ...sharedParameterFields,
 })
 
 interface ParameterFormDialogProps {
@@ -142,7 +161,9 @@ export function ParameterFormDialog({
   })
 
   const form = useForm<ParameterFormValues>({
-    resolver: zodResolver(parameterFormSchema) as never,
+    // Resolver is re-evaluated every render, so switching schema when
+    // `isEditing` flips picks up the right rules immediately.
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       paramCode: "",
       paramName: "",

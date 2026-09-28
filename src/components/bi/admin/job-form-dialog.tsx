@@ -27,16 +27,28 @@ const CRON_PRESETS = [
   { label: "Monthly H+5 at 08:00 WIB", value: "0 1 5 * *" },
 ] as const
 
-const schema = z.object({
-  jobName:         z.string().min(2).regex(/^[A-Z][A-Z0-9_]*$/, "Uppercase letters, digits, underscore only"),
+const baseJobFormFields = {
   sourceCode:      z.string().min(2),
   targetType:      z.string().min(2),
   scheduleCron:    z.string().min(9, "Enter a valid cron expression"),
   oracleProcedure: z.string().optional(),
   isActive:        z.boolean(),
+}
+
+const createSchema = z.object({
+  jobName: z.string().min(2).regex(/^[A-Z][A-Z0-9_]*$/, "Uppercase letters, digits, underscore only"),
+  ...baseJobFormFields,
 })
 
-type FormValues = z.infer<typeof schema>
+// Edit mode never renders/submits jobName (see !isEdit guard below), but react-hook-form
+// still validates its current value on submit since it's part of form state — a strict
+// regex here would block saving jobs whose legacy jobName predates the naming convention.
+const updateSchema = z.object({
+  jobName: z.string(),
+  ...baseJobFormFields,
+})
+
+type FormValues = z.infer<typeof createSchema>
 
 export interface JobFormDialogProps {
   open: boolean
@@ -59,7 +71,7 @@ export function JobFormDialog({ open, onOpenChange, job }: JobFormDialogProps) {
     reset,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(isEdit ? updateSchema : createSchema),
     defaultValues: {
       jobName:         job?.jobName ?? "",
       sourceCode:      job?.sourceCode ?? "ERP_ORACLE",

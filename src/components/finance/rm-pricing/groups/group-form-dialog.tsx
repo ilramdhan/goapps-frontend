@@ -379,7 +379,7 @@ export function GroupFormDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.01"
+                            step="any"
                             placeholder="e.g. 5"
                             {...field}
                             value={field.value ?? ""}
@@ -401,7 +401,7 @@ export function GroupFormDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.0001"
+                            step="any"
                             placeholder="0.89"
                             {...field}
                             value={field.value ?? ""}
@@ -423,7 +423,7 @@ export function GroupFormDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.0001"
+                            step="any"
                             placeholder="0.00"
                             value={field.value ?? ""}
                             onChange={(e) =>
@@ -447,7 +447,7 @@ export function GroupFormDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.01"
+                            step="any"
                             placeholder="e.g. 0"
                             value={field.value ?? ""}
                             onChange={(e) =>
@@ -471,7 +471,7 @@ export function GroupFormDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.0001"
+                            step="any"
                             placeholder="15.00"
                             value={field.value ?? ""}
                             onChange={(e) =>

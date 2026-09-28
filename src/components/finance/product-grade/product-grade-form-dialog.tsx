@@ -30,12 +30,7 @@ import { Switch } from "@/components/ui/switch"
 import type { ProductGrade } from "@/types/finance/product-grade"
 import { useCreateProductGrade, useUpdateProductGrade } from "@/hooks/finance/use-product-grade"
 
-const formSchema = z.object({
-  pgCode: z
-    .string()
-    .min(1, "Code is required")
-    .max(10)
-    .regex(/^[A-Z][A-Z0-9]*$/, "Uppercase letters and digits only"),
+const baseProductGradeFormFields = {
   pgName: z.string().min(1, "Name is required").max(100),
   pgDescription: z.string().max(500).optional(),
   bcPerc: z.coerce.number().min(0).max(100),
@@ -49,9 +44,23 @@ const formSchema = z.object({
   seqNo:   z.coerce.number().int().min(0).optional().nullable(),
   notes: z.string().max(500).optional(),
   isActive: z.boolean(),
+}
+
+const createFormSchema = z.object({
+  pgCode: z
+    .string()
+    .min(1, "Code is required")
+    .max(10)
+    .regex(/^[A-Z][A-Z0-9]*$/, "Uppercase letters and digits only"),
+  ...baseProductGradeFormFields,
 })
 
-type FormValues = z.infer<typeof formSchema>
+const updateFormSchema = z.object({
+  pgCode: z.string().min(1, "Code is required"),
+  ...baseProductGradeFormFields,
+})
+
+type FormValues = z.infer<typeof createFormSchema>
 
 interface ProductGradeFormDialogProps {
   open: boolean
@@ -66,7 +75,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
   const updateMutation = useUpdateProductGrade()
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as never,
+    resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       pgCode: "", pgName: "", pgDescription: "", bcPerc: 0, nonStdPerc: 0, bcRecoveryRate: 0.85, pgDetailProduct: "", pgGradeLabel: "", stdSellingPrice: 0, spValue: 0, lossPct: null, seqNo: null, notes: "", isActive: true,
     },
@@ -192,7 +201,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                   <FormItem>
                     <FormLabel>BC % <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" min="0" max="100" disabled={isPending} />
+                      <Input {...field} type="number" step="any" min="0" max="100" disabled={isPending} />
                     </FormControl>
                     <FormDescription>% output as BC grade</FormDescription>
                     <FormMessage />
@@ -206,7 +215,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                   <FormItem>
                     <FormLabel>Non-Std %</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" min="0" max="100" disabled={isPending} />
+                      <Input {...field} type="number" step="any" min="0" max="100" disabled={isPending} />
                     </FormControl>
                     <FormDescription>% output as non-standard</FormDescription>
                     <FormMessage />
@@ -220,7 +229,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                   <FormItem>
                     <FormLabel>BC Recovery Rate</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.001" min="0" max="1" placeholder="0.85" disabled={isPending} />
+                      <Input {...field} type="number" step="any" min="0" max="1" placeholder="0.85" disabled={isPending} />
                     </FormControl>
                     <FormDescription>0–1 (e.g. 0.85 = 85%)</FormDescription>
                     <FormMessage />
@@ -267,7 +276,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                     <FormItem>
                       <FormLabel>Std Selling Price (%)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" disabled={isPending} />
+                        <Input {...field} type="number" step="any" min="0" disabled={isPending} />
                       </FormControl>
                       <FormDescription>BC_SPECIAL_PROD value</FormDescription>
                       <FormMessage />
@@ -281,7 +290,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                     <FormItem>
                       <FormLabel>SP Value (%)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" disabled={isPending} />
+                        <Input {...field} type="number" step="any" min="0" disabled={isPending} />
                       </FormControl>
                       <FormDescription>VALUE_LOSS value</FormDescription>
                       <FormMessage />
@@ -297,7 +306,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.0001"
+                          step="any"
                           placeholder="Optional"
                           {...field}
                           value={field.value ?? ""}
