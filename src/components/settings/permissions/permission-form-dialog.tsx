@@ -41,7 +41,17 @@ import { MenuCombobox } from "@/components/settings/rbac/menu-combobox"
 
 const ACTION_TYPES = ["view", "create", "update", "delete", "export", "import"] as const
 
-const permissionFormSchema = z.object({
+const basePermissionFormFields = {
+    permissionName: z.string().min(1, "Name is required").max(100, "Maximum 100 characters"),
+    description: z.string().min(1, "Description is required").max(500, "Maximum 500 characters"),
+    serviceName: z.string().min(1, "Service is required").max(50, "Maximum 50 characters"),
+    moduleName: z.string().min(1, "Module is required").max(50, "Maximum 50 characters"),
+    actionType: z.enum(ACTION_TYPES, { message: "Action type is required" }),
+    menuId: z.string(),
+    isActive: z.boolean(),
+}
+
+const createPermissionFormSchema = z.object({
     permissionCode: z
         .string()
         .min(3, "Minimum 3 characters")
@@ -50,16 +60,15 @@ const permissionFormSchema = z.object({
             /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*\.[a-z][a-z0-9]*\.[a-z]+$/,
             "Format: service.module.entity.action (lowercase, dots)"
         ),
-    permissionName: z.string().min(1, "Name is required").max(100, "Maximum 100 characters"),
-    description: z.string().min(1, "Description is required").max(500, "Maximum 500 characters"),
-    serviceName: z.string().min(1, "Service is required").max(50, "Maximum 50 characters"),
-    moduleName: z.string().min(1, "Module is required").max(50, "Maximum 50 characters"),
-    actionType: z.enum(ACTION_TYPES, { message: "Action type is required" }),
-    menuId: z.string(),
-    isActive: z.boolean(),
+    ...basePermissionFormFields,
 })
 
-type PermissionFormValues = z.infer<typeof permissionFormSchema>
+const updatePermissionFormSchema = z.object({
+    permissionCode: z.string().min(1, "Code is required"),
+    ...basePermissionFormFields,
+})
+
+type PermissionFormValues = z.infer<typeof createPermissionFormSchema>
 
 interface PermissionFormDialogProps {
     open: boolean
@@ -73,7 +82,7 @@ export function PermissionFormDialog({ open, onOpenChange, permission }: Permiss
     const updateMutation = useUpdatePermission()
 
     const form = useForm<PermissionFormValues>({
-        resolver: zodResolver(permissionFormSchema) as never,
+        resolver: zodResolver(isEditing ? updatePermissionFormSchema : createPermissionFormSchema) as never,
         defaultValues: {
             permissionCode: "",
             permissionName: "",

@@ -31,18 +31,27 @@ import { Switch } from "@/components/ui/switch"
 import type { Role } from "@/types/iam/role"
 import { useCreateRole, useUpdateRole } from "@/hooks/iam/use-roles"
 
-const roleFormSchema = z.object({
+const baseRoleFormFields = {
+    roleName: z.string().min(1, "Name is required").max(100, "Maximum 100 characters"),
+    description: z.string().max(500, "Maximum 500 characters"),
+    isActive: z.boolean(),
+}
+
+const createRoleFormSchema = z.object({
     roleCode: z
         .string()
         .min(1, "Code is required")
         .max(50, "Maximum 50 characters")
         .regex(/^[A-Z][A-Z0-9_]*$/, "Must be uppercase, start with a letter, only letters, numbers, underscores"),
-    roleName: z.string().min(1, "Name is required").max(100, "Maximum 100 characters"),
-    description: z.string().max(500, "Maximum 500 characters"),
-    isActive: z.boolean(),
+    ...baseRoleFormFields,
 })
 
-type RoleFormValues = z.infer<typeof roleFormSchema>
+const updateRoleFormSchema = z.object({
+    roleCode: z.string().min(1, "Code is required"),
+    ...baseRoleFormFields,
+})
+
+type RoleFormValues = z.infer<typeof createRoleFormSchema>
 
 interface RoleFormDialogProps {
     open: boolean
@@ -57,7 +66,7 @@ export function RoleFormDialog({ open, onOpenChange, role, onSuccess }: RoleForm
     const updateMutation = useUpdateRole()
 
     const form = useForm<RoleFormValues>({
-        resolver: zodResolver(roleFormSchema) as never,
+        resolver: zodResolver(isEditing ? updateRoleFormSchema : createRoleFormSchema) as never,
         defaultValues: {
             roleCode: "",
             roleName: "",
