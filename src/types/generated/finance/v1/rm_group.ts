@@ -409,6 +409,13 @@ export interface RMGroupHead {
    * its per-period rate drives OIL_RATE in the costing engine.
    */
   isOilGroup: boolean;
+  /**
+   * Carry-forward provenance of the per-period values overlaid on this head
+   * (only meaningful when the head is read for a specific period).
+   * Empty = an exact row exists for the requested period; "ANCHOR" = values
+   * fell back to the anchor row; otherwise the YYYYMM of the earlier source period.
+   */
+  inheritedFromPeriod: string;
 }
 
 /** RMGroupDetail is one item's membership in an RM group. */
@@ -464,7 +471,16 @@ export interface RMGroupDetail {
     | number
     | undefined;
   /** V2: Valuation default value (per detail; drives FL). */
-  valuationDefaultValue?: number | undefined;
+  valuationDefaultValue?:
+    | number
+    | undefined;
+  /**
+   * Carry-forward provenance of the per-period values overlaid on this detail
+   * (only meaningful when the detail is read for a specific period).
+   * Empty = an exact row exists for the requested period; "ANCHOR" = values
+   * fell back to the anchor row; otherwise the YYYYMM of the earlier source period.
+   */
+  inheritedFromPeriod: string;
 }
 
 /** RMGroupHeadWithDetails bundles a head and its details for the Get response. */
@@ -1141,6 +1157,7 @@ function createBaseRMGroupHead(): RMGroupHead {
     valuationFlag: 0,
     marketingFlag: 0,
     isOilGroup: false,
+    inheritedFromPeriod: "",
   };
 }
 
@@ -1211,6 +1228,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     }
     if (message.isOilGroup !== false) {
       writer.uint32(176).bool(message.isOilGroup);
+    }
+    if (message.inheritedFromPeriod !== "") {
+      writer.uint32(186).string(message.inheritedFromPeriod);
     }
     return writer;
   },
@@ -1398,6 +1418,14 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
           message.isOilGroup = reader.bool();
           continue;
         }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.inheritedFromPeriod = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1507,6 +1535,11 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
         : isSet(object.is_oil_group)
         ? globalThis.Boolean(object.is_oil_group)
         : false,
+      inheritedFromPeriod: isSet(object.inheritedFromPeriod)
+        ? globalThis.String(object.inheritedFromPeriod)
+        : isSet(object.inherited_from_period)
+        ? globalThis.String(object.inherited_from_period)
+        : "",
     };
   },
 
@@ -1578,6 +1611,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     if (message.isOilGroup !== false) {
       obj.isOilGroup = message.isOilGroup;
     }
+    if (message.inheritedFromPeriod !== "") {
+      obj.inheritedFromPeriod = message.inheritedFromPeriod;
+    }
     return obj;
   },
 
@@ -1610,6 +1646,7 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     message.valuationFlag = object.valuationFlag ?? 0;
     message.marketingFlag = object.marketingFlag ?? 0;
     message.isOilGroup = object.isOilGroup ?? false;
+    message.inheritedFromPeriod = object.inheritedFromPeriod ?? "";
     return message;
   },
 };
@@ -1635,6 +1672,7 @@ function createBaseRMGroupDetail(): RMGroupDetail {
     valuationDutyPct: undefined,
     valuationTransportRate: undefined,
     valuationDefaultValue: undefined,
+    inheritedFromPeriod: "",
   };
 }
 
@@ -1696,6 +1734,9 @@ export const RMGroupDetail: MessageFns<RMGroupDetail> = {
     }
     if (message.valuationDefaultValue !== undefined) {
       writer.uint32(153).double(message.valuationDefaultValue);
+    }
+    if (message.inheritedFromPeriod !== "") {
+      writer.uint32(162).string(message.inheritedFromPeriod);
     }
     return writer;
   },
@@ -1859,6 +1900,14 @@ export const RMGroupDetail: MessageFns<RMGroupDetail> = {
           message.valuationDefaultValue = reader.double();
           continue;
         }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.inheritedFromPeriod = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1961,6 +2010,11 @@ export const RMGroupDetail: MessageFns<RMGroupDetail> = {
         : isSet(object.valuation_default_value)
         ? globalThis.Number(object.valuation_default_value)
         : undefined,
+      inheritedFromPeriod: isSet(object.inheritedFromPeriod)
+        ? globalThis.String(object.inheritedFromPeriod)
+        : isSet(object.inherited_from_period)
+        ? globalThis.String(object.inherited_from_period)
+        : "",
     };
   },
 
@@ -2023,6 +2077,9 @@ export const RMGroupDetail: MessageFns<RMGroupDetail> = {
     if (message.valuationDefaultValue !== undefined) {
       obj.valuationDefaultValue = message.valuationDefaultValue;
     }
+    if (message.inheritedFromPeriod !== "") {
+      obj.inheritedFromPeriod = message.inheritedFromPeriod;
+    }
     return obj;
   },
 
@@ -2052,6 +2109,7 @@ export const RMGroupDetail: MessageFns<RMGroupDetail> = {
     message.valuationDutyPct = object.valuationDutyPct ?? undefined;
     message.valuationTransportRate = object.valuationTransportRate ?? undefined;
     message.valuationDefaultValue = object.valuationDefaultValue ?? undefined;
+    message.inheritedFromPeriod = object.inheritedFromPeriod ?? "";
     return message;
   },
 };
