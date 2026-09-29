@@ -29,6 +29,7 @@ import {
   ItemListTable,
   GroupItemsImportDialog,
   GroupItemV2EditDialog,
+  InheritedPeriodBadge,
 } from "@/components/finance/rm-pricing/groups"
 import { CostRecalculateDialog } from "@/components/finance/rm-pricing/costs"
 import {
@@ -127,6 +128,15 @@ function GroupDetailContent() {
     (periodConfigData?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | undefined) ??
     group
   const details = marketingGroup?.details || []
+  // The header edit modal must ONLY ever be seeded from the period-overlaid
+  // head (exact row → carried-forward earlier period → anchor, resolved by
+  // the backend). Never fall back to the raw anchor read here: saving
+  // anchor values into a period would silently overwrite carried-forward
+  // values. Edit stays disabled until the period-scoped read resolves.
+  const periodHead =
+    (periodConfigData?.data as (RMGroupHead & { details?: RMGroupDetail[] }) | null | undefined) ??
+    null
+  const canEditHeader = !!effectivePeriod && !!periodHead
 
   const handleRemoveItem = async (item: RMGroupDetail) => {
     if (!groupId) return
@@ -177,7 +187,13 @@ function GroupDetailContent() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Recalculate
           </Button>
-          <Button variant="outline" onClick={() => setIsEditOpen(true)} size="sm" className="h-9">
+          <Button
+            variant="outline"
+            onClick={() => setIsEditOpen(true)}
+            size="sm"
+            className="h-9"
+            disabled={!canEditHeader}
+          >
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -189,7 +205,10 @@ function GroupDetailContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="min-w-0">
             <CardHeader className="pb-2 text-sm font-medium">
-              Marketing Inputs
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>Marketing Inputs{effectivePeriod ? ` · ${effectivePeriod}` : ""}</span>
+                <InheritedPeriodBadge inheritedFromPeriod={periodHead?.inheritedFromPeriod} />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-1 text-sm">
@@ -232,13 +251,13 @@ function GroupDetailContent() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">Valuation</span>
                   <Badge variant="outline" className="font-mono text-[10px]">
-                    {valuationFlagLabel(group.valuationFlag)}
+                    {valuationFlagLabel(marketingGroup?.valuationFlag)}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">Marketing</span>
                   <Badge variant="outline" className="font-mono text-[10px]">
-                    {marketingFlagLabel(group.marketingFlag)}
+                    {marketingFlagLabel(marketingGroup?.marketingFlag)}
                   </Badge>
                 </div>
                 <p className="text-[10px] text-muted-foreground pt-2 border-t">
@@ -256,11 +275,11 @@ function GroupDetailContent() {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Colourant</span>
-                  <span className="truncate text-right">{group.colourant || "—"}</span>
+                  <span className="truncate text-right">{marketingGroup?.colourant || "—"}</span>
                 </div>
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">CI Name</span>
-                  <span className="truncate text-right">{group.ciName || "—"}</span>
+                  <span className="truncate text-right">{marketingGroup?.ciName || "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Items</span>
@@ -322,12 +341,18 @@ function GroupDetailContent() {
       </div>
 
       {/* Dialogs */}
-      <GroupFormDialog
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        group={marketingGroup}
-        period={effectivePeriod}
-      />
+      {/* Keyed on groupId::period (like GroupItemV2EditDialog) so switching
+          period remounts the form and re-initializes from that period's
+          overlaid head instead of keeping the previous period's values. */}
+      {periodHead && (
+        <GroupFormDialog
+          key={`${groupId}::${effectivePeriod}`}
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          group={periodHead}
+          period={effectivePeriod}
+        />
+      )}
 
       <ItemPickerDialog
         open={isPickerOpen}

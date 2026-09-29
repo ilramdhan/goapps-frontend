@@ -25,6 +25,7 @@ import {
   ExportRMGroupsResponseParser,
   ImportRMGroupsResponseParser,
   DownloadRMGroupTemplateResponseParser,
+  normalizeRMGroupPeriodProvenance,
 } from "@/types/finance/rm-group"
 
 // Query keys
@@ -80,7 +81,7 @@ export function useRMGroup(id: string) {
       const head = withDetails?.head
       return {
         data: head
-          ? { ...head, details: withDetails?.details || [] }
+          ? normalizeRMGroupPeriodProvenance({ ...head, details: withDetails?.details || [] })
           : null,
       }
     },
@@ -139,6 +140,13 @@ export function useUpdateRMGroup() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: rmGroupKeys.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: rmGroupKeys.lists() })
+      // Period-scoped display config (Marketing Inputs card, header edit
+      // modal, item rows) must refresh too — mirrors useUpdateGroupItem.
+      // Without this the detail page kept showing the pre-edit (or
+      // inherited) values for the edited period.
+      queryClient.invalidateQueries({
+        queryKey: groupPeriodConfigKeys.detail(variables.id, variables.data.period),
+      })
       toast.success("RM Group updated successfully")
     },
     onError: (error: Error) => {
@@ -278,7 +286,7 @@ export function useGroupPeriodConfig(groupHeadId: string, period: string) {
       const head = withDetails?.head
       return {
         data: head
-          ? { ...head, details: withDetails?.details || [] }
+          ? normalizeRMGroupPeriodProvenance({ ...head, details: withDetails?.details || [] })
           : null,
       }
     },
