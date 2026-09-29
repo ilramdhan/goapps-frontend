@@ -285,3 +285,56 @@ export const DEFAULT_RM_GROUP_DETAIL_V2_FORM_VALUES: RMGroupDetailV2FormData = {
   valuationTransportRate: null,
   valuationDefaultValue: null,
 }
+
+// ---------------------------------------------------------------------------
+// Period carry-forward provenance (backlog1 T19)
+// ---------------------------------------------------------------------------
+// GetRMGroup / UpdateRMGroup / UpdateGroupItem fill `inheritedFromPeriod` on
+// the period-overlaid head and each detail:
+//   ""        → an exact row exists for the requested period
+//   "YYYYMM"  → values carried forward from that earlier period
+//   "ANCHOR"  → no period row yet; values come from the anchor/default row
+// The generated fromJSON already accepts camelCase + snake_case; this
+// normalizer additionally trims and canonicalizes the ANCHOR sentinel so UI
+// checks stay simple.
+
+export const RM_GROUP_INHERITED_ANCHOR = "ANCHOR"
+
+/** Normalize a raw `inheritedFromPeriod` / `inherited_from_period` value. */
+export function normalizeInheritedFromPeriod(raw: unknown): string {
+  if (raw === undefined || raw === null) return ""
+  const v = String(raw).trim()
+  if (v === "") return ""
+  if (v.toUpperCase() === RM_GROUP_INHERITED_ANCHOR) return RM_GROUP_INHERITED_ANCHOR
+  return v
+}
+
+/**
+ * Human label for the inherited-values badge, or null when the values are
+ * the period's own (exact row).
+ */
+export function inheritedFromPeriodLabel(raw: unknown): string | null {
+  const v = normalizeInheritedFromPeriod(raw)
+  if (v === "") return null
+  if (v === RM_GROUP_INHERITED_ANCHOR) return "Mewarisi nilai default"
+  return `Mewarisi nilai periode ${v}`
+}
+
+/** Normalize the provenance field on a period-overlaid head + its details. */
+export function normalizeRMGroupPeriodProvenance<
+  H extends { inheritedFromPeriod?: string; details?: D[] },
+  D extends { inheritedFromPeriod?: string },
+>(head: H): H {
+  return {
+    ...head,
+    inheritedFromPeriod: normalizeInheritedFromPeriod(head.inheritedFromPeriod),
+    ...(head.details
+      ? {
+          details: head.details.map((d) => ({
+            ...d,
+            inheritedFromPeriod: normalizeInheritedFromPeriod(d.inheritedFromPeriod),
+          })),
+        }
+      : {}),
+  }
+}

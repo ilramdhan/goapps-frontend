@@ -5,6 +5,8 @@ import { Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, type ColumnDef, type RowAction } from "@/components/shared"
 
+import { InheritedPeriodBadge } from "./inherited-period-badge"
+
 import type { RMGroupDetail, RMGroupItemRates } from "@/types/finance/rm-group"
 
 interface ItemListTableProps {
@@ -211,7 +213,10 @@ export function ItemListTable({
       sticky: "left",
       canHide: false,
       cell: (row) => (
-        <span className="truncate block">{row.itemName || "-"}</span>
+        <div className="min-w-0">
+          <span className="truncate block">{row.itemName || "-"}</span>
+          <InheritedPeriodBadge inheritedFromPeriod={row.inheritedFromPeriod} className="mt-0.5" />
+        </div>
       ),
     },
     {
