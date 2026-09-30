@@ -64,7 +64,7 @@ import {
   MBDozingServiceDefinition,
 } from "@/types/generated/finance/v1/yarn_master"
 import { CostRouteServiceDefinition } from "@/types/generated/finance/v1/cost_route"
-import { YarnTxWeightServiceDefinition } from "@/types/generated/finance/v1/yarn_tx_weight"
+import { YarnTxWeightGroupServiceDefinition } from "@/types/generated/finance/v1/yarn_tx_weight"
 import { PPCServiceDefinition } from "@/types/generated/ppc/v1/ppc_service"
 import { CostRequestTypeServiceDefinition } from "@/types/generated/finance/v1/cost_request_type"
 import { CostPaperTubeTypeServiceDefinition } from "@/types/generated/finance/v1/cost_paper_tube_type"
@@ -546,9 +546,9 @@ export function getMbLustureClient() {
   )
 }
 
-export function getYarnTxWeightClient() {
-  return getOrCreate("yarnTxWeight", () =>
-    createServiceClient(YarnTxWeightServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+export function getYarnTxWeightGroupClient() {
+  return getOrCreate("yarnTxWeightGroup", () =>
+    createServiceClient(YarnTxWeightGroupServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

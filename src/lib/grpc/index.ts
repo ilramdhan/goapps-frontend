@@ -69,7 +69,7 @@ export {
   getLookupMasterClient,
   getMbCompositionClient,
   getMbLustureClient,
-  getYarnTxWeightClient,
+  getYarnTxWeightGroupClient,
   getMbParamClient,
   getMbPushClient,
   getMbWorkflowLogClient,

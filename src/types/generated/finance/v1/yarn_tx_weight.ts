@@ -265,6 +265,164 @@ export interface ListYarnTxWeightsResponse {
   pagination: PaginationResponse | undefined;
 }
 
+/** YarnTxWeightProductTypeRef is a product type mapped to a TX Weight group. */
+export interface YarnTxWeightProductTypeRef {
+  /** Product type id (cost_product_type.cpt_type_id). */
+  id: number;
+  /** Product type code (e.g. "TTY"). */
+  code: string;
+  /** Product type name. */
+  name: string;
+}
+
+/** YarnTxWeightRule is one grade rule inside a TX Weight group. */
+export interface YarnTxWeightRule {
+  /** Grade the rule applies to (cannot be UNSPECIFIED). */
+  grade: YarnTxWeightGrade;
+  /** How value is applied to AX_WT (cannot be UNSPECIFIED). */
+  mode: YarnTxWeightMode;
+  /** Rule value (subtrahend, multiplier, or fixed weight depending on mode). */
+  value: number;
+  /** Optional description (max 200 chars). */
+  description: string;
+}
+
+/** YarnTxWeightGroup is one TX Weight config shared by one or more product types. */
+export interface YarnTxWeightGroup {
+  /** Unique identifier (UUID). */
+  groupId: string;
+  /** Group code (unique among live groups, e.g. "TTY"). */
+  code: string;
+  /** Group name. */
+  name: string;
+  /** Optional description. */
+  description: string;
+  /** Product types mapped to this group. */
+  productTypes: YarnTxWeightProductTypeRef[];
+  /** Grade rules of this group (at most one per grade). */
+  rules: YarnTxWeightRule[];
+  /** Audit information. */
+  audit: AuditInfo | undefined;
+}
+
+/** CreateYarnTxWeightGroupRequest is the request for creating a TX Weight group. */
+export interface CreateYarnTxWeightGroupRequest {
+  /** Group code (required, 1-30 chars, uppercase letters/digits/underscore). */
+  code: string;
+  /** Group name (required, 1-100 chars). */
+  name: string;
+  /** Optional description (max 200 chars). */
+  description: string;
+  /**
+   * Product type ids mapped to this group (min 1, unique, each >= 1).
+   * Each type may belong to at most one group.
+   */
+  productTypeIds: number[];
+  /** Grade rules (1-5, unique grade). */
+  rules: YarnTxWeightRule[];
+}
+
+/** CreateYarnTxWeightGroupResponse is the response for creating a TX Weight group. */
+export interface CreateYarnTxWeightGroupResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Created TX Weight group. */
+  data: YarnTxWeightGroup | undefined;
+}
+
+/** GetYarnTxWeightGroupRequest is the request for getting a TX Weight group by ID. */
+export interface GetYarnTxWeightGroupRequest {
+  /** Group ID (UUID format). */
+  groupId: string;
+}
+
+/** GetYarnTxWeightGroupResponse is the response for getting a TX Weight group. */
+export interface GetYarnTxWeightGroupResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** TX Weight group data. */
+  data: YarnTxWeightGroup | undefined;
+}
+
+/**
+ * UpdateYarnTxWeightGroupRequest is the request for updating a TX Weight group.
+ * The product type set and the rules are replaced in one transaction.
+ */
+export interface UpdateYarnTxWeightGroupRequest {
+  /** Group ID to update (UUID format). */
+  groupId: string;
+  /** Group code (required, 1-30 chars, uppercase letters/digits/underscore). */
+  code: string;
+  /** Group name (required, 1-100 chars). */
+  name: string;
+  /** Optional description (max 200 chars). */
+  description: string;
+  /** Full replacement set of product type ids (min 1, unique, each >= 1). */
+  productTypeIds: number[];
+  /** Full replacement set of grade rules (1-5, unique grade). */
+  rules: YarnTxWeightRule[];
+}
+
+/** UpdateYarnTxWeightGroupResponse is the response for updating a TX Weight group. */
+export interface UpdateYarnTxWeightGroupResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Updated TX Weight group. */
+  data: YarnTxWeightGroup | undefined;
+}
+
+/**
+ * DeleteYarnTxWeightGroupRequest is the request for deleting (soft delete) a TX Weight group.
+ * The product type mappings are removed so the types become free again.
+ */
+export interface DeleteYarnTxWeightGroupRequest {
+  /** Group ID to delete (UUID format). */
+  groupId: string;
+}
+
+/** DeleteYarnTxWeightGroupResponse is the response for deleting a TX Weight group. */
+export interface DeleteYarnTxWeightGroupResponse {
+  /** Standard response metadata. */
+  base: BaseResponse | undefined;
+}
+
+/**
+ * ListYarnTxWeightGroupsRequest is the request for listing TX Weight groups
+ * with search, filter, and pagination.
+ */
+export interface ListYarnTxWeightGroupsRequest {
+  /** Page number (1-indexed, default 1, min 1). */
+  page: number;
+  /** Items per page (1-100, default 10). */
+  pageSize: number;
+  /** Search query (searches in group code/name/description and mapped product type code/name). */
+  search: string;
+  /** Filter by mapped product type id (0 = all). */
+  productTypeId: number;
+  /** Sort field: "code", "name", "created_at", "updated_at" (default: "code"). */
+  sortBy: string;
+  /** Sort order: "asc", "desc" (default: "asc"). */
+  sortOrder: string;
+}
+
+/** ListYarnTxWeightGroupsResponse is the response for listing TX Weight groups. */
+export interface ListYarnTxWeightGroupsResponse {
+  /** Standard response metadata. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** List of TX Weight groups. */
+  data: YarnTxWeightGroup[];
+  /** Pagination metadata. */
+  pagination: PaginationResponse | undefined;
+}
+
 function createBaseYarnTxWeight(): YarnTxWeight {
   return {
     id: "",
@@ -1418,9 +1576,1357 @@ export const ListYarnTxWeightsResponse: MessageFns<ListYarnTxWeightsResponse> = 
   },
 };
 
+function createBaseYarnTxWeightProductTypeRef(): YarnTxWeightProductTypeRef {
+  return { id: 0, code: "", name: "" };
+}
+
+export const YarnTxWeightProductTypeRef: MessageFns<YarnTxWeightProductTypeRef> = {
+  encode(message: YarnTxWeightProductTypeRef, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== 0) {
+      writer.uint32(8).int32(message.id);
+    }
+    if (message.code !== "") {
+      writer.uint32(18).string(message.code);
+    }
+    if (message.name !== "") {
+      writer.uint32(26).string(message.name);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): YarnTxWeightProductTypeRef {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseYarnTxWeightProductTypeRef();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.id = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): YarnTxWeightProductTypeRef {
+    return {
+      id: isSet(object.id) ? globalThis.Number(object.id) : 0,
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+    };
+  },
+
+  toJSON(message: YarnTxWeightProductTypeRef): unknown {
+    const obj: any = {};
+    if (message.id !== 0) {
+      obj.id = Math.round(message.id);
+    }
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<YarnTxWeightProductTypeRef>): YarnTxWeightProductTypeRef {
+    return YarnTxWeightProductTypeRef.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<YarnTxWeightProductTypeRef>): YarnTxWeightProductTypeRef {
+    const message = createBaseYarnTxWeightProductTypeRef();
+    message.id = object.id ?? 0;
+    message.code = object.code ?? "";
+    message.name = object.name ?? "";
+    return message;
+  },
+};
+
+function createBaseYarnTxWeightRule(): YarnTxWeightRule {
+  return { grade: 0, mode: 0, value: 0, description: "" };
+}
+
+export const YarnTxWeightRule: MessageFns<YarnTxWeightRule> = {
+  encode(message: YarnTxWeightRule, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grade !== 0) {
+      writer.uint32(8).int32(message.grade);
+    }
+    if (message.mode !== 0) {
+      writer.uint32(16).int32(message.mode);
+    }
+    if (message.value !== 0) {
+      writer.uint32(25).double(message.value);
+    }
+    if (message.description !== "") {
+      writer.uint32(34).string(message.description);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): YarnTxWeightRule {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseYarnTxWeightRule();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.grade = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.mode = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 25) {
+            break;
+          }
+
+          message.value = reader.double();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): YarnTxWeightRule {
+    return {
+      grade: isSet(object.grade) ? yarnTxWeightGradeFromJSON(object.grade) : 0,
+      mode: isSet(object.mode) ? yarnTxWeightModeFromJSON(object.mode) : 0,
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+    };
+  },
+
+  toJSON(message: YarnTxWeightRule): unknown {
+    const obj: any = {};
+    if (message.grade !== 0) {
+      obj.grade = yarnTxWeightGradeToJSON(message.grade);
+    }
+    if (message.mode !== 0) {
+      obj.mode = yarnTxWeightModeToJSON(message.mode);
+    }
+    if (message.value !== 0) {
+      obj.value = message.value;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<YarnTxWeightRule>): YarnTxWeightRule {
+    return YarnTxWeightRule.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<YarnTxWeightRule>): YarnTxWeightRule {
+    const message = createBaseYarnTxWeightRule();
+    message.grade = object.grade ?? 0;
+    message.mode = object.mode ?? 0;
+    message.value = object.value ?? 0;
+    message.description = object.description ?? "";
+    return message;
+  },
+};
+
+function createBaseYarnTxWeightGroup(): YarnTxWeightGroup {
+  return { groupId: "", code: "", name: "", description: "", productTypes: [], rules: [], audit: undefined };
+}
+
+export const YarnTxWeightGroup: MessageFns<YarnTxWeightGroup> = {
+  encode(message: YarnTxWeightGroup, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.code !== "") {
+      writer.uint32(18).string(message.code);
+    }
+    if (message.name !== "") {
+      writer.uint32(26).string(message.name);
+    }
+    if (message.description !== "") {
+      writer.uint32(34).string(message.description);
+    }
+    for (const v of message.productTypes) {
+      YarnTxWeightProductTypeRef.encode(v!, writer.uint32(42).fork()).join();
+    }
+    for (const v of message.rules) {
+      YarnTxWeightRule.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.audit !== undefined) {
+      AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): YarnTxWeightGroup {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseYarnTxWeightGroup();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.productTypes.push(YarnTxWeightProductTypeRef.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.rules.push(YarnTxWeightRule.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.audit = AuditInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): YarnTxWeightGroup {
+    return {
+      groupId: isSet(object.groupId)
+        ? globalThis.String(object.groupId)
+        : isSet(object.group_id)
+        ? globalThis.String(object.group_id)
+        : "",
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      productTypes: globalThis.Array.isArray(object?.productTypes)
+        ? object.productTypes.map((e: any) => YarnTxWeightProductTypeRef.fromJSON(e))
+        : globalThis.Array.isArray(object?.product_types)
+        ? object.product_types.map((e: any) => YarnTxWeightProductTypeRef.fromJSON(e))
+        : [],
+      rules: globalThis.Array.isArray(object?.rules) ? object.rules.map((e: any) => YarnTxWeightRule.fromJSON(e)) : [],
+      audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
+    };
+  },
+
+  toJSON(message: YarnTxWeightGroup): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.productTypes?.length) {
+      obj.productTypes = message.productTypes.map((e) => YarnTxWeightProductTypeRef.toJSON(e));
+    }
+    if (message.rules?.length) {
+      obj.rules = message.rules.map((e) => YarnTxWeightRule.toJSON(e));
+    }
+    if (message.audit !== undefined) {
+      obj.audit = AuditInfo.toJSON(message.audit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<YarnTxWeightGroup>): YarnTxWeightGroup {
+    return YarnTxWeightGroup.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<YarnTxWeightGroup>): YarnTxWeightGroup {
+    const message = createBaseYarnTxWeightGroup();
+    message.groupId = object.groupId ?? "";
+    message.code = object.code ?? "";
+    message.name = object.name ?? "";
+    message.description = object.description ?? "";
+    message.productTypes = object.productTypes?.map((e) => YarnTxWeightProductTypeRef.fromPartial(e)) || [];
+    message.rules = object.rules?.map((e) => YarnTxWeightRule.fromPartial(e)) || [];
+    message.audit = (object.audit !== undefined && object.audit !== null)
+      ? AuditInfo.fromPartial(object.audit)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreateYarnTxWeightGroupRequest(): CreateYarnTxWeightGroupRequest {
+  return { code: "", name: "", description: "", productTypeIds: [], rules: [] };
+}
+
+export const CreateYarnTxWeightGroupRequest: MessageFns<CreateYarnTxWeightGroupRequest> = {
+  encode(message: CreateYarnTxWeightGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.code !== "") {
+      writer.uint32(10).string(message.code);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    for (const v of message.productTypeIds) {
+      writer.uint32(32).int32(v!);
+    }
+    for (const v of message.rules) {
+      YarnTxWeightRule.encode(v!, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateYarnTxWeightGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateYarnTxWeightGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag === 32) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 34) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.rules.push(YarnTxWeightRule.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateYarnTxWeightGroupRequest {
+    return {
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      rules: globalThis.Array.isArray(object?.rules) ? object.rules.map((e: any) => YarnTxWeightRule.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: CreateYarnTxWeightGroupRequest): unknown {
+    const obj: any = {};
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
+    if (message.rules?.length) {
+      obj.rules = message.rules.map((e) => YarnTxWeightRule.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateYarnTxWeightGroupRequest>): CreateYarnTxWeightGroupRequest {
+    return CreateYarnTxWeightGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateYarnTxWeightGroupRequest>): CreateYarnTxWeightGroupRequest {
+    const message = createBaseCreateYarnTxWeightGroupRequest();
+    message.code = object.code ?? "";
+    message.name = object.name ?? "";
+    message.description = object.description ?? "";
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
+    message.rules = object.rules?.map((e) => YarnTxWeightRule.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseCreateYarnTxWeightGroupResponse(): CreateYarnTxWeightGroupResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const CreateYarnTxWeightGroupResponse: MessageFns<CreateYarnTxWeightGroupResponse> = {
+  encode(message: CreateYarnTxWeightGroupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      YarnTxWeightGroup.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateYarnTxWeightGroupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateYarnTxWeightGroupResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = YarnTxWeightGroup.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateYarnTxWeightGroupResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? YarnTxWeightGroup.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: CreateYarnTxWeightGroupResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = YarnTxWeightGroup.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateYarnTxWeightGroupResponse>): CreateYarnTxWeightGroupResponse {
+    return CreateYarnTxWeightGroupResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateYarnTxWeightGroupResponse>): CreateYarnTxWeightGroupResponse {
+    const message = createBaseCreateYarnTxWeightGroupResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? YarnTxWeightGroup.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetYarnTxWeightGroupRequest(): GetYarnTxWeightGroupRequest {
+  return { groupId: "" };
+}
+
+export const GetYarnTxWeightGroupRequest: MessageFns<GetYarnTxWeightGroupRequest> = {
+  encode(message: GetYarnTxWeightGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetYarnTxWeightGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetYarnTxWeightGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetYarnTxWeightGroupRequest {
+    return {
+      groupId: isSet(object.groupId)
+        ? globalThis.String(object.groupId)
+        : isSet(object.group_id)
+        ? globalThis.String(object.group_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetYarnTxWeightGroupRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetYarnTxWeightGroupRequest>): GetYarnTxWeightGroupRequest {
+    return GetYarnTxWeightGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetYarnTxWeightGroupRequest>): GetYarnTxWeightGroupRequest {
+    const message = createBaseGetYarnTxWeightGroupRequest();
+    message.groupId = object.groupId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetYarnTxWeightGroupResponse(): GetYarnTxWeightGroupResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const GetYarnTxWeightGroupResponse: MessageFns<GetYarnTxWeightGroupResponse> = {
+  encode(message: GetYarnTxWeightGroupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      YarnTxWeightGroup.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetYarnTxWeightGroupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetYarnTxWeightGroupResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = YarnTxWeightGroup.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetYarnTxWeightGroupResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? YarnTxWeightGroup.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: GetYarnTxWeightGroupResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = YarnTxWeightGroup.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetYarnTxWeightGroupResponse>): GetYarnTxWeightGroupResponse {
+    return GetYarnTxWeightGroupResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetYarnTxWeightGroupResponse>): GetYarnTxWeightGroupResponse {
+    const message = createBaseGetYarnTxWeightGroupResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? YarnTxWeightGroup.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateYarnTxWeightGroupRequest(): UpdateYarnTxWeightGroupRequest {
+  return { groupId: "", code: "", name: "", description: "", productTypeIds: [], rules: [] };
+}
+
+export const UpdateYarnTxWeightGroupRequest: MessageFns<UpdateYarnTxWeightGroupRequest> = {
+  encode(message: UpdateYarnTxWeightGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.code !== "") {
+      writer.uint32(18).string(message.code);
+    }
+    if (message.name !== "") {
+      writer.uint32(26).string(message.name);
+    }
+    if (message.description !== "") {
+      writer.uint32(34).string(message.description);
+    }
+    for (const v of message.productTypeIds) {
+      writer.uint32(40).int32(v!);
+    }
+    for (const v of message.rules) {
+      YarnTxWeightRule.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateYarnTxWeightGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateYarnTxWeightGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.code = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag === 40) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 42) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.rules.push(YarnTxWeightRule.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateYarnTxWeightGroupRequest {
+    return {
+      groupId: isSet(object.groupId)
+        ? globalThis.String(object.groupId)
+        : isSet(object.group_id)
+        ? globalThis.String(object.group_id)
+        : "",
+      code: isSet(object.code) ? globalThis.String(object.code) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      description: isSet(object.description) ? globalThis.String(object.description) : "",
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      rules: globalThis.Array.isArray(object?.rules) ? object.rules.map((e: any) => YarnTxWeightRule.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: UpdateYarnTxWeightGroupRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.code !== "") {
+      obj.code = message.code;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.description !== "") {
+      obj.description = message.description;
+    }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
+    if (message.rules?.length) {
+      obj.rules = message.rules.map((e) => YarnTxWeightRule.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateYarnTxWeightGroupRequest>): UpdateYarnTxWeightGroupRequest {
+    return UpdateYarnTxWeightGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateYarnTxWeightGroupRequest>): UpdateYarnTxWeightGroupRequest {
+    const message = createBaseUpdateYarnTxWeightGroupRequest();
+    message.groupId = object.groupId ?? "";
+    message.code = object.code ?? "";
+    message.name = object.name ?? "";
+    message.description = object.description ?? "";
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
+    message.rules = object.rules?.map((e) => YarnTxWeightRule.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseUpdateYarnTxWeightGroupResponse(): UpdateYarnTxWeightGroupResponse {
+  return { base: undefined, data: undefined };
+}
+
+export const UpdateYarnTxWeightGroupResponse: MessageFns<UpdateYarnTxWeightGroupResponse> = {
+  encode(message: UpdateYarnTxWeightGroupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      YarnTxWeightGroup.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateYarnTxWeightGroupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateYarnTxWeightGroupResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = YarnTxWeightGroup.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateYarnTxWeightGroupResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? YarnTxWeightGroup.fromJSON(object.data) : undefined,
+    };
+  },
+
+  toJSON(message: UpdateYarnTxWeightGroupResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = YarnTxWeightGroup.toJSON(message.data);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateYarnTxWeightGroupResponse>): UpdateYarnTxWeightGroupResponse {
+    return UpdateYarnTxWeightGroupResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateYarnTxWeightGroupResponse>): UpdateYarnTxWeightGroupResponse {
+    const message = createBaseUpdateYarnTxWeightGroupResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? YarnTxWeightGroup.fromPartial(object.data)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteYarnTxWeightGroupRequest(): DeleteYarnTxWeightGroupRequest {
+  return { groupId: "" };
+}
+
+export const DeleteYarnTxWeightGroupRequest: MessageFns<DeleteYarnTxWeightGroupRequest> = {
+  encode(message: DeleteYarnTxWeightGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteYarnTxWeightGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteYarnTxWeightGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteYarnTxWeightGroupRequest {
+    return {
+      groupId: isSet(object.groupId)
+        ? globalThis.String(object.groupId)
+        : isSet(object.group_id)
+        ? globalThis.String(object.group_id)
+        : "",
+    };
+  },
+
+  toJSON(message: DeleteYarnTxWeightGroupRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteYarnTxWeightGroupRequest>): DeleteYarnTxWeightGroupRequest {
+    return DeleteYarnTxWeightGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteYarnTxWeightGroupRequest>): DeleteYarnTxWeightGroupRequest {
+    const message = createBaseDeleteYarnTxWeightGroupRequest();
+    message.groupId = object.groupId ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteYarnTxWeightGroupResponse(): DeleteYarnTxWeightGroupResponse {
+  return { base: undefined };
+}
+
+export const DeleteYarnTxWeightGroupResponse: MessageFns<DeleteYarnTxWeightGroupResponse> = {
+  encode(message: DeleteYarnTxWeightGroupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteYarnTxWeightGroupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteYarnTxWeightGroupResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteYarnTxWeightGroupResponse {
+    return { base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined };
+  },
+
+  toJSON(message: DeleteYarnTxWeightGroupResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteYarnTxWeightGroupResponse>): DeleteYarnTxWeightGroupResponse {
+    return DeleteYarnTxWeightGroupResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteYarnTxWeightGroupResponse>): DeleteYarnTxWeightGroupResponse {
+    const message = createBaseDeleteYarnTxWeightGroupResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListYarnTxWeightGroupsRequest(): ListYarnTxWeightGroupsRequest {
+  return { page: 0, pageSize: 0, search: "", productTypeId: 0, sortBy: "", sortOrder: "" };
+}
+
+export const ListYarnTxWeightGroupsRequest: MessageFns<ListYarnTxWeightGroupsRequest> = {
+  encode(message: ListYarnTxWeightGroupsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.page !== 0) {
+      writer.uint32(8).int32(message.page);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).int32(message.pageSize);
+    }
+    if (message.search !== "") {
+      writer.uint32(26).string(message.search);
+    }
+    if (message.productTypeId !== 0) {
+      writer.uint32(32).int32(message.productTypeId);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(42).string(message.sortBy);
+    }
+    if (message.sortOrder !== "") {
+      writer.uint32(50).string(message.sortOrder);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListYarnTxWeightGroupsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListYarnTxWeightGroupsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.productTypeId = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.sortOrder = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListYarnTxWeightGroupsRequest {
+    return {
+      page: isSet(object.page) ? globalThis.Number(object.page) : 0,
+      pageSize: isSet(object.pageSize)
+        ? globalThis.Number(object.pageSize)
+        : isSet(object.page_size)
+        ? globalThis.Number(object.page_size)
+        : 0,
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      productTypeId: isSet(object.productTypeId)
+        ? globalThis.Number(object.productTypeId)
+        : isSet(object.product_type_id)
+        ? globalThis.Number(object.product_type_id)
+        : 0,
+      sortBy: isSet(object.sortBy)
+        ? globalThis.String(object.sortBy)
+        : isSet(object.sort_by)
+        ? globalThis.String(object.sort_by)
+        : "",
+      sortOrder: isSet(object.sortOrder)
+        ? globalThis.String(object.sortOrder)
+        : isSet(object.sort_order)
+        ? globalThis.String(object.sort_order)
+        : "",
+    };
+  },
+
+  toJSON(message: ListYarnTxWeightGroupsRequest): unknown {
+    const obj: any = {};
+    if (message.page !== 0) {
+      obj.page = Math.round(message.page);
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.productTypeId !== 0) {
+      obj.productTypeId = Math.round(message.productTypeId);
+    }
+    if (message.sortBy !== "") {
+      obj.sortBy = message.sortBy;
+    }
+    if (message.sortOrder !== "") {
+      obj.sortOrder = message.sortOrder;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListYarnTxWeightGroupsRequest>): ListYarnTxWeightGroupsRequest {
+    return ListYarnTxWeightGroupsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListYarnTxWeightGroupsRequest>): ListYarnTxWeightGroupsRequest {
+    const message = createBaseListYarnTxWeightGroupsRequest();
+    message.page = object.page ?? 0;
+    message.pageSize = object.pageSize ?? 0;
+    message.search = object.search ?? "";
+    message.productTypeId = object.productTypeId ?? 0;
+    message.sortBy = object.sortBy ?? "";
+    message.sortOrder = object.sortOrder ?? "";
+    return message;
+  },
+};
+
+function createBaseListYarnTxWeightGroupsResponse(): ListYarnTxWeightGroupsResponse {
+  return { base: undefined, data: [], pagination: undefined };
+}
+
+export const ListYarnTxWeightGroupsResponse: MessageFns<ListYarnTxWeightGroupsResponse> = {
+  encode(message: ListYarnTxWeightGroupsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      YarnTxWeightGroup.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.pagination !== undefined) {
+      PaginationResponse.encode(message.pagination, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListYarnTxWeightGroupsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListYarnTxWeightGroupsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(YarnTxWeightGroup.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pagination = PaginationResponse.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListYarnTxWeightGroupsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => YarnTxWeightGroup.fromJSON(e)) : [],
+      pagination: isSet(object.pagination) ? PaginationResponse.fromJSON(object.pagination) : undefined,
+    };
+  },
+
+  toJSON(message: ListYarnTxWeightGroupsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => YarnTxWeightGroup.toJSON(e));
+    }
+    if (message.pagination !== undefined) {
+      obj.pagination = PaginationResponse.toJSON(message.pagination);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListYarnTxWeightGroupsResponse>): ListYarnTxWeightGroupsResponse {
+    return ListYarnTxWeightGroupsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListYarnTxWeightGroupsResponse>): ListYarnTxWeightGroupsResponse {
+    const message = createBaseListYarnTxWeightGroupsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => YarnTxWeightGroup.fromPartial(e)) || [];
+    message.pagination = (object.pagination !== undefined && object.pagination !== null)
+      ? PaginationResponse.fromPartial(object.pagination)
+      : undefined;
+    return message;
+  },
+};
+
 /**
  * YarnTxWeightService provides CRUD operations for the global TX Weight master
  * (per product type, per grade weight rules).
+ * DEPRECATED — superseded by YarnTxWeightGroupService (one config shared by many
+ * product types). Kept compiling for backward compatibility: per-row List/Get/Update
+ * keep working on rule rows and Delete of a single rule row is allowed, but Create may
+ * return FailedPrecondition ("use YarnTxWeightGroupService"). The frontend no longer
+ * uses this service. (Intentionally not using the Go "Deprecated:" doc marker: it would
+ * propagate into generated code and trip staticcheck SA1019 in existing handlers.)
  */
 export type YarnTxWeightServiceDefinition = typeof YarnTxWeightServiceDefinition;
 export const YarnTxWeightServiceDefinition = {
@@ -1472,6 +2978,68 @@ export const YarnTxWeightServiceDefinition = {
       requestType: ListYarnTxWeightsRequest,
       requestStream: false,
       responseType: ListYarnTxWeightsResponse,
+      responseStream: false,
+      options: {},
+    },
+  },
+} as const;
+
+/**
+ * YarnTxWeightGroupService provides CRUD operations for TX Weight groups: one
+ * config (grade rules) shared by many product types. Mapping a product type
+ * already owned by another group fails with FailedPrecondition/AlreadyExists
+ * naming the type code and the other group's code.
+ */
+export type YarnTxWeightGroupServiceDefinition = typeof YarnTxWeightGroupServiceDefinition;
+export const YarnTxWeightGroupServiceDefinition = {
+  name: "YarnTxWeightGroupService",
+  fullName: "finance.v1.YarnTxWeightGroupService",
+  methods: {
+    /** CreateYarnTxWeightGroup creates a new TX Weight group with its types and rules. */
+    createYarnTxWeightGroup: {
+      name: "CreateYarnTxWeightGroup",
+      requestType: CreateYarnTxWeightGroupRequest,
+      requestStream: false,
+      responseType: CreateYarnTxWeightGroupResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetYarnTxWeightGroup retrieves a TX Weight group by ID. */
+    getYarnTxWeightGroup: {
+      name: "GetYarnTxWeightGroup",
+      requestType: GetYarnTxWeightGroupRequest,
+      requestStream: false,
+      responseType: GetYarnTxWeightGroupResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * UpdateYarnTxWeightGroup updates a TX Weight group, replacing its type set
+     * and rules in one transaction.
+     */
+    updateYarnTxWeightGroup: {
+      name: "UpdateYarnTxWeightGroup",
+      requestType: UpdateYarnTxWeightGroupRequest,
+      requestStream: false,
+      responseType: UpdateYarnTxWeightGroupResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** DeleteYarnTxWeightGroup soft deletes a TX Weight group and frees its product types. */
+    deleteYarnTxWeightGroup: {
+      name: "DeleteYarnTxWeightGroup",
+      requestType: DeleteYarnTxWeightGroupRequest,
+      requestStream: false,
+      responseType: DeleteYarnTxWeightGroupResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** ListYarnTxWeightGroups lists TX Weight groups with search, filter, and pagination. */
+    listYarnTxWeightGroups: {
+      name: "ListYarnTxWeightGroups",
+      requestType: ListYarnTxWeightGroupsRequest,
+      requestStream: false,
+      responseType: ListYarnTxWeightGroupsResponse,
       responseStream: false,
       options: {},
     },

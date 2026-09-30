@@ -1,83 +1,84 @@
 "use client"
 
-// Yarn TX Weight Hooks - TanStack Query hooks for TX weight master CRUD
+// Yarn TX Weight group hooks - TanStack Query hooks for the shared TX weight config CRUD
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import {
-  listYarnTxWeights,
-  getYarnTxWeight,
-  createYarnTxWeight,
-  updateYarnTxWeight,
-  deleteYarnTxWeight,
+  listYarnTxWeightGroups,
+  getYarnTxWeightGroup,
+  createYarnTxWeightGroup,
+  updateYarnTxWeightGroup,
+  deleteYarnTxWeightGroup,
 } from "@/services/finance/yarn-tx-weight-api"
-import type { ListYarnTxWeightParams, YarnTxWeightFormData } from "@/types/finance/yarn-tx-weight"
+import type { ListYarnTxWeightGroupsParams, YarnTxWeightGroupFormData } from "@/types/finance/yarn-tx-weight"
 
-export const yarnTxWeightKeys = {
-  all: ["finance", "yarn-tx-weight"] as const,
-  lists: () => [...yarnTxWeightKeys.all, "list"] as const,
-  list: (params: ListYarnTxWeightParams) => [...yarnTxWeightKeys.lists(), JSON.stringify(params)] as const,
-  details: () => [...yarnTxWeightKeys.all, "detail"] as const,
-  detail: (id: string) => [...yarnTxWeightKeys.details(), id] as const,
+export const yarnTxWeightGroupKeys = {
+  all: ["finance", "yarn-tx-weight-group"] as const,
+  lists: () => [...yarnTxWeightGroupKeys.all, "list"] as const,
+  list: (params: ListYarnTxWeightGroupsParams) => [...yarnTxWeightGroupKeys.lists(), params] as const,
+  details: () => [...yarnTxWeightGroupKeys.all, "detail"] as const,
+  detail: (id: string) => [...yarnTxWeightGroupKeys.details(), id] as const,
 }
 
-export function useYarnTxWeights(params: ListYarnTxWeightParams = {}) {
+export function useYarnTxWeightGroups(params: ListYarnTxWeightGroupsParams = {}, options: { enabled?: boolean } = {}) {
   return useQuery({
-    queryKey: yarnTxWeightKeys.list(params),
-    queryFn: () => listYarnTxWeights(params),
+    queryKey: yarnTxWeightGroupKeys.list(params),
+    queryFn: () => listYarnTxWeightGroups(params),
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+    enabled: options.enabled ?? true,
   })
 }
 
-export function useYarnTxWeight(id: string | undefined) {
+export function useYarnTxWeightGroup(groupId: string | undefined) {
   return useQuery({
-    queryKey: yarnTxWeightKeys.detail(id ?? ""),
-    queryFn: () => getYarnTxWeight(id as string),
-    enabled: !!id,
+    queryKey: yarnTxWeightGroupKeys.detail(groupId ?? ""),
+    queryFn: () => getYarnTxWeightGroup(groupId as string),
+    enabled: !!groupId,
   })
 }
 
-export function useCreateYarnTxWeight() {
+export function useCreateYarnTxWeightGroup() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: YarnTxWeightFormData) => createYarnTxWeight(data),
+    mutationFn: (data: YarnTxWeightGroupFormData) => createYarnTxWeightGroup(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: yarnTxWeightKeys.all })
-      toast.success("TX weight rule created successfully")
+      queryClient.invalidateQueries({ queryKey: yarnTxWeightGroupKeys.all })
+      toast.success("TX weight config created successfully")
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to create TX weight rule")
-    },
-  })
-}
-
-export function useUpdateYarnTxWeight() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Pick<YarnTxWeightFormData, "mode" | "value" | "description"> }) =>
-      updateYarnTxWeight(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: yarnTxWeightKeys.all })
-      toast.success("TX weight rule updated successfully")
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to update TX weight rule")
+      toast.error(error.message || "Failed to create TX weight config")
     },
   })
 }
 
-export function useDeleteYarnTxWeight() {
+export function useUpdateYarnTxWeightGroup() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deleteYarnTxWeight(id),
+    mutationFn: ({ groupId, data }: { groupId: string; data: YarnTxWeightGroupFormData }) =>
+      updateYarnTxWeightGroup(groupId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: yarnTxWeightKeys.all })
-      toast.success("TX weight rule deleted successfully")
+      queryClient.invalidateQueries({ queryKey: yarnTxWeightGroupKeys.all })
+      toast.success("TX weight config updated successfully")
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to delete TX weight rule")
+      toast.error(error.message || "Failed to update TX weight config")
+    },
+  })
+}
+
+export function useDeleteYarnTxWeightGroup() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (groupId: string) => deleteYarnTxWeightGroup(groupId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: yarnTxWeightGroupKeys.all })
+      toast.success("TX weight config deleted successfully")
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete TX weight config")
     },
   })
 }

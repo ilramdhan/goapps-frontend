@@ -35,6 +35,7 @@ const DUPLICATE_OPTIONS = [
 
 vi.mock("@/hooks/finance/use-master-lookup", () => ({
   useMasterLookupOptions: () => ({ data: DUPLICATE_OPTIONS, isLoading: false }),
+  useMasterLookupResolveValue: () => ({ data: [], isLoading: false }),
 }))
 
 // ─── Import under test (after the mocks are registered) ───────────────────────
