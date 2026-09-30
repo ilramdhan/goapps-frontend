@@ -264,7 +264,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                       <FormControl>
                         <Input {...field} placeholder='e.g. "Type 7 NS"' disabled={isPending} />
                       </FormControl>
-                      <FormDescription>Value stored in STD_VALUE_LOSS param</FormDescription>
+                      <FormDescription>Grade display label (legacy; no longer copied to a param)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -278,7 +278,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                       <FormControl>
                         <Input {...field} type="number" step="any" min="0" disabled={isPending} />
                       </FormControl>
-                      <FormDescription>BC_SPECIAL_PROD value</FormDescription>
+                      <FormDescription>Auto-fills STD_SP_AX (via BC_LOSS_TYPE)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -292,7 +292,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                       <FormControl>
                         <Input {...field} type="number" step="any" min="0" disabled={isPending} />
                       </FormControl>
-                      <FormDescription>VALUE_LOSS value</FormDescription>
+                      <FormDescription>Auto-fills STD_SP_BC → BC V-Loss = (cost before QLoss − STD_SP_BC) × (B+C)/100</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -314,7 +314,7 @@ export function ProductGradeFormDialog({ open, onOpenChange, productGrade, onSuc
                           disabled={isPending}
                         />
                       </FormControl>
-                      <FormDescription>NON_STD_SPECIAL_PROD param</FormDescription>
+                      <FormDescription>Auto-fills NS_LOSS → NS V-Loss = (AE+A9+A)/100 × NS_LOSS</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
