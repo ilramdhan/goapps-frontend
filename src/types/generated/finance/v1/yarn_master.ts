@@ -1078,13 +1078,22 @@ export interface ProductGrade {
   notes: string;
   /** Pattern match key (e.g., "DBR <=600D"). */
   pgDetailProduct: string;
-  /** Grade label for STD_VALUE_LOSS. */
+  /**
+   * Display grade label (informational; no longer copied to a cost param —
+   * products reference the grade by pg_code via NS_LOSS_TYPE / BC_LOSS_TYPE).
+   */
   pgGradeLabel: string;
-  /** BC_SPECIAL_PROD rate. */
+  /** Standard selling price; auto-fills param STD_SP_AX. */
   stdSellingPrice: number;
-  /** VALUE_LOSS rate. */
+  /**
+   * BC selling price; auto-fills param STD_SP_BC via BC_LOSS_TYPE
+   * (BC V-Loss = (cost before QLoss − STD_SP_BC) × (B+C) / 100).
+   */
   spValue: number;
-  /** Optional loss factor (param NON_STD_SPECIAL_PROD, from Oracle CMPG_LOSS). */
+  /**
+   * Optional NS loss factor (from Oracle CMPG_LOSS); auto-fills param NS_LOSS via
+   * NS_LOSS_TYPE (NS V-Loss = (AE + A9 + A) / 100 × NS_LOSS).
+   */
   lossPct?:
     | number
     | undefined;
@@ -1114,13 +1123,13 @@ export interface CreateProductGradeRequest {
   notes: string;
   /** Pattern match key (max 100 chars). */
   pgDetailProduct: string;
-  /** Grade label for STD_VALUE_LOSS (max 50 chars). */
+  /** Display grade label (max 50 chars; informational, not copied to a param). */
   pgGradeLabel: string;
-  /** BC_SPECIAL_PROD rate (≥ 0). */
+  /** Standard selling price, auto-fills STD_SP_AX (≥ 0). */
   stdSellingPrice: number;
-  /** VALUE_LOSS rate (≥ 0). */
+  /** BC selling price, auto-fills STD_SP_BC via BC_LOSS_TYPE (≥ 0). */
   spValue: number;
-  /** Optional loss factor (≥ 0). */
+  /** Optional NS loss factor, auto-fills NS_LOSS via NS_LOSS_TYPE (≥ 0). */
   lossPct?:
     | number
     | undefined;
@@ -1190,19 +1199,19 @@ export interface UpdateProductGradeRequest {
   pgDetailProduct?:
     | string
     | undefined;
-  /** Optional grade label for STD_VALUE_LOSS (max 50 chars). */
+  /** Optional display grade label (max 50 chars; informational, not copied to a param). */
   pgGradeLabel?:
     | string
     | undefined;
-  /** Optional BC_SPECIAL_PROD rate (≥ 0). */
+  /** Optional standard selling price, auto-fills STD_SP_AX (≥ 0). */
   stdSellingPrice?:
     | number
     | undefined;
-  /** Optional VALUE_LOSS rate (≥ 0). */
+  /** Optional BC selling price, auto-fills STD_SP_BC via BC_LOSS_TYPE (≥ 0). */
   spValue?:
     | number
     | undefined;
-  /** Optional updated loss factor (≥ 0). */
+  /** Optional updated NS loss factor, auto-fills NS_LOSS via NS_LOSS_TYPE (≥ 0). */
   lossPct?:
     | number
     | undefined;
