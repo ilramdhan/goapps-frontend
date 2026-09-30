@@ -51,6 +51,15 @@ interface MasterLookupFieldProps {
 // silently dropping it.
 const DISPLAY_LIMIT = 200
 
+/** Exact code match first; exact label match only as a legacy fallback. */
+function findOption<T extends { value: string; label: string }>(
+  list: T[],
+  current: string
+): T | undefined {
+  if (!current) return undefined
+  return list.find((o) => o.value === current) ?? list.find((o) => o.label === current)
+}
+
 export function MasterLookupField({
   entry,
   draft,
@@ -104,7 +113,14 @@ export function MasterLookupField({
   // know the default batch is missing it (no redundant race), and it stays
   // off once `options` itself contains the value (e.g. a fresh, in-range
   // selection) so it never fires for the common case.
-  const defaultMatch = options.find((o) => o.value === currentValue)
+  //
+  // ⭐ FIX (2026-09-30, loss-param-dedup-vloss) — legacy rows may still hold the
+  // master's LABEL (e.g. PRODUCT_GRADE pg_name "Type 2 NS", backfilled by
+  // 000470/000514) instead of its code. `findOption` prefers an exact code
+  // match and only falls back to an exact label match, so such rows still
+  // display their selection instead of an empty combobox. The stored value is
+  // never rewritten here — picking a grade saves the code as before.
+  const defaultMatch = findOption(options, currentValue)
   const needsResolve = !!currentValue && !optionsLoading && !defaultMatch
   const { data: resolvedOptions = [] } = useMasterLookupResolveValue(
     entry.lookupMasterCode,
@@ -121,8 +137,8 @@ export function MasterLookupField({
   // `visibleOptions`/`hasMore`/search UX — it exists solely so
   // `selectedOption` below can find it for label display.
   const mergedOptions = useMemo(() => {
-    const exactMatch = resolvedOptions.find((o) => o.value === currentValue)
-    if (!exactMatch || options.some((o) => o.value === currentValue)) return options
+    const exactMatch = findOption(resolvedOptions, currentValue)
+    if (!exactMatch || findOption(options, currentValue)) return options
     return [...options, exactMatch]
   }, [options, resolvedOptions, currentValue])
 
@@ -169,7 +185,7 @@ export function MasterLookupField({
     [entry.paramId, entry.paramCode, entry.lookupMasterCode, currentValue, onChangeLookup]
   )
 
-  const selectedOption = mergedOptions.find((o) => o.value === currentValue)
+  const selectedOption = findOption(mergedOptions, currentValue)
 
   // ⭐ BUG-2 fix (2026-08-27) — `selectedOption` only exists while `currentValue`
   // happens to be present in the CURRENTLY LOADED `options` page. That list is
@@ -315,7 +331,7 @@ export function MasterLookupField({
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4 shrink-0",
-                            currentValue === opt.value ? "opacity-100" : "opacity-0"
+                            selectedOption?.value === opt.value ? "opacity-100" : "opacity-0"
                           )}
                         />
                         <span className="truncate">{opt.label}</span>
