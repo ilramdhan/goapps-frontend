@@ -59,9 +59,9 @@ function RMGroupsPageContent() {
   const [selectedGroup, setSelectedGroup] = useState<RMGroupHead | null>(null)
   const exportMutation = useExportRMGroups()
 
-  // This list page is period-blind (edits here always target the anchor
-  // row) — pass the latest sync period so create/update write straight
-  // through to the anchor row per the "latest period write-through" rule.
+  // This list page is period-blind and only creates groups (header edits
+  // live on the per-period detail page) — pass the latest sync period so
+  // create writes straight through per the "latest period write-through" rule.
   const { data: periodsData } = useSyncPeriods()
   const latestPeriod = useMemo(
     () => periodsData?.periods?.[0] || "",
@@ -91,11 +91,6 @@ function RMGroupsPageContent() {
     setIsFormOpen(true)
   }
 
-  const handleEdit = (group: RMGroupHead) => {
-    setSelectedGroup(group)
-    setIsFormOpen(true)
-  }
-
   const handleDelete = (group: RMGroupHead) => {
     setSelectedGroup(group)
     setIsDeleteOpen(true)
@@ -106,12 +101,9 @@ function RMGroupsPageContent() {
   }
 
   const handleFormSuccess = (groupHeadId: string) => {
-    // After create: navigate to the group detail page to add items
-    // After edit: stay on list (or navigate, either works)
-    if (!selectedGroup) {
-      // This was a create — navigate to detail page
-      router.push(`/finance/rm-pricing/groups/${groupHeadId}`)
-    }
+    // The list page only creates groups (header edits live on the per-period
+    // detail page) — after create, navigate to the detail page to add items.
+    router.push(`/finance/rm-pricing/groups/${groupHeadId}`)
   }
 
   const handlePageChange = (page: number) => {
@@ -187,7 +179,6 @@ function RMGroupsPageContent() {
             <GroupTable
               data={data?.data || []}
               isLoading={isLoading}
-              onEdit={handleEdit}
               onDelete={handleDelete}
               onView={handleView}
             />
@@ -204,7 +195,7 @@ function RMGroupsPageContent() {
       <GroupFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        group={selectedGroup}
+        group={null}
         period={latestPeriod}
         onSuccess={handleFormSuccess}
       />

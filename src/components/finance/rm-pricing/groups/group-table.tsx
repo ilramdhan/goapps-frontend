@@ -1,6 +1,6 @@
 "use client"
 
-import { Pencil, Trash2, Eye } from "lucide-react"
+import { Trash2, Eye } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { DataTable, type ColumnDef, type RowAction } from "@/components/shared"
@@ -18,7 +18,6 @@ import {
 interface GroupTableProps {
   data: RMGroupHead[]
   isLoading?: boolean
-  onEdit: (group: RMGroupHead) => void
   onDelete: (group: RMGroupHead) => void
   onView: (group: RMGroupHead) => void
 }
@@ -55,7 +54,7 @@ function marketingFlagShort(flag: number | undefined): string {
 const num = "text-right font-mono text-xs"
 const numHead = "text-right"
 
-export function GroupTable({ data, isLoading, onEdit, onDelete, onView }: GroupTableProps) {
+export function GroupTable({ data, isLoading, onDelete, onView }: GroupTableProps) {
   const columns: ColumnDef<RMGroupHead>[] = [
     {
       id: "groupCode",
@@ -129,12 +128,6 @@ export function GroupTable({ data, isLoading, onEdit, onDelete, onView }: GroupT
       label: "View Details",
       icon: <Eye className="h-4 w-4" />,
       onClick: onView,
-    },
-    {
-      id: "edit",
-      label: "Edit",
-      icon: <Pencil className="h-4 w-4" />,
-      onClick: onEdit,
     },
     {
       id: "delete",

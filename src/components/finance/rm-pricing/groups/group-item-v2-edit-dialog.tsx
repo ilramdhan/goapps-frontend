@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label"
 import type { RMGroupDetail } from "@/types/finance/rm-group"
 import { useUpdateGroupItem } from "@/hooks/finance/use-rm-group-items"
 
+import { InheritedPeriodBadge } from "./inherited-period-badge"
+
 interface GroupItemV2EditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -113,6 +115,7 @@ function GroupItemV2EditDialogInner({ open, onOpenChange, detail, period }: Grou
           <DialogDescription className="text-xs">
             Per-detail freight / anti-dumping / duty / transport / fix value (V2 valuation engine).
           </DialogDescription>
+          <InheritedPeriodBadge inheritedFromPeriod={detail.inheritedFromPeriod} className="w-fit" />
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3">

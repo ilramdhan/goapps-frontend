@@ -57,6 +57,8 @@ import {
 } from "@/types/generated/finance/v1/rm_group"
 import { useCreateRMGroup, useUpdateRMGroup } from "@/hooks/finance/use-rm-group"
 
+import { InheritedPeriodBadge } from "./inherited-period-badge"
+
 // V2 form schema — combines basic identity + marketing inputs + V2 flags.
 //
 // Convention: percent fields (`costPercentage`, `marketingAntiDumpingPct`)
@@ -246,6 +248,9 @@ export function GroupFormDialog({
               ? `Update the RM group configuration for period ${period}. Code cannot be changed.`
               : "Create a new RM group with V2 marketing inputs. Per-detail valuation inputs are configured per item after adding them."}
           </DialogDescription>
+          {isEditing && (
+            <InheritedPeriodBadge inheritedFromPeriod={group?.inheritedFromPeriod} className="w-fit" />
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-6">
