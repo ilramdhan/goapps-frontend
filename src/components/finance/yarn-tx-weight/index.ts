@@ -1,2 +1,3 @@
 export { YarnTxWeightFormDialog } from "./yarn-tx-weight-form-dialog"
-export { YarnTxWeightTable, groupYarnTxWeights } from "./yarn-tx-weight-table"
+export { YarnTxWeightGroupTable } from "./yarn-tx-weight-group-table"
+export { ProductTypeMultiSelect } from "./product-type-multi-select"

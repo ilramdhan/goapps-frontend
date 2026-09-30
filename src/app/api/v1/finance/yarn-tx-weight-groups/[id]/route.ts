@@ -1,8 +1,8 @@
-// Finance Yarn TX Weight master routes - Get, Update, Delete by ID
+// Finance Yarn TX Weight group routes - Get, Update, Delete by ID
 
 import { NextRequest, NextResponse } from "next/server"
-import { getYarnTxWeightClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
-import { modeCodeToEnum, toModeCode } from "@/types/finance/yarn-tx-weight"
+import { getYarnTxWeightGroupClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { toYarnTxWeightGroupRequestBody } from "@/types/finance/yarn-tx-weight"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -15,13 +15,13 @@ function errorResponse(message: string) {
     )
 }
 
-// GET /api/v1/finance/yarn-tx-weights/[id]
+// GET /api/v1/finance/yarn-tx-weight-groups/[id]
 export async function GET(request: NextRequest, context: RouteContext) {
     try {
         const { id } = await context.params
         const metadata = createMetadataFromRequest(request)
-        const client = getYarnTxWeightClient()
-        const response = await client.getYarnTxWeight({ id }, metadata)
+        const client = getYarnTxWeightGroupClient()
+        const response = await client.getYarnTxWeightGroup({ groupId: id }, metadata)
 
         return NextResponse.json({
             base: response.base,
@@ -29,28 +29,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
         })
     } catch (error) {
         if (isGrpcError(error)) return handleGrpcError(error)
-        console.error("Error fetching TX weight:", error)
-        return errorResponse("Failed to fetch TX weight")
+        console.error("Error fetching TX weight config:", error)
+        return errorResponse("Failed to fetch TX weight config")
     }
 }
 
-// PUT /api/v1/finance/yarn-tx-weights/[id]
-// product_type_id and grade are immutable — only mode/value/description are forwarded.
+// PUT /api/v1/finance/yarn-tx-weight-groups/[id]
+// Full replacement: the product type set and the rules are replaced in one transaction.
 export async function PUT(request: NextRequest, context: RouteContext) {
     try {
         const { id } = await context.params
         const body = await request.json()
         const metadata = createMetadataFromRequest(request)
-        const client = getYarnTxWeightClient()
-
-        const modeCode = toModeCode(body.mode)
-        const response = await client.updateYarnTxWeight(
-            {
-                id,
-                mode: modeCode ? modeCodeToEnum(modeCode) : undefined,
-                value: body.value === undefined || body.value === null ? undefined : Number(body.value),
-                description: body.description === undefined ? undefined : String(body.description ?? ""),
-            },
+        const client = getYarnTxWeightGroupClient()
+        const response = await client.updateYarnTxWeightGroup(
+            { groupId: id, ...toYarnTxWeightGroupRequestBody(body) },
             metadata
         )
 
@@ -60,25 +53,26 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         })
     } catch (error) {
         if (isGrpcError(error)) return handleGrpcError(error)
-        console.error("Error updating TX weight:", error)
-        return errorResponse("Failed to update TX weight")
+        console.error("Error updating TX weight config:", error)
+        return errorResponse("Failed to update TX weight config")
     }
 }
 
-// DELETE /api/v1/finance/yarn-tx-weights/[id]
+// DELETE /api/v1/finance/yarn-tx-weight-groups/[id]
+// Soft delete; its product types become free and fall back to the ratio formula.
 export async function DELETE(request: NextRequest, context: RouteContext) {
     try {
         const { id } = await context.params
         const metadata = createMetadataFromRequest(request)
-        const client = getYarnTxWeightClient()
-        const response = await client.deleteYarnTxWeight({ id }, metadata)
+        const client = getYarnTxWeightGroupClient()
+        const response = await client.deleteYarnTxWeightGroup({ groupId: id }, metadata)
 
         return NextResponse.json({
             base: response.base,
         })
     } catch (error) {
         if (isGrpcError(error)) return handleGrpcError(error)
-        console.error("Error deleting TX weight:", error)
-        return errorResponse("Failed to delete TX weight")
+        console.error("Error deleting TX weight config:", error)
+        return errorResponse("Failed to delete TX weight config")
     }
 }

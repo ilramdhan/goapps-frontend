@@ -25,6 +25,7 @@ vi.mock("@/hooks/finance/use-mb-param", () => ({
 }))
 vi.mock("@/hooks/finance/use-master-lookup", () => ({
   useMasterLookupOptions: () => ({ data: [], isLoading: false }),
+  useMasterLookupResolveValue: () => ({ data: [], isLoading: false }),
 }))
 
 import { useProductRequiredParams } from "@/hooks/finance/use-cost-product-parameter"

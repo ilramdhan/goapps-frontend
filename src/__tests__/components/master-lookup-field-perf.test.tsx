@@ -59,6 +59,7 @@ const useMasterLookupOptionsMock = vi.fn()
 
 vi.mock("@/hooks/finance/use-master-lookup", () => ({
   useMasterLookupOptions: (...args: unknown[]) => useMasterLookupOptionsMock(...args),
+  useMasterLookupResolveValue: () => ({ data: [], isLoading: false }),
 }))
 
 // ─── Import under test (after the mocks are registered) ───────────────────────
