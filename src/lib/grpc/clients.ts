@@ -46,6 +46,8 @@ import {
   WorkflowInstanceServiceDefinition,
 } from "@/types/generated/iam/v1/workflow"
 import { OracleSyncServiceDefinition } from "@/types/generated/finance/v1/oracle_sync"
+import { ErpIntegrationServiceDefinition } from "@/types/generated/finance/v1/erp_integration"
+import { ErpRuleServiceDefinition } from "@/types/generated/finance/v1/erp_rule"
 import { RMGroupServiceDefinition } from "@/types/generated/finance/v1/rm_group"
 import { RMCostServiceDefinition } from "@/types/generated/finance/v1/rm_cost"
 import { CostProductTypeServiceDefinition } from "@/types/generated/finance/v1/cost_product_type"
@@ -335,6 +337,18 @@ export function getPresenceClient() {
 export function getOracleSyncClient() {
   return getOrCreate("oracleSync", () =>
     createServiceClient(OracleSyncServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getErpIntegrationClient() {
+  return getOrCreate("erpIntegration", () =>
+    createServiceClient(ErpIntegrationServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getErpRuleClient() {
+  return getOrCreate("erpRule", () =>
+    createServiceClient(ErpRuleServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 
