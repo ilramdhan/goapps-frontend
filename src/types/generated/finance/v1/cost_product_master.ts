@@ -38,6 +38,12 @@ export interface CostProductMaster {
   source: string;
   /** true blocks manual edits to route/params; escape hatch via UnlockCostProductMaster */
   isLocked: boolean;
+  erpFgType: string;
+  erpChpItemCode: string;
+  erpMsBatchItem: string;
+  erpItemType: string;
+  /** decimal string */
+  erpPrdPerDay: string;
 }
 
 export interface CreateCostProductMasterRequest {
@@ -52,6 +58,13 @@ export interface CreateCostProductMasterRequest {
   flex02: string;
   /** legacy_type_label */
   flex03: string;
+  /** ERP linkage identifiers (optional, empty = unset). */
+  erpFgType: string;
+  erpChpItemCode: string;
+  erpMsBatchItem: string;
+  erpItemType: string;
+  /** decimal string */
+  erpPrdPerDay: string;
 }
 
 export interface CreateCostProductMasterResponse {
@@ -89,6 +102,13 @@ export interface UpdateCostProductMasterRequest {
   flex02: string;
   /** legacy_type_label */
   flex03: string;
+  /** ERP linkage identifiers (optional, empty = unset). */
+  erpFgType: string;
+  erpChpItemCode: string;
+  erpMsBatchItem: string;
+  erpItemType: string;
+  /** decimal string */
+  erpPrdPerDay: string;
 }
 
 export interface UpdateCostProductMasterResponse {
@@ -101,6 +121,13 @@ export interface UpdateCostProductMasterErpLinkageRequest {
   erpItemCode: string;
   erpGradeCode1: string;
   erpGradeCode2: string;
+  /** ERP linkage identifiers (optional, empty = unset). */
+  erpFgType: string;
+  erpChpItemCode: string;
+  erpMsBatchItem: string;
+  erpItemType: string;
+  /** decimal string */
+  erpPrdPerDay: string;
 }
 
 export interface UpdateCostProductMasterErpLinkageResponse {
@@ -213,6 +240,11 @@ function createBaseCostProductMaster(): CostProductMaster {
     flex03: "",
     source: "",
     isLocked: false,
+    erpFgType: "",
+    erpChpItemCode: "",
+    erpMsBatchItem: "",
+    erpItemType: "",
+    erpPrdPerDay: "",
   };
 }
 
@@ -283,6 +315,21 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     }
     if (message.isLocked !== false) {
       writer.uint32(176).bool(message.isLocked);
+    }
+    if (message.erpFgType !== "") {
+      writer.uint32(186).string(message.erpFgType);
+    }
+    if (message.erpChpItemCode !== "") {
+      writer.uint32(194).string(message.erpChpItemCode);
+    }
+    if (message.erpMsBatchItem !== "") {
+      writer.uint32(202).string(message.erpMsBatchItem);
+    }
+    if (message.erpItemType !== "") {
+      writer.uint32(210).string(message.erpItemType);
+    }
+    if (message.erpPrdPerDay !== "") {
+      writer.uint32(218).string(message.erpPrdPerDay);
     }
     return writer;
   },
@@ -470,6 +517,46 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
           message.isLocked = reader.bool();
           continue;
         }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.erpFgType = reader.string();
+          continue;
+        }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.erpChpItemCode = reader.string();
+          continue;
+        }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.erpMsBatchItem = reader.string();
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.erpItemType = reader.string();
+          continue;
+        }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.erpPrdPerDay = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -579,6 +666,31 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
         : isSet(object.is_locked)
         ? globalThis.Boolean(object.is_locked)
         : false,
+      erpFgType: isSet(object.erpFgType)
+        ? globalThis.String(object.erpFgType)
+        : isSet(object.erp_fg_type)
+        ? globalThis.String(object.erp_fg_type)
+        : "",
+      erpChpItemCode: isSet(object.erpChpItemCode)
+        ? globalThis.String(object.erpChpItemCode)
+        : isSet(object.erp_chp_item_code)
+        ? globalThis.String(object.erp_chp_item_code)
+        : "",
+      erpMsBatchItem: isSet(object.erpMsBatchItem)
+        ? globalThis.String(object.erpMsBatchItem)
+        : isSet(object.erp_ms_batch_item)
+        ? globalThis.String(object.erp_ms_batch_item)
+        : "",
+      erpItemType: isSet(object.erpItemType)
+        ? globalThis.String(object.erpItemType)
+        : isSet(object.erp_item_type)
+        ? globalThis.String(object.erp_item_type)
+        : "",
+      erpPrdPerDay: isSet(object.erpPrdPerDay)
+        ? globalThis.String(object.erpPrdPerDay)
+        : isSet(object.erp_prd_per_day)
+        ? globalThis.String(object.erp_prd_per_day)
+        : "",
     };
   },
 
@@ -650,6 +762,21 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     if (message.isLocked !== false) {
       obj.isLocked = message.isLocked;
     }
+    if (message.erpFgType !== "") {
+      obj.erpFgType = message.erpFgType;
+    }
+    if (message.erpChpItemCode !== "") {
+      obj.erpChpItemCode = message.erpChpItemCode;
+    }
+    if (message.erpMsBatchItem !== "") {
+      obj.erpMsBatchItem = message.erpMsBatchItem;
+    }
+    if (message.erpItemType !== "") {
+      obj.erpItemType = message.erpItemType;
+    }
+    if (message.erpPrdPerDay !== "") {
+      obj.erpPrdPerDay = message.erpPrdPerDay;
+    }
     return obj;
   },
 
@@ -682,6 +809,11 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     message.flex03 = object.flex03 ?? "";
     message.source = object.source ?? "";
     message.isLocked = object.isLocked ?? false;
+    message.erpFgType = object.erpFgType ?? "";
+    message.erpChpItemCode = object.erpChpItemCode ?? "";
+    message.erpMsBatchItem = object.erpMsBatchItem ?? "";
+    message.erpItemType = object.erpItemType ?? "";
+    message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     return message;
   },
 };
@@ -696,6 +828,11 @@ function createBaseCreateCostProductMasterRequest(): CreateCostProductMasterRequ
     flex01: "",
     flex02: "",
     flex03: "",
+    erpFgType: "",
+    erpChpItemCode: "",
+    erpMsBatchItem: "",
+    erpItemType: "",
+    erpPrdPerDay: "",
   };
 }
 
@@ -724,6 +861,21 @@ export const CreateCostProductMasterRequest: MessageFns<CreateCostProductMasterR
     }
     if (message.flex03 !== "") {
       writer.uint32(66).string(message.flex03);
+    }
+    if (message.erpFgType !== "") {
+      writer.uint32(74).string(message.erpFgType);
+    }
+    if (message.erpChpItemCode !== "") {
+      writer.uint32(82).string(message.erpChpItemCode);
+    }
+    if (message.erpMsBatchItem !== "") {
+      writer.uint32(90).string(message.erpMsBatchItem);
+    }
+    if (message.erpItemType !== "") {
+      writer.uint32(98).string(message.erpItemType);
+    }
+    if (message.erpPrdPerDay !== "") {
+      writer.uint32(106).string(message.erpPrdPerDay);
     }
     return writer;
   },
@@ -799,6 +951,46 @@ export const CreateCostProductMasterRequest: MessageFns<CreateCostProductMasterR
           message.flex03 = reader.string();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.erpFgType = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.erpChpItemCode = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.erpMsBatchItem = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.erpItemType = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.erpPrdPerDay = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -846,6 +1038,31 @@ export const CreateCostProductMasterRequest: MessageFns<CreateCostProductMasterR
         : isSet(object.flex_03)
         ? globalThis.String(object.flex_03)
         : "",
+      erpFgType: isSet(object.erpFgType)
+        ? globalThis.String(object.erpFgType)
+        : isSet(object.erp_fg_type)
+        ? globalThis.String(object.erp_fg_type)
+        : "",
+      erpChpItemCode: isSet(object.erpChpItemCode)
+        ? globalThis.String(object.erpChpItemCode)
+        : isSet(object.erp_chp_item_code)
+        ? globalThis.String(object.erp_chp_item_code)
+        : "",
+      erpMsBatchItem: isSet(object.erpMsBatchItem)
+        ? globalThis.String(object.erpMsBatchItem)
+        : isSet(object.erp_ms_batch_item)
+        ? globalThis.String(object.erp_ms_batch_item)
+        : "",
+      erpItemType: isSet(object.erpItemType)
+        ? globalThis.String(object.erpItemType)
+        : isSet(object.erp_item_type)
+        ? globalThis.String(object.erp_item_type)
+        : "",
+      erpPrdPerDay: isSet(object.erpPrdPerDay)
+        ? globalThis.String(object.erpPrdPerDay)
+        : isSet(object.erp_prd_per_day)
+        ? globalThis.String(object.erp_prd_per_day)
+        : "",
     };
   },
 
@@ -875,6 +1092,21 @@ export const CreateCostProductMasterRequest: MessageFns<CreateCostProductMasterR
     if (message.flex03 !== "") {
       obj.flex03 = message.flex03;
     }
+    if (message.erpFgType !== "") {
+      obj.erpFgType = message.erpFgType;
+    }
+    if (message.erpChpItemCode !== "") {
+      obj.erpChpItemCode = message.erpChpItemCode;
+    }
+    if (message.erpMsBatchItem !== "") {
+      obj.erpMsBatchItem = message.erpMsBatchItem;
+    }
+    if (message.erpItemType !== "") {
+      obj.erpItemType = message.erpItemType;
+    }
+    if (message.erpPrdPerDay !== "") {
+      obj.erpPrdPerDay = message.erpPrdPerDay;
+    }
     return obj;
   },
 
@@ -891,6 +1123,11 @@ export const CreateCostProductMasterRequest: MessageFns<CreateCostProductMasterR
     message.flex01 = object.flex01 ?? "";
     message.flex02 = object.flex02 ?? "";
     message.flex03 = object.flex03 ?? "";
+    message.erpFgType = object.erpFgType ?? "";
+    message.erpChpItemCode = object.erpChpItemCode ?? "";
+    message.erpMsBatchItem = object.erpMsBatchItem ?? "";
+    message.erpItemType = object.erpItemType ?? "";
+    message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     return message;
   },
 };
@@ -1273,6 +1510,11 @@ function createBaseUpdateCostProductMasterRequest(): UpdateCostProductMasterRequ
     flex01: "",
     flex02: "",
     flex03: "",
+    erpFgType: "",
+    erpChpItemCode: "",
+    erpMsBatchItem: "",
+    erpItemType: "",
+    erpPrdPerDay: "",
   };
 }
 
@@ -1301,6 +1543,21 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     }
     if (message.flex03 !== "") {
       writer.uint32(66).string(message.flex03);
+    }
+    if (message.erpFgType !== "") {
+      writer.uint32(74).string(message.erpFgType);
+    }
+    if (message.erpChpItemCode !== "") {
+      writer.uint32(82).string(message.erpChpItemCode);
+    }
+    if (message.erpMsBatchItem !== "") {
+      writer.uint32(90).string(message.erpMsBatchItem);
+    }
+    if (message.erpItemType !== "") {
+      writer.uint32(98).string(message.erpItemType);
+    }
+    if (message.erpPrdPerDay !== "") {
+      writer.uint32(106).string(message.erpPrdPerDay);
     }
     return writer;
   },
@@ -1376,6 +1633,46 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
           message.flex03 = reader.string();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.erpFgType = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.erpChpItemCode = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.erpMsBatchItem = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.erpItemType = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.erpPrdPerDay = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1423,6 +1720,31 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
         : isSet(object.flex_03)
         ? globalThis.String(object.flex_03)
         : "",
+      erpFgType: isSet(object.erpFgType)
+        ? globalThis.String(object.erpFgType)
+        : isSet(object.erp_fg_type)
+        ? globalThis.String(object.erp_fg_type)
+        : "",
+      erpChpItemCode: isSet(object.erpChpItemCode)
+        ? globalThis.String(object.erpChpItemCode)
+        : isSet(object.erp_chp_item_code)
+        ? globalThis.String(object.erp_chp_item_code)
+        : "",
+      erpMsBatchItem: isSet(object.erpMsBatchItem)
+        ? globalThis.String(object.erpMsBatchItem)
+        : isSet(object.erp_ms_batch_item)
+        ? globalThis.String(object.erp_ms_batch_item)
+        : "",
+      erpItemType: isSet(object.erpItemType)
+        ? globalThis.String(object.erpItemType)
+        : isSet(object.erp_item_type)
+        ? globalThis.String(object.erp_item_type)
+        : "",
+      erpPrdPerDay: isSet(object.erpPrdPerDay)
+        ? globalThis.String(object.erpPrdPerDay)
+        : isSet(object.erp_prd_per_day)
+        ? globalThis.String(object.erp_prd_per_day)
+        : "",
     };
   },
 
@@ -1452,6 +1774,21 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     if (message.flex03 !== "") {
       obj.flex03 = message.flex03;
     }
+    if (message.erpFgType !== "") {
+      obj.erpFgType = message.erpFgType;
+    }
+    if (message.erpChpItemCode !== "") {
+      obj.erpChpItemCode = message.erpChpItemCode;
+    }
+    if (message.erpMsBatchItem !== "") {
+      obj.erpMsBatchItem = message.erpMsBatchItem;
+    }
+    if (message.erpItemType !== "") {
+      obj.erpItemType = message.erpItemType;
+    }
+    if (message.erpPrdPerDay !== "") {
+      obj.erpPrdPerDay = message.erpPrdPerDay;
+    }
     return obj;
   },
 
@@ -1468,6 +1805,11 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     message.flex01 = object.flex01 ?? "";
     message.flex02 = object.flex02 ?? "";
     message.flex03 = object.flex03 ?? "";
+    message.erpFgType = object.erpFgType ?? "";
+    message.erpChpItemCode = object.erpChpItemCode ?? "";
+    message.erpMsBatchItem = object.erpMsBatchItem ?? "";
+    message.erpItemType = object.erpItemType ?? "";
+    message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     return message;
   },
 };
@@ -1553,7 +1895,17 @@ export const UpdateCostProductMasterResponse: MessageFns<UpdateCostProductMaster
 };
 
 function createBaseUpdateCostProductMasterErpLinkageRequest(): UpdateCostProductMasterErpLinkageRequest {
-  return { productSysId: 0, erpItemCode: "", erpGradeCode1: "", erpGradeCode2: "" };
+  return {
+    productSysId: 0,
+    erpItemCode: "",
+    erpGradeCode1: "",
+    erpGradeCode2: "",
+    erpFgType: "",
+    erpChpItemCode: "",
+    erpMsBatchItem: "",
+    erpItemType: "",
+    erpPrdPerDay: "",
+  };
 }
 
 export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProductMasterErpLinkageRequest> = {
@@ -1569,6 +1921,21 @@ export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProd
     }
     if (message.erpGradeCode2 !== "") {
       writer.uint32(34).string(message.erpGradeCode2);
+    }
+    if (message.erpFgType !== "") {
+      writer.uint32(42).string(message.erpFgType);
+    }
+    if (message.erpChpItemCode !== "") {
+      writer.uint32(50).string(message.erpChpItemCode);
+    }
+    if (message.erpMsBatchItem !== "") {
+      writer.uint32(58).string(message.erpMsBatchItem);
+    }
+    if (message.erpItemType !== "") {
+      writer.uint32(66).string(message.erpItemType);
+    }
+    if (message.erpPrdPerDay !== "") {
+      writer.uint32(74).string(message.erpPrdPerDay);
     }
     return writer;
   },
@@ -1612,6 +1979,46 @@ export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProd
           message.erpGradeCode2 = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.erpFgType = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.erpChpItemCode = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.erpMsBatchItem = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.erpItemType = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.erpPrdPerDay = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1643,6 +2050,31 @@ export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProd
         : isSet(object.erp_grade_code_2)
         ? globalThis.String(object.erp_grade_code_2)
         : "",
+      erpFgType: isSet(object.erpFgType)
+        ? globalThis.String(object.erpFgType)
+        : isSet(object.erp_fg_type)
+        ? globalThis.String(object.erp_fg_type)
+        : "",
+      erpChpItemCode: isSet(object.erpChpItemCode)
+        ? globalThis.String(object.erpChpItemCode)
+        : isSet(object.erp_chp_item_code)
+        ? globalThis.String(object.erp_chp_item_code)
+        : "",
+      erpMsBatchItem: isSet(object.erpMsBatchItem)
+        ? globalThis.String(object.erpMsBatchItem)
+        : isSet(object.erp_ms_batch_item)
+        ? globalThis.String(object.erp_ms_batch_item)
+        : "",
+      erpItemType: isSet(object.erpItemType)
+        ? globalThis.String(object.erpItemType)
+        : isSet(object.erp_item_type)
+        ? globalThis.String(object.erp_item_type)
+        : "",
+      erpPrdPerDay: isSet(object.erpPrdPerDay)
+        ? globalThis.String(object.erpPrdPerDay)
+        : isSet(object.erp_prd_per_day)
+        ? globalThis.String(object.erp_prd_per_day)
+        : "",
     };
   },
 
@@ -1660,6 +2092,21 @@ export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProd
     if (message.erpGradeCode2 !== "") {
       obj.erpGradeCode2 = message.erpGradeCode2;
     }
+    if (message.erpFgType !== "") {
+      obj.erpFgType = message.erpFgType;
+    }
+    if (message.erpChpItemCode !== "") {
+      obj.erpChpItemCode = message.erpChpItemCode;
+    }
+    if (message.erpMsBatchItem !== "") {
+      obj.erpMsBatchItem = message.erpMsBatchItem;
+    }
+    if (message.erpItemType !== "") {
+      obj.erpItemType = message.erpItemType;
+    }
+    if (message.erpPrdPerDay !== "") {
+      obj.erpPrdPerDay = message.erpPrdPerDay;
+    }
     return obj;
   },
 
@@ -1672,6 +2119,11 @@ export const UpdateCostProductMasterErpLinkageRequest: MessageFns<UpdateCostProd
     message.erpItemCode = object.erpItemCode ?? "";
     message.erpGradeCode1 = object.erpGradeCode1 ?? "";
     message.erpGradeCode2 = object.erpGradeCode2 ?? "";
+    message.erpFgType = object.erpFgType ?? "";
+    message.erpChpItemCode = object.erpChpItemCode ?? "";
+    message.erpMsBatchItem = object.erpMsBatchItem ?? "";
+    message.erpItemType = object.erpItemType ?? "";
+    message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     return message;
   },
 };

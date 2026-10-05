@@ -623,6 +623,9 @@ export interface CostResult {
    * contributor. Reuses CostRMDetail (already defined for CostBreakdown).
    */
   rmDetails: CostRMDetail[];
+  /** Approval stamp (empty until approved). */
+  approvedAt: string;
+  approvedBy: string;
 }
 
 /** CostBreakdown is the full drill-down for one CostResult. */
@@ -2748,6 +2751,8 @@ function createBaseCostResult(): CostResult {
     primaryRmName: "",
     rmCount: 0,
     rmDetails: [],
+    approvedAt: "",
+    approvedBy: "",
   };
 }
 
@@ -2845,6 +2850,12 @@ export const CostResult: MessageFns<CostResult> = {
     }
     for (const v of message.rmDetails) {
       CostRMDetail.encode(v!, writer.uint32(250).fork()).join();
+    }
+    if (message.approvedAt !== "") {
+      writer.uint32(258).string(message.approvedAt);
+    }
+    if (message.approvedBy !== "") {
+      writer.uint32(266).string(message.approvedBy);
     }
     return writer;
   },
@@ -3104,6 +3115,22 @@ export const CostResult: MessageFns<CostResult> = {
           message.rmDetails.push(CostRMDetail.decode(reader, reader.uint32()));
           continue;
         }
+        case 32: {
+          if (tag !== 258) {
+            break;
+          }
+
+          message.approvedAt = reader.string();
+          continue;
+        }
+        case 33: {
+          if (tag !== 266) {
+            break;
+          }
+
+          message.approvedBy = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3258,6 +3285,16 @@ export const CostResult: MessageFns<CostResult> = {
         : globalThis.Array.isArray(object?.rm_details)
         ? object.rm_details.map((e: any) => CostRMDetail.fromJSON(e))
         : [],
+      approvedAt: isSet(object.approvedAt)
+        ? globalThis.String(object.approvedAt)
+        : isSet(object.approved_at)
+        ? globalThis.String(object.approved_at)
+        : "",
+      approvedBy: isSet(object.approvedBy)
+        ? globalThis.String(object.approvedBy)
+        : isSet(object.approved_by)
+        ? globalThis.String(object.approved_by)
+        : "",
     };
   },
 
@@ -3356,6 +3393,12 @@ export const CostResult: MessageFns<CostResult> = {
     if (message.rmDetails?.length) {
       obj.rmDetails = message.rmDetails.map((e) => CostRMDetail.toJSON(e));
     }
+    if (message.approvedAt !== "") {
+      obj.approvedAt = message.approvedAt;
+    }
+    if (message.approvedBy !== "") {
+      obj.approvedBy = message.approvedBy;
+    }
     return obj;
   },
 
@@ -3395,6 +3438,8 @@ export const CostResult: MessageFns<CostResult> = {
     message.primaryRmName = object.primaryRmName ?? "";
     message.rmCount = object.rmCount ?? 0;
     message.rmDetails = object.rmDetails?.map((e) => CostRMDetail.fromPartial(e)) || [];
+    message.approvedAt = object.approvedAt ?? "";
+    message.approvedBy = object.approvedBy ?? "";
     return message;
   },
 };
