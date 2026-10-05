@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, BarChart3, CheckCircle2, ShieldCheck } from "lucide-react"
+import { ArrowLeft, BarChart3, CheckCircle2, Lock, ShieldCheck } from "lucide-react"
 
 import { useBreadcrumbTrail } from "@/components/common/dynamic-breadcrumb"
 import { PageHeader } from "@/components/common/page-header"
@@ -19,6 +19,7 @@ import {
   useVerifyCost,
 } from "@/hooks/finance/use-cost-calc"
 import { useCostProductMaster } from "@/hooks/finance/use-cost-product-master"
+import { useErpPeriodLock } from "@/hooks/finance/use-erp-integration"
 import { usePermissionContext } from "@/providers/permission-provider"
 import type { CalculationType } from "@/types/finance/cost-calc"
 
@@ -37,6 +38,9 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const { hasPermission } = usePermissionContext()
   const { data: result, isLoading } = useCostResult(productSysId, period, calcType)
+  // Period-lock badge: the BFF 403s without the ERP view permission, so only query then.
+  const canViewErp = hasPermission("finance.cost.erpintegration.view")
+  const { data: periodLock } = useErpPeriodLock(canViewErp ? period : "")
   const verify = useVerifyCost()
   const approve = useApproveCost()
 
@@ -138,8 +142,20 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
                     <CardTitle className="text-sm font-semibold">{productName}</CardTitle>
                   )}
                 </div>
-                <StatusBadge status={result.status} type="cost" />
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={result.status} type="cost" />
+                  {canViewErp && periodLock?.locked && (
+                    <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                      <Lock className="h-3 w-3" /> Period locked
+                    </span>
+                  )}
+                </div>
               </div>
+              {result.approvedBy && result.approvedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Approved by <UserName userId={result.approvedBy} compact /> at {formatDate(result.approvedAt)}
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {(result.itemCode || result.itemName || result.shadeCode || result.shadeName) && (

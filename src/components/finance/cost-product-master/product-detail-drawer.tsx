@@ -106,6 +106,12 @@ function DetailsSection({
             <Field label="Grade">{product.gradeCode || "—"}</Field>
             <Field label="ERP Compound Key" mono>{product.flex01 || "—"}</Field>
             <Field label="Oracle Sys ID" mono>{product.flex02 || "—"}</Field>
+            <Field label="ERP Item Code" mono>{product.erpItemCode || "—"}</Field>
+            <Field label="ERP FG Type" mono>{product.erpFgType || "—"}</Field>
+            <Field label="ERP CHP Item Code" mono>{product.erpChpItemCode || "—"}</Field>
+            <Field label="ERP MS Batch Item" mono>{product.erpMsBatchItem || "—"}</Field>
+            <Field label="ERP Item Type" mono>{product.erpItemType || "—"}</Field>
+            <Field label="ERP Production/Day" mono>{product.erpPrdPerDay || "—"}</Field>
             {product.description && (
               <div className="col-span-2">
                 <Field label="Description">

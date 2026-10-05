@@ -1,8 +1,8 @@
 "use client"
 
 import { CheckCircle2, ChevronDown, FileSpreadsheet, Package, PauseCircle, Plus, Upload } from "lucide-react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -91,6 +91,7 @@ export default function ProductMasterPageClient() {
   const { data: counts, isLoading: countsLoading } = useCostProductMasterCounts()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const { columns, visibility, toggle, setAll, reset } = useProductMasterTableColumns()
 
@@ -113,6 +114,20 @@ export default function ProductMasterPageClient() {
   const [bulkProgressOpen, setBulkProgressOpen] = useState(false)
 
   const { exportEntity, loading: exportLoading } = useExportData()
+
+  // Deep links from ERP coverage: ?erpItemCode=<code> prefills search, ?createFromErp=<code> opens create.
+  const erpItemCodeParam = searchParams?.get("erpItemCode") ?? ""
+  const createFromErpParam = searchParams?.get("createFromErp") ?? ""
+  useEffect(() => {
+    if (erpItemCodeParam) setFilters({ ...filters, search: erpItemCodeParam, page: 1 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erpItemCodeParam])
+  useEffect(() => {
+    if (createFromErpParam) {
+      setEditing(null)
+      setFormOpen(true)
+    }
+  }, [createFromErpParam])
 
   function openCreate() {
     setEditing(null)
