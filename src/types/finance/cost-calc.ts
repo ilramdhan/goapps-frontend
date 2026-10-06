@@ -318,6 +318,8 @@ export interface CostResult {
   // descending) — populated on both list rows and single-result fetches now
   // that the backend RM-detail bug is fixed. Empty array if the product has
   // no RM detail (rmCount will also be 0 in that case).
+  approvedAt?: string
+  approvedBy?: string
   rmDetails: CostRmDetail[]
 }
 
@@ -479,6 +481,8 @@ export function normalizeCostResult(raw: Record<string, unknown>): CostResult {
     rmDetails: arr<Record<string, unknown>>(raw.rmDetails ?? raw.rm_details).map(
       normalizeCostRmDetail,
     ),
+    approvedAt: fieldStr(raw, "approvedAt", "approved_at") || undefined,
+    approvedBy: fieldStr(raw, "approvedBy", "approved_by") || undefined,
   }
 }
 

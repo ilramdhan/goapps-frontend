@@ -28,6 +28,11 @@ const schema = z.object({
   flex01: z.string().max(255, "Max 255 chars"),
   flex02: z.string().max(100, "Max 100 chars"),
   flex03: z.string().max(100, "Max 100 chars"),
+  erpFgType: z.string().max(15, "Max 15 chars").optional(),
+  erpChpItemCode: z.string().max(50, "Max 50 chars").optional(),
+  erpMsBatchItem: z.string().max(12, "Max 12 chars").optional(),
+  erpItemType: z.string().max(20, "Max 20 chars").optional(),
+  erpPrdPerDay: z.string().regex(/^$|^\d{1,15}(\.\d{1,5})?$/, "Up to 15 digits, max 5 decimals").optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -48,6 +53,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
     defaultValues: {
       productTypeId: 0, productName: "", shadeCode: "", gradeCode: "AX", description: "",
       flex01: "", flex02: "", flex03: "",
+      erpFgType: "", erpChpItemCode: "", erpMsBatchItem: "", erpItemType: "", erpPrdPerDay: "",
     },
   })
 
@@ -62,6 +68,11 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
         flex01: product?.flex01 ?? "",
         flex02: product?.flex02 ?? "",
         flex03: product?.flex03 ?? "",
+        erpFgType: product?.erpFgType ?? "",
+        erpChpItemCode: product?.erpChpItemCode ?? "",
+        erpMsBatchItem: product?.erpMsBatchItem ?? "",
+        erpItemType: product?.erpItemType ?? "",
+        erpPrdPerDay: product?.erpPrdPerDay ?? "",
       })
     }
   }, [open, product, form])
@@ -78,6 +89,11 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
           flex01: values.flex01,
           flex02: values.flex02,
           flex03: values.flex03,
+          erpFgType: values.erpFgType,
+          erpChpItemCode: values.erpChpItemCode,
+          erpMsBatchItem: values.erpMsBatchItem,
+          erpItemType: values.erpItemType,
+          erpPrdPerDay: values.erpPrdPerDay,
         })
       } else {
         await createMutation.mutateAsync({
@@ -89,6 +105,11 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
           flex01: values.flex01,
           flex02: values.flex02,
           flex03: values.flex03,
+          erpFgType: values.erpFgType,
+          erpChpItemCode: values.erpChpItemCode,
+          erpMsBatchItem: values.erpMsBatchItem,
+          erpItemType: values.erpItemType,
+          erpPrdPerDay: values.erpPrdPerDay,
         })
       }
       onOpenChange(false)
@@ -233,6 +254,90 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
                         <Input {...field} placeholder="e.g. FINISH" />
                       </FormControl>
                       <FormDescription>Legacy product type label (legacy_type_label).</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </details>
+            <details className="rounded border p-3 text-sm">
+              <summary className="cursor-pointer select-none font-medium text-muted-foreground">
+                ERP attributes (optional)
+              </summary>
+              <div className="mt-3 space-y-3">
+                {isEditing && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ERP item code</p>
+                    <p className="font-mono text-sm">{product?.erpItemCode || "-"}</p>
+                    <p className="text-xs text-muted-foreground">Linked via ERP Integration (item + product shade)</p>
+                  </div>
+                )}
+                <FormField
+                  control={form.control}
+                  name="erpFgType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>FG Type</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Max 15.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="erpChpItemCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CHP Item Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Max 50.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="erpMsBatchItem"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>MS Batch Item</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Max 12.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="erpItemType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Item Type</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Max 20.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="erpPrdPerDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Production per day</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Decimal, max 5 decimals.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

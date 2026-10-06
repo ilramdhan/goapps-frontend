@@ -36,6 +36,8 @@ export {
   getChatClient,
   getPresenceClient,
   getOracleSyncClient,
+  getErpIntegrationClient,
+  getErpRuleClient,
   getRmGroupClient,
   getRmCostClient,
   getCostProductTypeClient,

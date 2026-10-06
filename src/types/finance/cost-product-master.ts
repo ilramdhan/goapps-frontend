@@ -13,6 +13,12 @@ export interface CostProductMaster {
   flex01: string
   flex02: string
   flex03: string
+  erpItemCode?: string
+  erpFgType?: string
+  erpChpItemCode?: string
+  erpMsBatchItem?: string
+  erpItemType?: string
+  erpPrdPerDay?: string
   isActive: boolean
   source: string
   isLocked: boolean
@@ -44,6 +50,11 @@ export interface CreateCostProductMasterPayload {
   flex01?: string
   flex02?: string
   flex03?: string
+  erpFgType?: string
+  erpChpItemCode?: string
+  erpMsBatchItem?: string
+  erpItemType?: string
+  erpPrdPerDay?: string
 }
 
 export interface UpdateCostProductMasterPayload {
@@ -54,6 +65,11 @@ export interface UpdateCostProductMasterPayload {
   flex01?: string
   flex02?: string
   flex03?: string
+  erpFgType?: string
+  erpChpItemCode?: string
+  erpMsBatchItem?: string
+  erpItemType?: string
+  erpPrdPerDay?: string
 }
 
 type Raw = Record<string, unknown> & {
@@ -83,6 +99,12 @@ export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
     flex01: str(raw.flex01 ?? raw.flex_01),
     flex02: str(raw.flex02 ?? raw.flex_02),
     flex03: str(raw.flex03 ?? raw.flex_03),
+    erpItemCode: str(raw.erpItemCode ?? raw.erp_item_code),
+    erpFgType: str(raw.erpFgType ?? raw.erp_fg_type),
+    erpChpItemCode: str(raw.erpChpItemCode ?? raw.erp_chp_item_code),
+    erpMsBatchItem: str(raw.erpMsBatchItem ?? raw.erp_ms_batch_item),
+    erpItemType: str(raw.erpItemType ?? raw.erp_item_type),
+    erpPrdPerDay: str(raw.erpPrdPerDay ?? raw.erp_prd_per_day),
     isActive: (raw.isActive ?? raw.is_active ?? true) as boolean,
     source: str(raw.source),
     isLocked: (raw.isLocked ?? raw.is_locked ?? false) as boolean,
