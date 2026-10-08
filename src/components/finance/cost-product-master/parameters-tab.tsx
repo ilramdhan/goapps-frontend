@@ -31,6 +31,7 @@ import {
   type MBSpinCandidate,
 } from "@/types/finance/cost-product-parameter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { computeLookupFillPatches } from "./lookup-fill"
 import type { LookupFillValuesResponse } from "@/types/finance/yarn-master"
 import type { RemoveApplicablePreview } from "@/types/finance/lookup-master"
 import { AddParameterDialog } from "./add-parameter-dialog"
@@ -112,13 +113,13 @@ export function ProductParametersTab({ productSysId, isLocked = false }: Paramet
       patch(triggerParamId, { valueText: selectedKey })
       if (!fills || !data) return
 
-      for (const [paramCode, numVal] of Object.entries(fills.numericFills)) {
-        const target = data.find((e) => e.paramCode === paramCode)
-        if (target) patch(target.paramId, { valueNumeric: String(numVal) })
-      }
-      for (const [paramCode, textVal] of Object.entries(fills.textFills)) {
-        const target = data.find((e) => e.paramCode === paramCode)
-        if (target) patch(target.paramId, { valueText: textVal })
+      // Overwrite (or clear) every child of this trigger with the newly
+      // selected master row's values — never keep the previous row's values.
+      const trigger = data.find((e) => e.paramId === triggerParamId)
+      if (trigger) {
+        for (const [childId, p] of computeLookupFillPatches(data, trigger.paramCode, fills)) {
+          patch(childId, p)
+        }
       }
       if (fills.displayLabel) {
         toast.success(`Auto-filled from: ${fills.displayLabel}`)
