@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, Download, Loader2, Lock, Package } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -37,6 +37,26 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
   const { hasPermission } = usePermissionContext()
   const canUnlock = hasPermission("finance.product.route.update")
 
+  // The sticky page header's height varies (title wraps, buttons wrap on mobile),
+  // so the tab bar below it offsets by the MEASURED height via --pm-header-h
+  // instead of a magic number.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  // Slot inside the sticky tab bar where the Parameters tab portals its toolbar.
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const root = rootRef.current
+    const header = headerRef.current
+    if (!root || !header) return
+    const apply = () => root.style.setProperty("--pm-header-h", `${header.offsetHeight}px`)
+    apply()
+    if (typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(apply)
+    ro.observe(header)
+    return () => ro.disconnect()
+  }, [])
+
   async function handleExport() {
     setExporting(true)
     try {
@@ -56,7 +76,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={rootRef} className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href="/finance/product-master">
           <ArrowLeft className="h-4 w-4 mr-1" />
@@ -65,6 +85,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
       </Button>
 
       <div
+        ref={headerRef}
         data-testid="product-master-sticky-header"
         className="sticky top-16 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b flex flex-wrap items-start justify-between gap-3"
       >
@@ -158,14 +179,22 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
       {product && <MbRecipeLinkCard productSysId={product.productSysId} source={product.source} />}
 
       <Tabs defaultValue="parameters">
-        <TabsList>
-          <TabsTrigger value="parameters">Parameters</TabsTrigger>
-          <TabsTrigger value="routing">Routing</TabsTrigger>
-          <TabsTrigger value="cost-history">Cost history</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
-        </TabsList>
+        {/* Sticky under the page header (z-20): tabs + Parameters toolbar stay visible.
+            Opaque bg + z-10 keeps it above content but below header/dialogs/popovers. */}
+        <div
+          data-testid="product-master-sticky-tabbar"
+          className="sticky top-[calc(4rem+var(--pm-header-h,0px))] group-has-data-[collapsible=icon]/sidebar-wrapper:top-[calc(3rem+var(--pm-header-h,0px))] z-10 -mx-6 px-6 py-2 bg-background border-b space-y-2"
+        >
+          <TabsList className="h-auto flex-wrap justify-start">
+            <TabsTrigger value="parameters">Parameters</TabsTrigger>
+            <TabsTrigger value="routing">Routing</TabsTrigger>
+            <TabsTrigger value="cost-history">Cost history</TabsTrigger>
+            <TabsTrigger value="audit">Audit</TabsTrigger>
+          </TabsList>
+          <div ref={setToolbarSlot} data-testid="product-master-toolbar-slot" className="empty:hidden" />
+        </div>
         <TabsContent value="parameters" className="mt-4">
-          <ProductParametersTab productSysId={productSysId} isLocked={!!product?.isLocked} />
+          <ProductParametersTab productSysId={productSysId} isLocked={!!product?.isLocked} toolbarSlot={toolbarSlot} />
         </TabsContent>
         <TabsContent value="routing" className="mt-4">
           <ProductRoutingTab productSysId={productSysId} />
