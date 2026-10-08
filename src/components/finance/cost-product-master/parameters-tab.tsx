@@ -5,7 +5,8 @@
 // display_group, lets the responsible user fill values, and saves them in a
 // single batch.
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Loader2, Save, AlertCircle, Plus, Trash2, ArrowUp, Check, ChevronsUpDown } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -43,6 +44,8 @@ import { toast } from "sonner"
 interface ParametersTabProps {
   productSysId: number
   isLocked?: boolean
+  /** When set, the status/actions toolbar is portaled here (a sticky bar owned by the page). */
+  toolbarSlot?: HTMLElement | null
 }
 
 export interface DraftValue {
@@ -68,7 +71,7 @@ function emptyDraft(entry: RequiredParamEntry): DraftValue {
   }
 }
 
-export function ProductParametersTab({ productSysId, isLocked = false }: ParametersTabProps) {
+export function ProductParametersTab({ productSysId, isLocked = false, toolbarSlot }: ParametersTabProps) {
   const { data, isLoading } = useProductRequiredParams(productSysId)
   const { data: missing } = useMissingRequiredParams(productSysId)
   const upsertM = useUpsertProductParamValuesBatch()
@@ -250,37 +253,42 @@ export function ProductParametersTab({ productSysId, isLocked = false }: Paramet
     )
   }
 
+  const toolbarEl = (
+  <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {missingCount > 0 ? (
+        <Badge variant="destructive" className="gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Missing {missingCount} required
+        </Badge>
+      ) : (
+        <Badge variant="default">All required params filled</Badge>
+      )}
+      <span className="text-xs text-muted-foreground">{data.length} parameters</span>
+      {dirtyCount > 0 && (
+        <span className="text-xs text-orange-600">{dirtyCount} unsaved change(s)</span>
+      )}
+    </div>
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} disabled={isLocked}>
+        <Plus className="h-4 w-4 mr-1" /> Add parameter
+      </Button>
+      <Button onClick={handleSave} disabled={dirtyCount === 0 || upsertM.isPending || isLocked}>
+        {upsertM.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        ) : (
+          <Save className="h-4 w-4 mr-2" />
+        )}
+        Save changes
+      </Button>
+    </div>
+  </div>
+  )
+  const toolbar: ReactNode = toolbarSlot ? createPortal(toolbarEl, toolbarSlot) : toolbarEl
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {missingCount > 0 ? (
-            <Badge variant="destructive" className="gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Missing {missingCount} required
-            </Badge>
-          ) : (
-            <Badge variant="default">All required params filled</Badge>
-          )}
-          <span className="text-xs text-muted-foreground">{data.length} parameters</span>
-          {dirtyCount > 0 && (
-            <span className="text-xs text-orange-600">{dirtyCount} unsaved change(s)</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} disabled={isLocked}>
-            <Plus className="h-4 w-4 mr-1" /> Add parameter
-          </Button>
-          <Button onClick={handleSave} disabled={dirtyCount === 0 || upsertM.isPending || isLocked}>
-            {upsertM.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Save changes
-          </Button>
-        </div>
-      </div>
+      {toolbar}
 
       {grouped.map(([group, entries]) => (
         <Card key={group}>
