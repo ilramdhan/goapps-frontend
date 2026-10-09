@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createCrudHooks } from "@/lib/hooks"
@@ -16,6 +16,7 @@ import {
   DeleteSuperbaCostSpResponseParser,
   GetSuperbaCostSpResponseParser,
   parseSyncOutcome,
+  normalizeSuperbaCostSpList,
 } from "@/types/finance/superba-cost-sp"
 
 function buildQueryString(params: ListSuperbaCostSpsParams): string {
@@ -105,5 +106,21 @@ export function useSyncSuperbaCostSps() {
       }
       toast.error(error.message || "Failed to sync Superba Cost SPs")
     },
+  })
+}
+
+/**
+ * useSuperbaLastSync reads lastSyncedAt (carried on the list response, which
+ * the CRUD factory does not expose). Keyed under lists() so every create /
+ * update / delete / sync invalidation refreshes it.
+ */
+export function useSuperbaLastSync() {
+  return useQuery({
+    queryKey: [...superbaCostSpKeys.lists(), "last-sync"] as const,
+    queryFn: async () => {
+      const raw = await apiClient.get<unknown>("/api/v1/finance/superba-cost-sps?page=1&pageSize=1")
+      return normalizeSuperbaCostSpList(raw).lastSyncedAt
+    },
+    staleTime: 30 * 1000,
   })
 }
