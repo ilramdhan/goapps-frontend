@@ -16,6 +16,7 @@ export {
   getOrganizationClient,
   getUomClient,
   getShadeClient,
+  getSuperbaCostSpClient,
   getBiDashboardClient,
   getBiChartDataClient,
   getBiDataSourceClient,
