@@ -128,6 +128,12 @@ export interface RequiredParamEntry {
   valueFlag: boolean;
   filledAt: string;
   filledBy: string;
+  /**
+   * Optional read-time display text that replaces/augments the stored value in
+   * the UI (e.g. Superba colour name for MB_SP_DYE on SUPERBA products). Empty =
+   * none. Never stored; the stored value stays editable.
+   */
+  displayValue: string;
 }
 
 export interface ListProductRequiredParamsRequest {
@@ -1056,6 +1062,7 @@ function createBaseRequiredParamEntry(): RequiredParamEntry {
     valueFlag: false,
     filledAt: "",
     filledBy: "",
+    displayValue: "",
   };
 }
 
@@ -1129,6 +1136,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     }
     if (message.filledBy !== "") {
       writer.uint32(250).string(message.filledBy);
+    }
+    if (message.displayValue !== "") {
+      writer.uint32(258).string(message.displayValue);
     }
     return writer;
   },
@@ -1324,6 +1334,14 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
           message.filledBy = reader.string();
           continue;
         }
+        case 32: {
+          if (tag !== 258) {
+            break;
+          }
+
+          message.displayValue = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1450,6 +1468,11 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
         : isSet(object.filled_by)
         ? globalThis.String(object.filled_by)
         : "",
+      displayValue: isSet(object.displayValue)
+        ? globalThis.String(object.displayValue)
+        : isSet(object.display_value)
+        ? globalThis.String(object.display_value)
+        : "",
     };
   },
 
@@ -1524,6 +1547,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     if (message.filledBy !== "") {
       obj.filledBy = message.filledBy;
     }
+    if (message.displayValue !== "") {
+      obj.displayValue = message.displayValue;
+    }
     return obj;
   },
 
@@ -1555,6 +1581,7 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     message.valueFlag = object.valueFlag ?? false;
     message.filledAt = object.filledAt ?? "";
     message.filledBy = object.filledBy ?? "";
+    message.displayValue = object.displayValue ?? "";
     return message;
   },
 };
