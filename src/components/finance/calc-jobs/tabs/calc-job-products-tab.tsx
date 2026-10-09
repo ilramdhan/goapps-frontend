@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { blockReasonLabel } from "@/lib/finance/block-reason"
 import { Card } from "@/components/ui/card"
 import {
   Select,
@@ -243,7 +244,7 @@ function ProductRow({
         </TableCell>
         <TableCell className="max-w-[240px] text-sm">
           {p.status === "BLOCKED" && p.blockReason ? (
-            <span className="text-amber-700 dark:text-amber-400">{p.blockReason}</span>
+            <span className="text-amber-700 dark:text-amber-400">{blockReasonLabel(p.blockReason)}</span>
           ) : p.errorMessage ? (
             <span className="text-destructive">{p.errorMessage}</span>
           ) : (
