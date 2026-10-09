@@ -361,6 +361,25 @@ interface ParamRowProps {
   productSysId?: number
 }
 
+/**
+ * Read-only hint for a param whose backend row carries a display_value (MB_SP_DYE
+ * on SUPERBA products: the Superba colour name). Purely presentational: the
+ * stored value and the draft/dirty state are untouched.
+ */
+export function SuperbaDisplayHint({ value }: { value: string }) {
+  return (
+    <p
+      className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+      data-testid="param-display-value"
+    >
+      <Badge variant="secondary" className="px-1.5 py-0 text-[10px]" title="from Superba Cost SP master">
+        Superba
+      </Badge>
+      <span className="font-medium text-foreground">{value}</span>
+    </p>
+  )
+}
+
 function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, allDrafts, onLookupChange, disabled, productSysId }: ParamRowProps) {
   const mbSpinState = getMbSpinAmbiguityState(entry)
 
@@ -416,6 +435,7 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, allD
       </div>
       <div className="col-span-6">
         {renderValueInput(entry, draft, onChange, allEntries, onLookupChange, disabled, productSysId, allDrafts)}
+        {entry.displayValue && <SuperbaDisplayHint value={entry.displayValue} />}
       </div>
       <div className="col-span-1 text-right">
         {entry.lookupFillGroupCode ? (

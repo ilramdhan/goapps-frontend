@@ -57,6 +57,7 @@ function baseEntry(overrides: Partial<RequiredParamEntry>): RequiredParamEntry {
     valueFlag: false,
     filledAt: "",
     filledBy: "",
+    displayValue: "",
     ...overrides,
   }
 }
@@ -134,5 +135,57 @@ describe("ProductParametersTab — OIL_RATE renders a hint, never the stored num
     render(<ProductParametersTab productSysId={1} />)
 
     expect(screen.getByText("12.5")).toBeInTheDocument()
+  })
+})
+
+describe("ProductParametersTab — Superba display_value hint (MB_SP_DYE)", () => {
+  beforeEach(() => {
+    vi.mocked(useProductRequiredParams).mockReset()
+  })
+
+  const DYE_ENTRY = baseEntry({
+    paramId: "p-dye",
+    paramCode: "MB_SP_DYE",
+    paramName: "MB SP Dye",
+    dataType: "TEXT",
+    paramCategory: "REQUIRED",
+    valueText: "STORED-DYE-CODE",
+    displayValue: "SUPERBA RED 12",
+  })
+
+  it("shows the colour name with a Superba badge, alongside the stored value", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [DYE_ENTRY],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+
+    render(<ProductParametersTab productSysId={1} />)
+
+    expect(screen.getByTestId("param-display-value")).toHaveTextContent("SUPERBA RED 12")
+    expect(screen.getByText("Superba")).toBeInTheDocument()
+    // Stored value remains in its editable input.
+    expect(screen.getByDisplayValue("STORED-DYE-CODE")).toBeInTheDocument()
+  })
+
+  it("renders nothing extra when displayValue is empty", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [{ ...DYE_ENTRY, displayValue: "" }],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+
+    render(<ProductParametersTab productSysId={1} />)
+
+    expect(screen.queryByTestId("param-display-value")).not.toBeInTheDocument()
+  })
+})
+
+describe("normalizeRequiredEntry displayValue", () => {
+  it("accepts camelCase and snake_case and defaults to empty", async () => {
+    const { normalizeRequiredEntry } = await import("@/types/finance/cost-product-parameter")
+    expect(normalizeRequiredEntry({ displayValue: "A" }).displayValue).toBe("A")
+    expect(normalizeRequiredEntry({ display_value: "B" }).displayValue).toBe("B")
+    expect(normalizeRequiredEntry({}).displayValue).toBe("")
   })
 })
