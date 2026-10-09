@@ -19,6 +19,7 @@ import {
 } from "@/types/generated/iam/v1/organization"
 import { UOMServiceDefinition } from "@/types/generated/finance/v1/uom"
 import { ShadeServiceDefinition } from "@/types/generated/finance/v1/shade"
+import { SuperbaCostSpServiceDefinition } from "@/types/generated/finance/v1/superba_cost_sp"
 import {
   DashboardServiceDefinition,
   ChartDataServiceDefinition,
@@ -212,6 +213,12 @@ export function getUomClient() {
 export function getShadeClient() {
   return getOrCreate("shade", () =>
     createServiceClient(ShadeServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+export function getSuperbaCostSpClient() {
+  return getOrCreate("superba-cost-sp", () =>
+    createServiceClient(SuperbaCostSpServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

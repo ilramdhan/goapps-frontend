@@ -44,6 +44,7 @@ function baseEntry(overrides: Partial<RequiredParamEntry> = {}): RequiredParamEn
     valueFlag: false,
     filledAt: "",
     filledBy: "",
+    displayValue: "",
     valueMbSpinId: "",
     mbSpinCandidateCount: 0,
     hasMbSpinCandidateCount: false,

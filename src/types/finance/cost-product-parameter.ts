@@ -39,6 +39,10 @@ export interface RequiredParamEntry {
   valueFlag: boolean
   filledAt: string
   filledBy: string
+  // Read-time display text from the backend (e.g. Superba colour name for
+  // MB_SP_DYE on SUPERBA products). Empty = none. Never stored, never part of
+  // the draft/dirty state.
+  displayValue: string
 }
 
 // MBSpinCandidate is one possible mst_mb_spin match behind an ambiguous
@@ -148,6 +152,8 @@ interface RawRequiredParamEntry {
   filled_at?: string
   filledBy?: string
   filled_by?: string
+  displayValue?: string
+  display_value?: string
 }
 
 // Boolean("false") === true in JS, so string-shaped booleans must be parsed
@@ -202,6 +208,7 @@ export function normalizeRequiredEntry(raw: RawRequiredParamEntry): RequiredPara
     valueFlag: raw.valueFlag ?? raw.value_flag ?? false,
     filledAt: raw.filledAt ?? raw.filled_at ?? "",
     filledBy: raw.filledBy ?? raw.filled_by ?? "",
+    displayValue: raw.displayValue ?? raw.display_value ?? "",
   }
 }
 

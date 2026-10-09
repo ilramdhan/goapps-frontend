@@ -69,6 +69,7 @@ const ENTRY: RequiredParamEntry = {
   valueFlag: false,
   filledAt: "",
   filledBy: "",
+  displayValue: "",
 }
 
 const DRAFT: DraftValue = {

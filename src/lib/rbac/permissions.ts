@@ -131,6 +131,14 @@ export const PERMISSIONS = {
     spinfixedcostUpdate: "finance.master.spinfixedcost.update",
     spinfixedcostView: "finance.master.spinfixedcost.view",
   },
+  // Superba Cost SP (FINANCE_SUPERBA_COST_SP)
+  SuperbaCostSp: {
+    superbacostspCreate: "finance.master.superbacostsp.create",
+    superbacostspDelete: "finance.master.superbacostsp.delete",
+    superbacostspSync: "finance.master.superbacostsp.sync",
+    superbacostspUpdate: "finance.master.superbacostsp.update",
+    superbacostspView: "finance.master.superbacostsp.view",
+  },
   // RM Category (FINANCE_RM_CATEGORY)
   RmCategory: {
     rmcategoryCreate: "finance.master.rmcategory.create",
