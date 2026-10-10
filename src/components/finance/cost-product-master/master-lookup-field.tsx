@@ -34,6 +34,10 @@ interface MasterLookupFieldProps {
    *  lookup's options to what's allowed for the product (e.g. RM_GROUP_OIL
    *  filtered by the product type's oil class, D11). */
   productSysId?: number
+  /** Label to show when the stored value is NOT one of the lookup's options
+   *  (e.g. a Superba shade code stored in MB_SP_CODE). Display only — the
+   *  stored value is never rewritten or cleared. */
+  unlistedLabel?: string
 }
 
 // ⭐ DIPERBARUI 2026-08-26 (perf: SP Code dropdown lag, server-side search) —
@@ -67,6 +71,7 @@ export function MasterLookupField({
   onChangeLookup,
   disabled,
   productSysId,
+  unlistedLabel,
 }: MasterLookupFieldProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -217,7 +222,7 @@ export function MasterLookupField({
   }, [selectedOption])
 
   const fallbackLabel = knownLabel && knownLabel.value === currentValue ? knownLabel.label : undefined
-  const displayValue = selectedOption?.label ?? fallbackLabel ?? ""
+  const displayValue = selectedOption?.label ?? fallbackLabel ?? (currentValue ? unlistedLabel : undefined) ?? ""
 
   return (
     <div className="space-y-1">

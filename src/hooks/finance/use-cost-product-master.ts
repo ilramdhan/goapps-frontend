@@ -16,6 +16,8 @@ const KEYS = {
   detail: (id: number) => ["finance", "cost-product-master", "detail", id] as const,
 }
 
+const CPP_KEY = ["finance", "cost-product-parameter"] as const
+
 async function fetchList(params: ListCostProductMastersParams) {
   const qs = new URLSearchParams()
   if (params.search) qs.set("search", params.search)
@@ -104,6 +106,8 @@ export function useCreateCostProductMaster() {
     onSuccess: (p) => {
       toast.success(`Product ${p.productCode} created`)
       qc.invalidateQueries({ queryKey: KEYS.all })
+      // Backend auto-attaches MB source params from the shade on create.
+      qc.invalidateQueries({ queryKey: CPP_KEY })
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -126,6 +130,8 @@ export function useUpdateCostProductMaster() {
     onSuccess: () => {
       toast.success("Product updated")
       qc.invalidateQueries({ queryKey: KEYS.all })
+      // Shade change may auto-attach/fill MB_SP_CODE etc.
+      qc.invalidateQueries({ queryKey: CPP_KEY })
     },
     onError: (e: Error) => toast.error(e.message),
   })

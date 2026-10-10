@@ -366,6 +366,29 @@ interface ParamRowProps {
  * on SUPERBA products: the Superba colour name). Purely presentational: the
  * stored value and the draft/dirty state are untouched.
  */
+/** filled_by markers written by the backend shade-driven MB source auto-fill. */
+export function isAutoMbSourceFill(filledBy: string | undefined): boolean {
+  return filledBy === "auto_mb_source" || filledBy === "backfill_mb_source_000569"
+}
+
+/**
+ * Label for a lookup value that is not one of the lookup's options (Superba
+ * shade code in MB_SP_CODE): "SHADE — colour" using the same product's
+ * MB_SP_DYE, else the bare code when the backend auto-attached it.
+ */
+export function unlistedLookupLabel(
+  entry: RequiredParamEntry,
+  draft: DraftValue,
+  allEntries: RequiredParamEntry[] | undefined,
+  allDrafts: Record<string, DraftValue> | undefined,
+): string | undefined {
+  if (entry.paramCode !== "MB_SP_CODE" || !draft.valueText) return undefined
+  const dyeEntry = allEntries?.find((e) => e.paramCode === "MB_SP_DYE")
+  const dye = (dyeEntry && (allDrafts?.[dyeEntry.paramId]?.valueText || dyeEntry.displayValue || dyeEntry.valueText)) || ""
+  if (dye) return `${draft.valueText} — ${dye}`
+  return isAutoMbSourceFill(entry.filledBy) ? draft.valueText : undefined
+}
+
 export function SuperbaDisplayHint({ value }: { value: string }) {
   return (
     <p
@@ -436,6 +459,16 @@ function ParamRow({ entry, draft, onChange, onRemove, removing, allEntries, allD
       <div className="col-span-6">
         {renderValueInput(entry, draft, onChange, allEntries, onLookupChange, disabled, productSysId, allDrafts)}
         {entry.displayValue && <SuperbaDisplayHint value={entry.displayValue} />}
+        {isAutoMbSourceFill(entry.filledBy) && !draft.dirty && (
+          <Badge
+            variant="outline"
+            className="mt-1 px-1.5 py-0 text-[10px]"
+            title="Filled automatically from this product's shade (MB Spin or Superba Cost SP)"
+            data-testid="param-auto-badge"
+          >
+            Auto (shade)
+          </Badge>
+        )}
       </div>
       <div className="col-span-1 text-right">
         {entry.lookupFillGroupCode ? (
@@ -698,6 +731,7 @@ function renderValueInput(
           onChangeLookup={onLookupChange}
           disabled={disabled}
           productSysId={productSysId}
+          unlistedLabel={unlistedLookupLabel(entry, draft, allEntries, allDrafts)}
         />
       )
     }

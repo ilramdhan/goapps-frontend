@@ -181,7 +181,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
                     <FormControl>
                       <Input {...field} placeholder="NL / Z114S / …" />
                     </FormControl>
-                    <FormDescription>Optional master shade reference.</FormDescription>
+                    <FormDescription>Optional master shade reference. MB SP Code & Dye will be filled automatically from this shade (if found in MB Spin or Superba Cost SP).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
