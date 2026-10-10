@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, Download, Loader2, Lock, Package } from "lucide-react"
+import { ArrowLeft, Download, Loader2, Lock, Package, Pencil } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -13,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/common/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCostProductMaster } from "@/hooks/finance/use-cost-product-master"
+import { PERMISSIONS } from "@/lib/rbac/permissions"
 import { usePermissionContext } from "@/providers/permission-provider"
 import { CalculateButton } from "@/components/finance/calc-jobs/calculate-button"
 import { ProductParametersTab } from "@/components/finance/cost-product-master/parameters-tab"
@@ -20,6 +22,7 @@ import { ProductRoutingTab } from "@/components/finance/cost-product-master/rout
 import { ProductAuditTab } from "@/components/finance/cost-product-master/audit-tab"
 import { CostHistoryTab } from "@/components/finance/cost-results/cost-history-tab"
 import { ProductTypeName } from "@/components/common/product-type-name"
+import { ProductMasterFormDialog } from "@/components/finance/cost-product-master/product-master-form-dialog"
 import { UnlockProductMasterDialog } from "@/components/finance/cost-product-master/unlock-dialog"
 import { MbRecipeLinkCard } from "@/components/finance/cost-product-master/mb-recipe-link-card"
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
@@ -36,6 +39,9 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
   const [unlockOpen, setUnlockOpen] = useState(false)
   const { hasPermission } = usePermissionContext()
   const canUnlock = hasPermission("finance.product.route.update")
+  const canEdit = hasPermission(PERMISSIONS.Products.masterUpdate)
+  const [editOpen, setEditOpen] = useState(false)
+  const queryClient = useQueryClient()
 
   // The sticky page header's height varies (title wraps, buttons wrap on mobile),
   // so the tab bar below it offsets by the MEASURED height via --pm-header-h
@@ -101,6 +107,18 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         />
         <div className="flex flex-wrap gap-2">
           {product && <CalculateButton productSysId={productSysId} label="Calculate cost" />}
+          {product && canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+              disabled={!product.isActive}
+              aria-label="Edit product"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Product
+            </Button>
+          )}
           {product && (
             <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
               {exporting ? (
@@ -207,6 +225,18 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         </TabsContent>
       </Tabs>
 
+      {/* Same dialog as the list page. The update mutation already invalidates all
+          cost-product-master queries (detail + list + counts) and toasts; additionally refresh the
+          params queries (shade/colour-derived data). The Parameters tab keeps unsaved edits in its
+          own state, so a refetch never discards them. */}
+      <ProductMasterFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        product={product ?? null}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: ["finance", "cost-product-parameter"] })
+        }}
+      />
       <UnlockProductMasterDialog open={unlockOpen} onOpenChange={setUnlockOpen} product={product ?? null} />
     </div>
   )

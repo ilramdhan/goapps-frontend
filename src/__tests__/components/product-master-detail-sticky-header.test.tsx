@@ -53,6 +53,9 @@ vi.mock("@/components/finance/cost-product-master/audit-tab", () => ({
 vi.mock("@/components/finance/cost-results/cost-history-tab", () => ({
   CostHistoryTab: () => null,
 }))
+vi.mock("@/components/finance/cost-product-master/product-master-form-dialog", () => ({
+  ProductMasterFormDialog: () => null,
+}))
 vi.mock("@/components/finance/cost-product-master/unlock-dialog", () => ({
   UnlockProductMasterDialog: () => null,
 }))

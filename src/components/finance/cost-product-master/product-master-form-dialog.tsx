@@ -41,9 +41,11 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   product?: CostProductMaster | null
+  /** Called after a successful create/update, before the dialog closes. */
+  onSuccess?: () => void
 }
 
-export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) {
+export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess }: Props) {
   const isEditing = !!product
   const createMutation = useCreateCostProductMaster()
   const updateMutation = useUpdateCostProductMaster()
@@ -112,6 +114,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product }: Props) 
           erpPrdPerDay: values.erpPrdPerDay,
         })
       }
+      onSuccess?.()
       onOpenChange(false)
     } catch {
       // toast already shown by hook
