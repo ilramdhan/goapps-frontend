@@ -15,6 +15,7 @@ import { ErpBacktestReportDialog } from "./erp-backtest-report-dialog"
 import { ErpBatchesFilters } from "./erp-batches-filters"
 import { ErpBatchesTable } from "./erp-batches-table"
 import { ErpConfigBanner } from "./erp-config-banner"
+import { ErpPeriodLockCard } from "./erp-period-lock-card"
 import { ErpScheduleCard } from "./erp-schedule-card"
 
 interface Filters {
@@ -55,9 +56,10 @@ export function ErpIntegrationPageClient() {
 
       <ErpConfigBanner />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <ErpBacktestPanel />
         <ErpScheduleCard />
+        <ErpPeriodLockCard />
       </div>
 
       <ErpBatchesFilters
