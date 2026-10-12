@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -33,21 +34,27 @@ export function CreateBatchDialog({ open, onOpenChange }: Props) {
   const router = useRouter()
   const create = useCreateErpBatch()
   const [period, setPeriod] = useState(defaultPeriod())
+  const [needsLock, setNeedsLock] = useState(false)
   const valid = PERIOD_RE.test(period)
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) setPeriod(defaultPeriod())
+    if (!next) {
+      setPeriod(defaultPeriod())
+      setNeedsLock(false)
+    }
     onOpenChange(next)
   }
 
   const submit = async () => {
     if (!valid) return
+    setNeedsLock(false)
     try {
       const batch = await create.mutateAsync({ period, mode: "LIVE" })
       handleOpenChange(false)
       if (batch?.batchId) router.push(`/finance/erp-integration/${batch.batchId}`)
-    } catch {
-      // toast already shown by mutation onError
+    } catch (e) {
+      // The mutation's onError already shows the error toast; add an inline hint only.
+      if (e instanceof Error && /not locked/i.test(e.message)) setNeedsLock(true)
     }
   }
 
@@ -71,6 +78,11 @@ export function CreateBatchDialog({ open, onOpenChange }: Props) {
               aria-invalid={!valid}
             />
             {!valid && <p className="text-xs text-destructive">Enter a valid period, e.g. 202606.</p>}
+            {needsLock && (
+              <p className="text-xs text-destructive">
+                Period {period} is not locked. Lock it first in the Period lock card, then create the batch.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Mode</Label>
