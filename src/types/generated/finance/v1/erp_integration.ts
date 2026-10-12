@@ -955,6 +955,11 @@ export interface LockErpPeriodResponse {
 export interface UnlockErpPeriodRequest {
   period: string;
   reason: string;
+  /**
+   * SUPER_ADMIN only: unlock even when the ERP ADJ period is posted (GoApps
+   * lock only; Oracle is never touched). Requires a reason; audited.
+   */
+  overridePosted: boolean;
 }
 
 export interface UnlockErpPeriodResponse {
@@ -7699,7 +7704,7 @@ export const LockErpPeriodResponse: MessageFns<LockErpPeriodResponse> = {
 };
 
 function createBaseUnlockErpPeriodRequest(): UnlockErpPeriodRequest {
-  return { period: "", reason: "" };
+  return { period: "", reason: "", overridePosted: false };
 }
 
 export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
@@ -7709,6 +7714,9 @@ export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
     }
     if (message.reason !== "") {
       writer.uint32(18).string(message.reason);
+    }
+    if (message.overridePosted !== false) {
+      writer.uint32(24).bool(message.overridePosted);
     }
     return writer;
   },
@@ -7736,6 +7744,14 @@ export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
           message.reason = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.overridePosted = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7749,6 +7765,11 @@ export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
     return {
       period: isSet(object.period) ? globalThis.String(object.period) : "",
       reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      overridePosted: isSet(object.overridePosted)
+        ? globalThis.Boolean(object.overridePosted)
+        : isSet(object.override_posted)
+        ? globalThis.Boolean(object.override_posted)
+        : false,
     };
   },
 
@@ -7760,6 +7781,9 @@ export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
     if (message.reason !== "") {
       obj.reason = message.reason;
     }
+    if (message.overridePosted !== false) {
+      obj.overridePosted = message.overridePosted;
+    }
     return obj;
   },
 
@@ -7770,6 +7794,7 @@ export const UnlockErpPeriodRequest: MessageFns<UnlockErpPeriodRequest> = {
     const message = createBaseUnlockErpPeriodRequest();
     message.period = object.period ?? "";
     message.reason = object.reason ?? "";
+    message.overridePosted = object.overridePosted ?? false;
     return message;
   },
 };
