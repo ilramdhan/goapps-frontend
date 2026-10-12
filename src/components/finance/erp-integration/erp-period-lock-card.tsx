@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -38,7 +39,8 @@ function defaultPeriod(): string {
 }
 
 export function ErpPeriodLockCard() {
-  const { hasPermission } = usePermission()
+  const { hasPermission, hasRole } = usePermission()
+  const isSuperAdmin = hasRole("SUPER_ADMIN")
   const canLock = hasPermission("finance.cost.erpintegration.lock")
   const canUnlock = hasPermission("finance.cost.erpintegration.unlock")
 
@@ -51,6 +53,9 @@ export function ErpPeriodLockCard() {
   const [action, setAction] = useState<"lock" | "unlock" | null>(null)
   const [reason, setReason] = useState("")
   const [error, setError] = useState<string | null>(null)
+  // Set after an unlock is refused because the ERP ADJ period is posted.
+  const [postedRefused, setPostedRefused] = useState(false)
+  const [overridePosted, setOverridePosted] = useState(false)
 
   // No data or an error (never locked) is treated as "Not locked".
   const info = lockQuery.data
@@ -60,6 +65,8 @@ export function ErpPeriodLockCard() {
     setAction(null)
     setReason("")
     setError(null)
+    setPostedRefused(false)
+    setOverridePosted(false)
   }
 
   const submit = async () => {
@@ -69,11 +76,23 @@ export function ErpPeriodLockCard() {
       return
     }
     try {
-      const m = action === "lock" ? lock : unlock
-      await m.mutateAsync({ period, reason: parsed.data })
+      if (action === "lock") {
+        await lock.mutateAsync({ period, reason: parsed.data })
+      } else {
+        await unlock.mutateAsync({
+          period,
+          reason: parsed.data,
+          ...(overridePosted ? { overridePosted: true } : {}),
+        })
+      }
       close()
-    } catch {
+    } catch (e) {
       // toast already shown by mutation onError
+      const msg = e instanceof Error ? e.message : ""
+      if (action === "unlock" && msg.includes("ERP ADJ is posted")) {
+        setPostedRefused(true)
+        setError(msg)
+      }
     }
   }
 
@@ -147,6 +166,20 @@ export function ErpPeriodLockCard() {
             />
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
+          {action === "unlock" && postedRefused && isSuperAdmin && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+              <Checkbox
+                id="erp-unlock-override"
+                checked={overridePosted}
+                onCheckedChange={(c) => setOverridePosted(c === true)}
+                className="mt-0.5 border-destructive"
+              />
+              <Label htmlFor="erp-unlock-override" className="text-sm font-normal leading-snug text-destructive">
+                Override: unlock even though the ERP period is posted (GoApps lock only, Oracle is not changed).
+                This is audited.
+              </Label>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={close} disabled={pending}>
               Cancel

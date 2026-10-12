@@ -5,12 +5,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 let perms: string[] = []
+let roles: string[] = []
 let lockData: { locked: boolean; lockedBy: string; lockedAt: string; reason: string; period: string } | undefined
 const lockMutate = vi.fn().mockResolvedValue({})
 const unlockMutate = vi.fn().mockResolvedValue({})
 
 vi.mock("@/lib/hooks/use-permission", () => ({
-  usePermission: () => ({ hasPermission: (c: string) => perms.includes(c) }),
+  usePermission: () => ({
+    hasPermission: (c: string) => perms.includes(c),
+    hasRole: (r: string) => roles.includes(r),
+  }),
 }))
 vi.mock("@/hooks/finance/use-erp-integration", () => ({
   useErpPeriodLock: () => ({ data: lockData }),
@@ -23,9 +27,11 @@ import { ErpPeriodLockCard } from "@/components/finance/erp-integration/erp-peri
 describe("ErpPeriodLockCard", () => {
   beforeEach(() => {
     perms = []
+    roles = []
     lockData = undefined
     lockMutate.mockClear()
-    unlockMutate.mockClear()
+    unlockMutate.mockReset()
+    unlockMutate.mockResolvedValue({})
   })
 
   it("shows Lock button when not locked with .lock perm", () => {
@@ -64,5 +70,33 @@ describe("ErpPeriodLockCard", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Lock period" }).pop()!)
     await waitFor(() => expect(lockMutate).toHaveBeenCalledTimes(1))
     expect(lockMutate.mock.calls[0][0]).toMatchObject({ reason: "month end close done" })
+  })
+
+  const postedErr = new Error("period cannot be unlocked: ERP ADJ is posted")
+  const openUnlockAndSubmit = async () => {
+    perms = ["finance.cost.erpintegration.unlock"]
+    lockData = { locked: true, lockedBy: "alice", lockedAt: "2026-08-01", reason: "month end close", period: "202608" }
+    render(<ErpPeriodLockCard />)
+    fireEvent.click(screen.getByRole("button", { name: "Unlock period" }))
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "emergency reopen" } })
+    fireEvent.click(screen.getAllByRole("button", { name: "Unlock period" }).pop()!)
+    expect(await screen.findByText(/ERP ADJ is posted/)).toBeTruthy()
+  }
+
+  it("non super admin sees only the posted error, no override", async () => {
+    unlockMutate.mockRejectedValueOnce(postedErr)
+    await openUnlockAndSubmit()
+    expect(screen.queryByRole("checkbox")).toBeNull()
+  })
+
+  it("super admin can override a posted period and retry with overridePosted", async () => {
+    roles = ["SUPER_ADMIN"]
+    unlockMutate.mockRejectedValueOnce(postedErr)
+    await openUnlockAndSubmit()
+    expect(unlockMutate.mock.calls[0][0]).not.toHaveProperty("overridePosted")
+    fireEvent.click(screen.getByRole("checkbox"))
+    fireEvent.click(screen.getAllByRole("button", { name: "Unlock period" }).pop()!)
+    await waitFor(() => expect(unlockMutate).toHaveBeenCalledTimes(2))
+    expect(unlockMutate.mock.calls[1][0]).toMatchObject({ reason: "emergency reopen", overridePosted: true })
   })
 })

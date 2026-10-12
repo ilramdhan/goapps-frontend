@@ -296,7 +296,8 @@ export function useLockErpPeriod() {
 export function useUnlockErpPeriod() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (v: { period: string; reason?: string }) => api.unlockPeriod(v.period, { reason: v.reason }),
+    mutationFn: (v: { period: string; reason?: string; overridePosted?: boolean }) =>
+      api.unlockPeriod(v.period, { reason: v.reason, overridePosted: v.overridePosted }),
     onSuccess: (_r, v) => {
       queryClient.invalidateQueries({ queryKey: erpIntegrationKeys.periodLock(v.period) })
       queryClient.invalidateQueries({ queryKey: erpIntegrationKeys.batches() })

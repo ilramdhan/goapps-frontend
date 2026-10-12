@@ -138,7 +138,10 @@ export async function listOracleCalls(batchId: number, params?: Params): Promise
 export async function lockPeriod(period: string, body: { reason?: string } = {}): Promise<ErpPeriodLock> {
   return normalizeErpPeriodLock(data(await call(`/periods/${encodeURIComponent(period)}/lock`, "POST", body)))
 }
-export async function unlockPeriod(period: string, body: { reason?: string } = {}): Promise<ErpPeriodLock> {
+export async function unlockPeriod(
+  period: string,
+  body: { reason?: string; overridePosted?: boolean } = {},
+): Promise<ErpPeriodLock> {
   return normalizeErpPeriodLock(data(await call(`/periods/${encodeURIComponent(period)}/unlock`, "POST", body)))
 }
 export async function getPeriodLock(period: string): Promise<ErpPeriodLock> {

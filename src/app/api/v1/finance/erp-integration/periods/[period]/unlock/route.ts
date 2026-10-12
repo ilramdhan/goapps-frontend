@@ -14,6 +14,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const body = await erpBody(request)
         const metadata = createMetadataFromRequest(request)
         const client = getErpIntegrationClient()
-        return client.unlockErpPeriod({ period, reason: String(body.reason ?? "") }, metadata)
+        return client.unlockErpPeriod(
+            { period, reason: String(body.reason ?? ""), overridePosted: body.overridePosted === true },
+            metadata,
+        )
     })
 }
