@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { layoutChunksFiles, type ExportLayout } from "@/lib/finance/export-layout"
+import { layoutChunksFiles, EXPORT_LAYOUT_OPTIONS, type ExportLayout } from "@/lib/finance/export-layout"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog/confirm-dialog"
 import { ExportBatchFilesPopover } from "@/components/finance/cost-results/export-batch-files-popover"
 import {
@@ -26,12 +26,6 @@ import {
 // above this, a filter resolves into a parent job + N chunked child jobs
 // instead of one workbook.
 const MAX_EXPORT_PRODUCTS = 200
-
-export const EXPORT_LAYOUT_OPTIONS: { layout: ExportLayout; label: string }[] = [
-  { layout: "COMBINED", label: "Combined (all data + cost sheets)" },
-  { layout: "HORIZONTAL", label: "Horizontal (all data)" },
-  { layout: "VERTICAL", label: "Vertical (cost sheet)" },
-]
 
 // needsBatchConfirm: the ">200 products -> multiple files" warning applies to
 // COMBINED and VERTICAL only; HORIZONTAL is always a single file.
@@ -103,7 +97,7 @@ export function ExportCostSheetButton({
     )
   }
 
-  function handleClick(layout: ExportLayout = "COMBINED") {
+  function handleClick(layout: ExportLayout) {
     if (!hasPeriod) {
       toast.warning("Set a 6-digit period (YYYYMM) before exporting.")
       return
@@ -128,43 +122,38 @@ export function ExportCostSheetButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <div className="flex items-center">
-        <Button
-          variant={variant}
-          size={size}
-          className={`${className ?? ""} rounded-r-none`}
-          onClick={() => handleClick("COMBINED")}
-          disabled={mutation.isPending || !hasPeriod}
-          title={hasPeriod ? undefined : "Set a period first"}
-        >
-          {mutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="mr-2 h-4 w-4" />
-          )}
-          {mutation.isPending ? "Preparing…" : label}
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={variant}
-              size={size}
-              className="rounded-l-none border-l-0 px-2"
-              disabled={mutation.isPending || !hasPeriod}
-              aria-label="Choose export layout"
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant={variant}
+            size={size}
+            className={className}
+            disabled={mutation.isPending || !hasPeriod}
+            title={hasPeriod ? undefined : "Set a period first"}
+            aria-label={label}
+          >
+            {mutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            {mutation.isPending ? "Preparing export…" : label}
+            {!mutation.isPending && <ChevronDown className="ml-2 h-4 w-4" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {EXPORT_LAYOUT_OPTIONS.map((o) => (
+            <DropdownMenuItem
+              key={o.layout}
+              onSelect={() => handleClick(o.layout)}
+              className="flex flex-col items-start gap-0.5"
             >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {EXPORT_LAYOUT_OPTIONS.map((o) => (
-              <DropdownMenuItem key={o.layout} onSelect={() => handleClick(o.layout)}>
-                {o.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              <span>{o.label}</span>
+              <span className="text-xs text-muted-foreground">{o.description}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {progress && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

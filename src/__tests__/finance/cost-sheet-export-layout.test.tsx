@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { DataTable } from "@/components/shared/data-table"
+import { EXPORT_LAYOUT_OPTIONS } from "@/lib/finance/export-layout"
 import { CostSheetExportLayout } from "@/types/generated/finance/v1/cost_calc"
 
 const requestProductCostSheetExport = vi.fn()
@@ -75,11 +78,66 @@ describe("needsBatchConfirm", () => {
   })
 })
 
+describe("BFF deadline", () => {
+  it("passes a deadline and maps DEADLINE_EXCEEDED to 504", async () => {
+    requestProductCostSheetExport.mockRejectedValueOnce({ code: 4, details: "Deadline exceeded" })
+    const res = await post({ period: "202601" })
+    expect(requestProductCostSheetExport.mock.calls[0][2].deadline).toBeGreaterThan(Date.now())
+    expect(res.status).toBe(504)
+  })
+})
+
+async function openMenu(name: string) {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole("button", { name }))
+  return user
+}
+
 describe("ExportCostSheetButton", () => {
-  it("primary click with >200 asks to confirm, not exported yet", () => {
+  it("click opens the menu and does not export", async () => {
+    render(<ExportCostSheetButton filters={{ period: "202601" }} totalCount={5} label="Export" />)
+    await openMenu("Export")
+    expect(await screen.findAllByRole("menuitem")).toHaveLength(3)
+    expect(mutate).not.toHaveBeenCalled()
+  })
+  it("horizontal skips confirm even with >200", async () => {
     render(<ExportCostSheetButton filters={{ period: "202601" }} totalCount={500} label="Export" />)
-    fireEvent.click(screen.getByText("Export"))
+    const user = await openMenu("Export")
+    await user.click(await screen.findByText("Horizontal — all data"))
+    expect(mutate).toHaveBeenCalledTimes(1)
+    expect(mutate.mock.calls[0][0].layout).toBe("HORIZONTAL")
+  })
+  it("vertical with >200 asks to confirm first", async () => {
+    render(<ExportCostSheetButton filters={{ period: "202601" }} totalCount={500} label="Export" />)
+    const user = await openMenu("Export")
+    await user.click(await screen.findByText("Vertical — cost sheet per product"))
     expect(mutate).not.toHaveBeenCalled()
     expect(screen.getByText("Export a large product set")).toBeTruthy()
+  })
+})
+
+describe("DataTable row action menu", () => {
+  it("renders 3 items and calls onSelect per layout", async () => {
+    const onSelect = vi.fn()
+    const row = { id: 1 }
+    render(
+      <DataTable
+        data={[row]}
+        columns={[{ id: "id", header: "ID", cell: (r: { id: number }) => String(r.id) }]}
+        keyField="id"
+        actions={[
+          {
+            id: "export",
+            label: "Export cost sheet",
+            menu: EXPORT_LAYOUT_OPTIONS.map((o) => ({ id: o.layout, label: o.label, onSelect: () => onSelect(o.layout) })),
+          },
+        ]}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getAllByRole("button", { name: "Export cost sheet" })[0])
+    expect(await screen.findAllByRole("menuitem")).toHaveLength(3)
+    await user.click(screen.getByText("Vertical — cost sheet per product"))
+    expect(onSelect).toHaveBeenCalledWith("VERTICAL")
   })
 })

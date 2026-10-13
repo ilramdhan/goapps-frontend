@@ -298,18 +298,49 @@ function RowActions<TData>({
   return (
     <>
       <div className="hidden items-center justify-end gap-1 sm:flex">
-        {actions.map((action) => (
-          <Button
-            key={action.id}
-            variant="ghost"
-            size="icon"
-            onClick={() => action.onClick(row)}
-            disabled={action.disabled?.(row)}
-            title={action.label}
-          >
-            {action.icon}
-          </Button>
-        ))}
+        {actions.map((action) =>
+          action.menu ? (
+            <DropdownMenu key={action.id}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={action.disabled?.(row)}
+                  title={action.label}
+                  aria-label={action.label}
+                >
+                  {action.icon}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {action.menu.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onSelect={() => item.onSelect(row)}
+                    className="flex flex-col items-start gap-0.5"
+                  >
+                    <span>{item.label}</span>
+                    {item.description && (
+                      <span className="text-xs text-muted-foreground">{item.description}</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              key={action.id}
+              variant="ghost"
+              size="icon"
+              onClick={() => action.onClick?.(row)}
+              disabled={action.disabled?.(row)}
+              title={action.label}
+              aria-label={action.label}
+            >
+              {action.icon}
+            </Button>
+          ),
+        )}
       </div>
       <div className="sm:hidden">
         <DropdownMenu>
@@ -319,17 +350,30 @@ function RowActions<TData>({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {actions.map((action) => (
+            {actions.flatMap((action) =>
+              action.menu
+                ? action.menu.map((item) => (
+                    <DropdownMenuItem
+                      key={`${action.id}-${item.id}`}
+                      onSelect={() => item.onSelect(row)}
+                      disabled={action.disabled?.(row)}
+                    >
+                      {action.icon && <span className="mr-2">{action.icon}</span>}
+                      {action.label}: {item.label}
+                    </DropdownMenuItem>
+                  ))
+                : [
               <DropdownMenuItem
                 key={action.id}
-                onClick={() => action.onClick(row)}
+                onClick={() => action.onClick?.(row)}
                 disabled={action.disabled?.(row)}
                 className={action.variant === "destructive" ? "text-destructive" : undefined}
               >
                 {action.icon && <span className="mr-2">{action.icon}</span>}
                 {action.label}
-              </DropdownMenuItem>
-            ))}
+              </DropdownMenuItem>,
+                  ],
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

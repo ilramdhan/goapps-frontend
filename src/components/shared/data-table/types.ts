@@ -53,6 +53,14 @@ export interface ColumnDef<TData> {
 /**
  * Action definition for row actions
  */
+export interface RowActionMenuItem<TData> {
+  id: string
+  label: string
+  /** Short secondary line under the label */
+  description?: string
+  onSelect: (row: TData) => void
+}
+
 export interface RowAction<TData> {
   /** Unique identifier for the action */
   id: string
@@ -60,8 +68,10 @@ export interface RowAction<TData> {
   label: string
   /** Icon component */
   icon?: ReactNode
-  /** Action handler */
-  onClick: (row: TData) => void
+  /** Action handler (ignored when `menu` is set) */
+  onClick?: (row: TData) => void
+  /** When set, the action renders as ONE icon button opening a dropdown with these items. */
+  menu?: RowActionMenuItem<TData>[]
   /** Whether to show in destructive color */
   variant?: "default" | "destructive"
   /** Whether the action is disabled */
