@@ -28,3 +28,9 @@ export function normalizeExportLayout(v: unknown): ExportLayout {
 export function layoutChunksFiles(layout: ExportLayout): boolean {
   return layout !== "HORIZONTAL"
 }
+
+export const EXPORT_LAYOUT_OPTIONS: { layout: ExportLayout; label: string; description: string }[] = [
+  { layout: "COMBINED", label: "Combined (cost sheet + all data)", description: "One workbook with cost sheets and the full data sheet" },
+  { layout: "HORIZONTAL", label: "Horizontal — all data", description: "Single sheet, one row per product" },
+  { layout: "VERTICAL", label: "Vertical — cost sheet per product", description: "One A4 cost sheet per product" },
+]

@@ -7,6 +7,7 @@ export { useColumnVisibility } from "./use-column-visibility"
 export type {
   ColumnDef,
   RowAction,
+  RowActionMenuItem,
   DataTableProps,
   DataTablePaginationProps,
 } from "./types"

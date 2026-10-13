@@ -37,6 +37,7 @@ import type { CostResult } from "@/types/finance/cost-calc"
 import { useUrlState } from "@/lib/hooks"
 
 import { CALC_TYPE_LABELS, formatNumeric } from "./format"
+import { EXPORT_LAYOUT_OPTIONS } from "@/lib/finance/export-layout"
 import { ExportCostSheetButton } from "./export-cost-sheet-button"
 import { RecentExportsPopover } from "./recent-exports-popover"
 
@@ -256,17 +257,16 @@ export function CostResultsPageClient() {
 
   const rowActions: RowAction<CostResult>[] = useMemo(
     () => [
-      ...([
-        { layout: "COMBINED", label: "Export — Combined" },
-        { layout: "HORIZONTAL", label: "Export — Horizontal (all data)" },
-        { layout: "VERTICAL", label: "Export — Vertical (cost sheet)" },
-      ] as const).map(
-        (o): RowAction<CostResult> => ({
-          id: `export-${o.layout.toLowerCase()}`,
+      {
+        id: "export",
+        label: "Export cost sheet",
+        icon: <FileSpreadsheet className="h-4 w-4" />,
+        disabled: () => exportMutation.isPending,
+        menu: EXPORT_LAYOUT_OPTIONS.map((o) => ({
+          id: o.layout.toLowerCase(),
           label: o.label,
-          icon: <FileSpreadsheet className="h-4 w-4" />,
-          disabled: () => exportMutation.isPending,
-          onClick: (r) => {
+          description: o.description,
+          onSelect: (r: CostResult) => {
             exportMutation.mutate({
               period: r.period,
               calculationType: r.calculationType,
@@ -274,8 +274,8 @@ export function CostResultsPageClient() {
               layout: o.layout,
             })
           },
-        }),
-      ),
+        })),
+      },
     ],
     [exportMutation],
   )

@@ -500,7 +500,13 @@ export function useRequestCostSheetExport() {
         toast.error("Export already running", { description: err.message })
         return
       }
-      toast.error("Failed to start export", { description: err.message })
+      if (err.statusCode === "504") {
+        toast.error("Export request timed out", {
+          description: err.message || "The server took too long to respond. Please try again.",
+        })
+        return
+      }
+      toast.error("Couldn't start the export. Please try again.", { description: err.message })
     },
   })
 }
