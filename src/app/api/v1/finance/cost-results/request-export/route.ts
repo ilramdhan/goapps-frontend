@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getCostCalcClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
-import { toCalcType, toCostResultStatus } from "@/lib/grpc/cost-calc-enums"
+import { toCalcType, toCostResultStatus, toExportLayout } from "@/lib/grpc/cost-calc-enums"
+import { normalizeExportLayout } from "@/lib/finance/export-layout"
 
 // toIdList coerces a JSON array (or CSV string) of ids into positive numbers,
 // dropping anything malformed so a bad payload narrows nothing instead of
@@ -51,11 +52,15 @@ export async function POST(request: NextRequest) {
         productSysIds: toIdList(body.productSysIds),
         shadeCodes: toCodeList(body.shadeCodes),
         rmGroupCodes: toCodeList(body.rmGroupCodes),
+        layout: toExportLayout(body.layout),
       },
       metadata,
     )
 
-    return NextResponse.json({ base: response.base, data: response.data })
+    return NextResponse.json({
+      base: response.base,
+      data: response.data ? { ...response.data, layout: normalizeExportLayout(response.data.layout) } : response.data,
+    })
   } catch (error) {
     if (isGrpcError(error)) return handleGrpcError(error)
     return NextResponse.json(

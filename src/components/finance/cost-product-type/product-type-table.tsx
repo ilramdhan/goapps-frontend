@@ -22,6 +22,7 @@ export function ProductTypeTable({ items, isLoading, onEdit, onOilConfig }: Prop
           <TableRow>
             <TableHead className="w-28">Code</TableHead>
             <TableHead>Name</TableHead>
+            <TableHead className="w-28">RM Ratio</TableHead>
             <TableHead className="w-24">Status</TableHead>
             <TableHead className="w-20 text-right">Actions</TableHead>
           </TableRow>
@@ -29,14 +30,14 @@ export function ProductTypeTable({ items, isLoading, onEdit, onOilConfig }: Prop
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                 No product types yet.
               </TableCell>
             </TableRow>
@@ -45,6 +46,11 @@ export function ProductTypeTable({ items, isLoading, onEdit, onOilConfig }: Prop
             <TableRow key={t.typeId}>
               <TableCell className="font-mono text-xs">{t.typeCode}</TableCell>
               <TableCell>{t.typeName}</TableCell>
+              <TableCell>
+                <Badge variant={t.rmRatioMode === "DENIER" ? "default" : "outline"} className="text-[10px]">
+                  {t.rmRatioMode}
+                </Badge>
+              </TableCell>
               <TableCell>
                 {t.isActive ? (
                   <Badge variant="secondary">Active</Badge>

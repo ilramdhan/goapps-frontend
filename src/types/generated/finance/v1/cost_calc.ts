@@ -402,6 +402,69 @@ export function costResultStatusToJSON(object: CostResultStatus): string {
   }
 }
 
+/**
+ * CostSheetExportLayout selects the workbook shape a product cost sheet
+ * export renders. UNSPECIFIED behaves exactly like COMBINED, so callers that
+ * predate the field keep today's output.
+ */
+export enum CostSheetExportLayout {
+  /** COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED - Not set; treated as COMBINED. */
+  COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED = 0,
+  /**
+   * COST_SHEET_EXPORT_LAYOUT_COMBINED - Flat "all data" sheet plus one vertical sheet per product, at most
+   * 200 products per file (larger selections fan out into a batch).
+   */
+  COST_SHEET_EXPORT_LAYOUT_COMBINED = 1,
+  /**
+   * COST_SHEET_EXPORT_LAYOUT_HORIZONTAL - Only the flat "all data" sheet (one row per route stage) in a single
+   * file; not chunked at 200 products.
+   */
+  COST_SHEET_EXPORT_LAYOUT_HORIZONTAL = 2,
+  /**
+   * COST_SHEET_EXPORT_LAYOUT_VERTICAL - Only the per-product vertical sheets (no "all data" sheet), at most
+   * 200 products per file.
+   */
+  COST_SHEET_EXPORT_LAYOUT_VERTICAL = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function costSheetExportLayoutFromJSON(object: any): CostSheetExportLayout {
+  switch (object) {
+    case 0:
+    case "COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED;
+    case 1:
+    case "COST_SHEET_EXPORT_LAYOUT_COMBINED":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_COMBINED;
+    case 2:
+    case "COST_SHEET_EXPORT_LAYOUT_HORIZONTAL":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_HORIZONTAL;
+    case 3:
+    case "COST_SHEET_EXPORT_LAYOUT_VERTICAL":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_VERTICAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return CostSheetExportLayout.UNRECOGNIZED;
+  }
+}
+
+export function costSheetExportLayoutToJSON(object: CostSheetExportLayout): string {
+  switch (object) {
+    case CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED:
+      return "COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED";
+    case CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_COMBINED:
+      return "COST_SHEET_EXPORT_LAYOUT_COMBINED";
+    case CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_HORIZONTAL:
+      return "COST_SHEET_EXPORT_LAYOUT_HORIZONTAL";
+    case CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_VERTICAL:
+      return "COST_SHEET_EXPORT_LAYOUT_VERTICAL";
+    case CostSheetExportLayout.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** CalJob represents a calculation job batch. */
 export interface CalJob {
   /** Auto-increment job id. */
@@ -686,6 +749,10 @@ export interface CostRMDetail {
    * cpc_rm_cost_detail JSON; previously omitted from the contract.
    */
   routeLevel: number;
+  /** Denier of the RM group head. Only set for DENIER ratio-mode products. */
+  denier: number;
+  /** Source of the ratio (e.g. DENIER, SPANDEX_DRAFT). Only set for DENIER ratio-mode products. */
+  ratioSource: string;
 }
 
 /** FormulaEval traces one formula evaluation step. */
@@ -1080,6 +1147,8 @@ export interface RequestProductCostSheetExportRequest {
    * (empty = all raw materials).
    */
   rmGroupCodes: string[];
+  /** Workbook layout (UNSPECIFIED = COMBINED, today's behaviour). */
+  layout: CostSheetExportLayout;
 }
 
 /** RequestProductCostSheetExportResponse acknowledges the queued job. */
@@ -1112,6 +1181,11 @@ export interface ProductCostSheetExportJobInfo {
   completedChildren: number;
   /** Child jobs that finished FAILED so far. */
   failedChildren: number;
+  /**
+   * Workbook layout the job renders (jobs queued before the field existed
+   * report COMBINED).
+   */
+  layout: CostSheetExportLayout;
 }
 
 /**
@@ -1417,6 +1491,11 @@ export interface ExportJobSummary {
    * child export jobs; false for a standalone single job.
    */
   isBatch: boolean;
+  /**
+   * Workbook layout the job renders (jobs queued before the field existed
+   * report COMBINED).
+   */
+  layout: CostSheetExportLayout;
 }
 
 function createBaseCalJob(): CalJob {
@@ -3857,6 +3936,8 @@ function createBaseCostRMDetail(): CostRMDetail {
     ratio: "",
     contribution: "",
     routeLevel: 0,
+    denier: 0,
+    ratioSource: "",
   };
 }
 
@@ -3885,6 +3966,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     }
     if (message.routeLevel !== 0) {
       writer.uint32(64).int32(message.routeLevel);
+    }
+    if (message.denier !== 0) {
+      writer.uint32(73).double(message.denier);
+    }
+    if (message.ratioSource !== "") {
+      writer.uint32(82).string(message.ratioSource);
     }
     return writer;
   },
@@ -3960,6 +4047,22 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
           message.routeLevel = reader.int32();
           continue;
         }
+        case 9: {
+          if (tag !== 73) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.ratioSource = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4003,6 +4106,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
         : isSet(object.route_level)
         ? globalThis.Number(object.route_level)
         : 0,
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
+      ratioSource: isSet(object.ratioSource)
+        ? globalThis.String(object.ratioSource)
+        : isSet(object.ratio_source)
+        ? globalThis.String(object.ratio_source)
+        : "",
     };
   },
 
@@ -4032,6 +4141,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     if (message.routeLevel !== 0) {
       obj.routeLevel = Math.round(message.routeLevel);
     }
+    if (message.denier !== 0) {
+      obj.denier = message.denier;
+    }
+    if (message.ratioSource !== "") {
+      obj.ratioSource = message.ratioSource;
+    }
     return obj;
   },
 
@@ -4048,6 +4163,8 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     message.ratio = object.ratio ?? "";
     message.contribution = object.contribution ?? "";
     message.routeLevel = object.routeLevel ?? 0;
+    message.denier = object.denier ?? 0;
+    message.ratioSource = object.ratioSource ?? "";
     return message;
   },
 };
@@ -7122,6 +7239,7 @@ function createBaseRequestProductCostSheetExportRequest(): RequestProductCostShe
     productSysIds: [],
     shadeCodes: [],
     rmGroupCodes: [],
+    layout: 0,
   };
 }
 
@@ -7150,6 +7268,9 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     }
     for (const v of message.rmGroupCodes) {
       writer.uint32(66).string(v!);
+    }
+    if (message.layout !== 0) {
+      writer.uint32(72).int32(message.layout);
     }
     return writer;
   },
@@ -7245,6 +7366,14 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
           message.rmGroupCodes.push(reader.string());
           continue;
         }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.layout = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7284,6 +7413,7 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
         : globalThis.Array.isArray(object?.rm_group_codes)
         ? object.rm_group_codes.map((e: any) => globalThis.String(e))
         : [],
+      layout: isSet(object.layout) ? costSheetExportLayoutFromJSON(object.layout) : 0,
     };
   },
 
@@ -7313,6 +7443,9 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     if (message.rmGroupCodes?.length) {
       obj.rmGroupCodes = message.rmGroupCodes;
     }
+    if (message.layout !== 0) {
+      obj.layout = costSheetExportLayoutToJSON(message.layout);
+    }
     return obj;
   },
 
@@ -7329,6 +7462,7 @@ export const RequestProductCostSheetExportRequest: MessageFns<RequestProductCost
     message.productSysIds = object.productSysIds?.map((e) => e) || [];
     message.shadeCodes = object.shadeCodes?.map((e) => e) || [];
     message.rmGroupCodes = object.rmGroupCodes?.map((e) => e) || [];
+    message.layout = object.layout ?? 0;
     return message;
   },
 };
@@ -7422,6 +7556,7 @@ function createBaseProductCostSheetExportJobInfo(): ProductCostSheetExportJobInf
     totalChildren: 0,
     completedChildren: 0,
     failedChildren: 0,
+    layout: 0,
   };
 }
 
@@ -7447,6 +7582,9 @@ export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJob
     }
     if (message.failedChildren !== 0) {
       writer.uint32(56).int32(message.failedChildren);
+    }
+    if (message.layout !== 0) {
+      writer.uint32(64).int32(message.layout);
     }
     return writer;
   },
@@ -7514,6 +7652,14 @@ export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJob
           message.failedChildren = reader.int32();
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.layout = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7556,6 +7702,7 @@ export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJob
         : isSet(object.failed_children)
         ? globalThis.Number(object.failed_children)
         : 0,
+      layout: isSet(object.layout) ? costSheetExportLayoutFromJSON(object.layout) : 0,
     };
   },
 
@@ -7582,6 +7729,9 @@ export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJob
     if (message.failedChildren !== 0) {
       obj.failedChildren = Math.round(message.failedChildren);
     }
+    if (message.layout !== 0) {
+      obj.layout = costSheetExportLayoutToJSON(message.layout);
+    }
     return obj;
   },
 
@@ -7597,6 +7747,7 @@ export const ProductCostSheetExportJobInfo: MessageFns<ProductCostSheetExportJob
     message.totalChildren = object.totalChildren ?? 0;
     message.completedChildren = object.completedChildren ?? 0;
     message.failedChildren = object.failedChildren ?? 0;
+    message.layout = object.layout ?? 0;
     return message;
   },
 };
@@ -9697,6 +9848,7 @@ function createBaseExportJobSummary(): ExportJobSummary {
     failedChildren: 0,
     queuedAt: undefined,
     isBatch: false,
+    layout: 0,
   };
 }
 
@@ -9728,6 +9880,9 @@ export const ExportJobSummary: MessageFns<ExportJobSummary> = {
     }
     if (message.isBatch !== false) {
       writer.uint32(72).bool(message.isBatch);
+    }
+    if (message.layout !== 0) {
+      writer.uint32(80).int32(message.layout);
     }
     return writer;
   },
@@ -9811,6 +9966,14 @@ export const ExportJobSummary: MessageFns<ExportJobSummary> = {
           message.isBatch = reader.bool();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.layout = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9859,6 +10022,7 @@ export const ExportJobSummary: MessageFns<ExportJobSummary> = {
         : isSet(object.is_batch)
         ? globalThis.Boolean(object.is_batch)
         : false,
+      layout: isSet(object.layout) ? costSheetExportLayoutFromJSON(object.layout) : 0,
     };
   },
 
@@ -9891,6 +10055,9 @@ export const ExportJobSummary: MessageFns<ExportJobSummary> = {
     if (message.isBatch !== false) {
       obj.isBatch = message.isBatch;
     }
+    if (message.layout !== 0) {
+      obj.layout = costSheetExportLayoutToJSON(message.layout);
+    }
     return obj;
   },
 
@@ -9908,6 +10075,7 @@ export const ExportJobSummary: MessageFns<ExportJobSummary> = {
     message.failedChildren = object.failedChildren ?? 0;
     message.queuedAt = object.queuedAt ?? undefined;
     message.isBatch = object.isBatch ?? false;
+    message.layout = object.layout ?? 0;
     return message;
   },
 };

@@ -31,6 +31,7 @@ function serializeHead(head: any) {
     valuationFlag: head.valuationFlag ?? 0,
     marketingFlag: head.marketingFlag ?? 0,
     isOilGroup: head.isOilGroup ?? false,
+    denier: head.denier ?? 0,
     audit: head.audit
       ? {
           createdAt: head.audit.createdAt || "",

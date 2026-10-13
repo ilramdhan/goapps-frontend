@@ -7,6 +7,7 @@ import {
   type CostProductType,
   type ListCostProductTypesParams,
   normalizeCostProductType,
+  type RmRatioMode,
 } from "@/types/finance/cost-product-type"
 
 const KEYS = {
@@ -62,7 +63,7 @@ export function useCostProductType(typeId: number | undefined) {
 export function useCreateCostProductType() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { typeCode: string; typeName: string }) => {
+    mutationFn: async (payload: { typeCode: string; typeName: string; rmRatioMode?: RmRatioMode }) => {
       const res = await fetch("/api/v1/finance/cost-product-types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,11 +84,11 @@ export function useCreateCostProductType() {
 export function useUpdateCostProductType() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { typeId: number; typeName: string; isActive: boolean }) => {
+    mutationFn: async (payload: { typeId: number; typeName: string; isActive: boolean; rmRatioMode?: RmRatioMode }) => {
       const res = await fetch(`/api/v1/finance/cost-product-types/${payload.typeId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typeName: payload.typeName, isActive: payload.isActive }),
+        body: JSON.stringify({ typeName: payload.typeName, isActive: payload.isActive, rmRatioMode: payload.rmRatioMode }),
       })
       const json = await res.json()
       if (!json.base?.isSuccess) throw new Error(json.base?.message || "Failed")

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { CalcNotesCallout } from "./calc-notes-callout"
 import { blockReasonLabel } from "@/lib/finance/block-reason"
 import { Card } from "@/components/ui/card"
 import {
@@ -31,7 +32,7 @@ import type {
   ListCalcJobProductsParams,
 } from "@/types/finance/cost-calc"
 
-import { fmtDate, fmtDuration, prettyJson } from "./calc-job-tab-utils"
+import { fmtDate, fmtDuration, parseCalcNotes, prettyJson } from "./calc-job-tab-utils"
 
 interface Props {
   jobId: number
@@ -257,7 +258,8 @@ function ProductRow({
       {isOpen && hasLog && (
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/30 p-0">
-            <div className="px-4 py-3">
+            <div className="space-y-3 px-4 py-3">
+              <CalcNotesCallout notes={parseCalcNotes(p.calculationLogJson)} />
               <pre className="overflow-x-auto rounded-md bg-background p-3 text-xs leading-relaxed">
                 {prettyJson(p.calculationLogJson)}
               </pre>

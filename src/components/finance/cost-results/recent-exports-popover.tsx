@@ -5,6 +5,7 @@ import { History, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { StatusBadge } from "@/components/common/status-badge"
+import { EXPORT_LAYOUT_LABEL } from "@/lib/finance/export-layout"
 import { useExportJobsList } from "@/hooks/finance/use-cost-calc"
 
 interface Props {
@@ -62,7 +63,12 @@ export function RecentExportsPopover({ period, onSelectJob }: Props) {
                       <StatusBadge status={job.status} type="job" size="sm" />
                     </span>
                     <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>Period {job.period || "—"}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span>Period {job.period || "—"}</span>
+                        <span className="rounded border px-1 text-[10px] leading-4" data-testid="layout-badge">
+                          {EXPORT_LAYOUT_LABEL[job.layout]}
+                        </span>
+                      </span>
                       {progressLabel && <span>{progressLabel}</span>}
                     </span>
                   </button>

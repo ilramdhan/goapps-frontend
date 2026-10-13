@@ -1,10 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Download, Loader2, X, XCircle } from "lucide-react"
+import { CheckCircle2, ChevronDown, Download, Loader2, X, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { layoutChunksFiles, type ExportLayout } from "@/lib/finance/export-layout"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog/confirm-dialog"
 import { ExportBatchFilesPopover } from "@/components/finance/cost-results/export-batch-files-popover"
 import {
@@ -19,6 +26,18 @@ import {
 // above this, a filter resolves into a parent job + N chunked child jobs
 // instead of one workbook.
 const MAX_EXPORT_PRODUCTS = 200
+
+export const EXPORT_LAYOUT_OPTIONS: { layout: ExportLayout; label: string }[] = [
+  { layout: "COMBINED", label: "Combined (all data + cost sheets)" },
+  { layout: "HORIZONTAL", label: "Horizontal (all data)" },
+  { layout: "VERTICAL", label: "Vertical (cost sheet)" },
+]
+
+// needsBatchConfirm: the ">200 products -> multiple files" warning applies to
+// COMBINED and VERTICAL only; HORIZONTAL is always a single file.
+export function needsBatchConfirm(layout: ExportLayout, count: number): boolean {
+  return layoutChunksFiles(layout) && count > MAX_EXPORT_PRODUCTS
+}
 
 interface Props {
   // Current filter state. `period` must be a 6-digit YYYYMM — the backend
@@ -70,11 +89,11 @@ export function ExportCostSheetButton({
   // only applies to the filter-driven bulk export, where the resolved count
   // comes from the caller (results list's total, not the current page size).
   const effectiveCount = productSysIds?.length ? productSysIds.length : (totalCount ?? 0)
-  const isBulkBatch = effectiveCount > MAX_EXPORT_PRODUCTS
+  const [pendingLayout, setPendingLayout] = useState<ExportLayout>("COMBINED")
 
-  function fireExport() {
+  function fireExport(layout: ExportLayout) {
     mutation.mutate(
-      { ...filters, productSysIds },
+      { ...filters, productSysIds, layout },
       {
         onSuccess: (info) => {
           setJob(info)
@@ -84,16 +103,17 @@ export function ExportCostSheetButton({
     )
   }
 
-  function handleClick() {
+  function handleClick(layout: ExportLayout = "COMBINED") {
     if (!hasPeriod) {
       toast.warning("Set a 6-digit period (YYYYMM) before exporting.")
       return
     }
-    if (isBulkBatch) {
+    if (needsBatchConfirm(layout, effectiveCount)) {
+      setPendingLayout(layout)
       setConfirmOpen(true)
       return
     }
-    fireExport()
+    fireExport(layout)
   }
 
   const batchCount = Math.ceil(effectiveCount / MAX_EXPORT_PRODUCTS)
@@ -108,21 +128,43 @@ export function ExportCostSheetButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <Button
-        variant={variant}
-        size={size}
-        className={className}
-        onClick={handleClick}
-        disabled={mutation.isPending || !hasPeriod}
-        title={hasPeriod ? undefined : "Set a period first"}
-      >
-        {mutation.isPending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <Download className="mr-2 h-4 w-4" />
-        )}
-        {mutation.isPending ? "Preparing…" : label}
-      </Button>
+      <div className="flex items-center">
+        <Button
+          variant={variant}
+          size={size}
+          className={`${className ?? ""} rounded-r-none`}
+          onClick={() => handleClick("COMBINED")}
+          disabled={mutation.isPending || !hasPeriod}
+          title={hasPeriod ? undefined : "Set a period first"}
+        >
+          {mutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 h-4 w-4" />
+          )}
+          {mutation.isPending ? "Preparing…" : label}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={variant}
+              size={size}
+              className="rounded-l-none border-l-0 px-2"
+              disabled={mutation.isPending || !hasPeriod}
+              aria-label="Choose export layout"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {EXPORT_LAYOUT_OPTIONS.map((o) => (
+              <DropdownMenuItem key={o.layout} onSelect={() => handleClick(o.layout)}>
+                {o.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {progress && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -196,11 +238,11 @@ export function ExportCostSheetButton({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Export a large product set"
-        description={`This will export ${effectiveCount.toLocaleString()} products across ${batchCount} batches (max ${MAX_EXPORT_PRODUCTS} products per file). Continue?`}
+        description={`This will export ${effectiveCount.toLocaleString()} products across ${batchCount} batches (max ${MAX_EXPORT_PRODUCTS} products per file). Continue? (Horizontal exports are always a single file and skip this prompt.)`}
         confirmText="Export"
         onConfirm={() => {
           setConfirmOpen(false)
-          fireExport()
+          fireExport(pendingLayout)
         }}
       />
     </div>

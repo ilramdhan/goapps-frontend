@@ -260,6 +260,12 @@ function GroupDetailContent() {
                     {marketingFlagLabel(marketingGroup?.marketingFlag)}
                   </Badge>
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Denier</span>
+                  <span className="font-mono">
+                    {marketingGroup?.denier ? marketingGroup.denier : "-"}
+                  </span>
+                </div>
                 <p className="text-[10px] text-muted-foreground pt-2 border-t">
                   AUTO uses cascade fallback (CL→SL→FL→PR / SP→PP→FP).
                 </p>
