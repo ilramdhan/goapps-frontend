@@ -3,6 +3,7 @@
 // returns a job handle, the worker writes the artifact to MinIO, and the UI
 // polls / waits for the notification before hitting the download route.
 
+import * as grpc from "@grpc/grpc-js"
 import { NextRequest, NextResponse } from "next/server"
 import { getCostCalcClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
 import { toCalcType, toCostResultStatus, toExportLayout } from "@/lib/grpc/cost-calc-enums"
@@ -36,6 +37,9 @@ function toCodeList(raw: unknown): string[] {
     .filter((s) => s.length > 0)
 }
 
+// Bound the queue RPC so the UI never spins forever if the backend stalls.
+const REQUEST_EXPORT_DEADLINE_MS = 30_000
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -55,6 +59,7 @@ export async function POST(request: NextRequest) {
         layout: toExportLayout(body.layout),
       },
       metadata,
+      { deadline: Date.now() + REQUEST_EXPORT_DEADLINE_MS },
     )
 
     return NextResponse.json({
@@ -62,6 +67,19 @@ export async function POST(request: NextRequest) {
       data: response.data ? { ...response.data, layout: normalizeExportLayout(response.data.layout) } : response.data,
     })
   } catch (error) {
+    if (isGrpcError(error) && error.code === grpc.status.DEADLINE_EXCEEDED) {
+      return NextResponse.json(
+        {
+          base: {
+            isSuccess: false,
+            statusCode: "504",
+            message: "The export request timed out after 30 seconds. Please try again.",
+            validationErrors: [],
+          },
+        },
+        { status: 504 },
+      )
+    }
     if (isGrpcError(error)) return handleGrpcError(error)
     return NextResponse.json(
       {
