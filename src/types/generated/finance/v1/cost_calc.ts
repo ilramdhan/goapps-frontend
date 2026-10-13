@@ -686,6 +686,10 @@ export interface CostRMDetail {
    * cpc_rm_cost_detail JSON; previously omitted from the contract.
    */
   routeLevel: number;
+  /** Denier of the RM group head. Only set for DENIER ratio-mode products. */
+  denier: number;
+  /** Source of the ratio (e.g. DENIER, SPANDEX_DRAFT). Only set for DENIER ratio-mode products. */
+  ratioSource: string;
 }
 
 /** FormulaEval traces one formula evaluation step. */
@@ -3857,6 +3861,8 @@ function createBaseCostRMDetail(): CostRMDetail {
     ratio: "",
     contribution: "",
     routeLevel: 0,
+    denier: 0,
+    ratioSource: "",
   };
 }
 
@@ -3885,6 +3891,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     }
     if (message.routeLevel !== 0) {
       writer.uint32(64).int32(message.routeLevel);
+    }
+    if (message.denier !== 0) {
+      writer.uint32(73).double(message.denier);
+    }
+    if (message.ratioSource !== "") {
+      writer.uint32(82).string(message.ratioSource);
     }
     return writer;
   },
@@ -3960,6 +3972,22 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
           message.routeLevel = reader.int32();
           continue;
         }
+        case 9: {
+          if (tag !== 73) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.ratioSource = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4003,6 +4031,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
         : isSet(object.route_level)
         ? globalThis.Number(object.route_level)
         : 0,
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
+      ratioSource: isSet(object.ratioSource)
+        ? globalThis.String(object.ratioSource)
+        : isSet(object.ratio_source)
+        ? globalThis.String(object.ratio_source)
+        : "",
     };
   },
 
@@ -4032,6 +4066,12 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     if (message.routeLevel !== 0) {
       obj.routeLevel = Math.round(message.routeLevel);
     }
+    if (message.denier !== 0) {
+      obj.denier = message.denier;
+    }
+    if (message.ratioSource !== "") {
+      obj.ratioSource = message.ratioSource;
+    }
     return obj;
   },
 
@@ -4048,6 +4088,8 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     message.ratio = object.ratio ?? "";
     message.contribution = object.contribution ?? "";
     message.routeLevel = object.routeLevel ?? 0;
+    message.denier = object.denier ?? 0;
+    message.ratioSource = object.ratioSource ?? "";
     return message;
   },
 };
