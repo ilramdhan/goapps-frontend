@@ -409,6 +409,8 @@ export interface RMGroupHead {
    * its per-period rate drives OIL_RATE in the costing engine.
    */
   isOilGroup: boolean;
+  /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
+  denier: number;
   /**
    * Carry-forward provenance of the per-period values overlaid on this head
    * (only meaningful when the head is read for a specific period).
@@ -579,6 +581,8 @@ export interface CreateRMGroupRequest {
   marketingFlag: RMMarketingFlag;
   /** Mark the new group as an oil group (global, not per period). Defaults to false. */
   isOilGroup: boolean;
+  /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
+  denier?: number | undefined;
 }
 
 /** Create response. */
@@ -705,7 +709,11 @@ export interface UpdateRMGroupRequest {
    * leaves it unchanged. Un-flagging a group still referenced by product
    * OIL_NAME values is rejected by the backend (ErrOilGroupInUse).
    */
-  isOilGroup?: boolean | undefined;
+  isOilGroup?:
+    | boolean
+    | undefined;
+  /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
+  denier?: number | undefined;
 }
 
 /** Update response. */
@@ -1157,6 +1165,7 @@ function createBaseRMGroupHead(): RMGroupHead {
     valuationFlag: 0,
     marketingFlag: 0,
     isOilGroup: false,
+    denier: 0,
     inheritedFromPeriod: "",
   };
 }
@@ -1228,6 +1237,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     }
     if (message.isOilGroup !== false) {
       writer.uint32(176).bool(message.isOilGroup);
+    }
+    if (message.denier !== 0) {
+      writer.uint32(193).double(message.denier);
     }
     if (message.inheritedFromPeriod !== "") {
       writer.uint32(186).string(message.inheritedFromPeriod);
@@ -1418,6 +1430,14 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
           message.isOilGroup = reader.bool();
           continue;
         }
+        case 24: {
+          if (tag !== 193) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
         case 23: {
           if (tag !== 186) {
             break;
@@ -1535,6 +1555,7 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
         : isSet(object.is_oil_group)
         ? globalThis.Boolean(object.is_oil_group)
         : false,
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
       inheritedFromPeriod: isSet(object.inheritedFromPeriod)
         ? globalThis.String(object.inheritedFromPeriod)
         : isSet(object.inherited_from_period)
@@ -1611,6 +1632,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     if (message.isOilGroup !== false) {
       obj.isOilGroup = message.isOilGroup;
     }
+    if (message.denier !== 0) {
+      obj.denier = message.denier;
+    }
     if (message.inheritedFromPeriod !== "") {
       obj.inheritedFromPeriod = message.inheritedFromPeriod;
     }
@@ -1646,6 +1670,7 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     message.valuationFlag = object.valuationFlag ?? 0;
     message.marketingFlag = object.marketingFlag ?? 0;
     message.isOilGroup = object.isOilGroup ?? false;
+    message.denier = object.denier ?? 0;
     message.inheritedFromPeriod = object.inheritedFromPeriod ?? "";
     return message;
   },
@@ -2609,6 +2634,7 @@ function createBaseCreateRMGroupRequest(): CreateRMGroupRequest {
     valuationFlag: 0,
     marketingFlag: 0,
     isOilGroup: false,
+    denier: undefined,
   };
 }
 
@@ -2652,6 +2678,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     }
     if (message.isOilGroup !== false) {
       writer.uint32(104).bool(message.isOilGroup);
+    }
+    if (message.denier !== undefined) {
+      writer.uint32(113).double(message.denier);
     }
     return writer;
   },
@@ -2767,6 +2796,14 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
           message.isOilGroup = reader.bool();
           continue;
         }
+        case 14: {
+          if (tag !== 113) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2835,6 +2872,7 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
         : isSet(object.is_oil_group)
         ? globalThis.Boolean(object.is_oil_group)
         : false,
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : undefined,
     };
   },
 
@@ -2879,6 +2917,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     if (message.isOilGroup !== false) {
       obj.isOilGroup = message.isOilGroup;
     }
+    if (message.denier !== undefined) {
+      obj.denier = message.denier;
+    }
     return obj;
   },
 
@@ -2900,6 +2941,7 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     message.valuationFlag = object.valuationFlag ?? 0;
     message.marketingFlag = object.marketingFlag ?? 0;
     message.isOilGroup = object.isOilGroup ?? false;
+    message.denier = object.denier ?? undefined;
     return message;
   },
 };
@@ -3173,6 +3215,7 @@ function createBaseUpdateRMGroupRequest(): UpdateRMGroupRequest {
     clearMarketingDefaultValue: false,
     period: "",
     isOilGroup: undefined,
+    denier: undefined,
   };
 }
 
@@ -3258,6 +3301,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     }
     if (message.isOilGroup !== undefined) {
       writer.uint32(216).bool(message.isOilGroup);
+    }
+    if (message.denier !== undefined) {
+      writer.uint32(225).double(message.denier);
     }
     return writer;
   },
@@ -3485,6 +3531,14 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
           message.isOilGroup = reader.bool();
           continue;
         }
+        case 28: {
+          if (tag !== 225) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3619,6 +3673,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
         : isSet(object.is_oil_group)
         ? globalThis.Boolean(object.is_oil_group)
         : undefined,
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : undefined,
     };
   },
 
@@ -3705,6 +3760,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     if (message.isOilGroup !== undefined) {
       obj.isOilGroup = message.isOilGroup;
     }
+    if (message.denier !== undefined) {
+      obj.denier = message.denier;
+    }
     return obj;
   },
 
@@ -3740,6 +3798,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     message.clearMarketingDefaultValue = object.clearMarketingDefaultValue ?? false;
     message.period = object.period ?? "";
     message.isOilGroup = object.isOilGroup ?? undefined;
+    message.denier = object.denier ?? undefined;
     return message;
   },
 };

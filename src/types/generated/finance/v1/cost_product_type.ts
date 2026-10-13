@@ -22,12 +22,16 @@ export interface CostProductType {
    * Drives IS_PTY/IS_POY/IS_SUPERBA flags and OIL_RATE resolution in costing.
    */
   oilClass: string;
+  /** RM ratio mode: INPUT (route ratio as entered, default) or DENIER (ratio = denier share, used by MEL/ACY). */
+  rmRatioMode: string;
   audit: AuditInfo | undefined;
 }
 
 export interface CreateCostProductTypeRequest {
   typeCode: string;
   typeName: string;
+  /** RM ratio mode: INPUT (route ratio as entered, default) or DENIER (ratio = denier share, used by MEL/ACY). Empty defaults to INPUT. */
+  rmRatioMode: string;
 }
 
 export interface CreateCostProductTypeResponse {
@@ -48,6 +52,8 @@ export interface UpdateCostProductTypeRequest {
   typeId: number;
   typeName: string;
   isActive: boolean;
+  /** RM ratio mode: INPUT (route ratio as entered, default) or DENIER (ratio = denier share, used by MEL/ACY). Empty leaves unchanged. */
+  rmRatioMode: string;
 }
 
 export interface UpdateCostProductTypeResponse {
@@ -160,7 +166,7 @@ export interface SetCostProductTypeOilConfigResponse {
 }
 
 function createBaseCostProductType(): CostProductType {
-  return { typeId: 0, typeCode: "", typeName: "", isActive: false, oilClass: "", audit: undefined };
+  return { typeId: 0, typeCode: "", typeName: "", isActive: false, oilClass: "", rmRatioMode: "", audit: undefined };
 }
 
 export const CostProductType: MessageFns<CostProductType> = {
@@ -179,6 +185,9 @@ export const CostProductType: MessageFns<CostProductType> = {
     }
     if (message.oilClass !== "") {
       writer.uint32(42).string(message.oilClass);
+    }
+    if (message.rmRatioMode !== "") {
+      writer.uint32(50).string(message.rmRatioMode);
     }
     if (message.audit !== undefined) {
       AuditInfo.encode(message.audit, writer.uint32(130).fork()).join();
@@ -233,6 +242,14 @@ export const CostProductType: MessageFns<CostProductType> = {
           message.oilClass = reader.string();
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.rmRatioMode = reader.string();
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -277,6 +294,11 @@ export const CostProductType: MessageFns<CostProductType> = {
         : isSet(object.oil_class)
         ? globalThis.String(object.oil_class)
         : "",
+      rmRatioMode: isSet(object.rmRatioMode)
+        ? globalThis.String(object.rmRatioMode)
+        : isSet(object.rm_ratio_mode)
+        ? globalThis.String(object.rm_ratio_mode)
+        : "",
       audit: isSet(object.audit) ? AuditInfo.fromJSON(object.audit) : undefined,
     };
   },
@@ -298,6 +320,9 @@ export const CostProductType: MessageFns<CostProductType> = {
     if (message.oilClass !== "") {
       obj.oilClass = message.oilClass;
     }
+    if (message.rmRatioMode !== "") {
+      obj.rmRatioMode = message.rmRatioMode;
+    }
     if (message.audit !== undefined) {
       obj.audit = AuditInfo.toJSON(message.audit);
     }
@@ -314,6 +339,7 @@ export const CostProductType: MessageFns<CostProductType> = {
     message.typeName = object.typeName ?? "";
     message.isActive = object.isActive ?? false;
     message.oilClass = object.oilClass ?? "";
+    message.rmRatioMode = object.rmRatioMode ?? "";
     message.audit = (object.audit !== undefined && object.audit !== null)
       ? AuditInfo.fromPartial(object.audit)
       : undefined;
@@ -322,7 +348,7 @@ export const CostProductType: MessageFns<CostProductType> = {
 };
 
 function createBaseCreateCostProductTypeRequest(): CreateCostProductTypeRequest {
-  return { typeCode: "", typeName: "" };
+  return { typeCode: "", typeName: "", rmRatioMode: "" };
 }
 
 export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeRequest> = {
@@ -332,6 +358,9 @@ export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeReque
     }
     if (message.typeName !== "") {
       writer.uint32(18).string(message.typeName);
+    }
+    if (message.rmRatioMode !== "") {
+      writer.uint32(26).string(message.rmRatioMode);
     }
     return writer;
   },
@@ -359,6 +388,14 @@ export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeReque
           message.typeName = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rmRatioMode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -380,6 +417,11 @@ export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeReque
         : isSet(object.type_name)
         ? globalThis.String(object.type_name)
         : "",
+      rmRatioMode: isSet(object.rmRatioMode)
+        ? globalThis.String(object.rmRatioMode)
+        : isSet(object.rm_ratio_mode)
+        ? globalThis.String(object.rm_ratio_mode)
+        : "",
     };
   },
 
@@ -391,6 +433,9 @@ export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeReque
     if (message.typeName !== "") {
       obj.typeName = message.typeName;
     }
+    if (message.rmRatioMode !== "") {
+      obj.rmRatioMode = message.rmRatioMode;
+    }
     return obj;
   },
 
@@ -401,6 +446,7 @@ export const CreateCostProductTypeRequest: MessageFns<CreateCostProductTypeReque
     const message = createBaseCreateCostProductTypeRequest();
     message.typeCode = object.typeCode ?? "";
     message.typeName = object.typeName ?? "";
+    message.rmRatioMode = object.rmRatioMode ?? "";
     return message;
   },
 };
@@ -630,7 +676,7 @@ export const GetCostProductTypeResponse: MessageFns<GetCostProductTypeResponse> 
 };
 
 function createBaseUpdateCostProductTypeRequest(): UpdateCostProductTypeRequest {
-  return { typeId: 0, typeName: "", isActive: false };
+  return { typeId: 0, typeName: "", isActive: false, rmRatioMode: "" };
 }
 
 export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeRequest> = {
@@ -643,6 +689,9 @@ export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeReque
     }
     if (message.isActive !== false) {
       writer.uint32(24).bool(message.isActive);
+    }
+    if (message.rmRatioMode !== "") {
+      writer.uint32(34).string(message.rmRatioMode);
     }
     return writer;
   },
@@ -678,6 +727,14 @@ export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeReque
           message.isActive = reader.bool();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.rmRatioMode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -704,6 +761,11 @@ export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeReque
         : isSet(object.is_active)
         ? globalThis.Boolean(object.is_active)
         : false,
+      rmRatioMode: isSet(object.rmRatioMode)
+        ? globalThis.String(object.rmRatioMode)
+        : isSet(object.rm_ratio_mode)
+        ? globalThis.String(object.rm_ratio_mode)
+        : "",
     };
   },
 
@@ -718,6 +780,9 @@ export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeReque
     if (message.isActive !== false) {
       obj.isActive = message.isActive;
     }
+    if (message.rmRatioMode !== "") {
+      obj.rmRatioMode = message.rmRatioMode;
+    }
     return obj;
   },
 
@@ -729,6 +794,7 @@ export const UpdateCostProductTypeRequest: MessageFns<UpdateCostProductTypeReque
     message.typeId = object.typeId ?? 0;
     message.typeName = object.typeName ?? "";
     message.isActive = object.isActive ?? false;
+    message.rmRatioMode = object.rmRatioMode ?? "";
     return message;
   },
 };
