@@ -9,6 +9,7 @@ import {
   CalcJobStatus,
   ChunkStatus,
   CostResultStatus,
+  CostSheetExportLayout,
   JobProductStatus,
 } from "@/types/generated/finance/v1/cost_calc"
 
@@ -113,5 +114,22 @@ export function toJobProductStatus(s: string | undefined | null): JobProductStat
       return JobProductStatus.JOB_PRODUCT_STATUS_SKIPPED
     default:
       return JobProductStatus.JOB_PRODUCT_STATUS_UNSPECIFIED
+  }
+}
+
+// ---------- cost sheet export layout ----------
+
+// toExportLayout maps the UI short form to the proto enum. Absent/unknown ->
+// UNSPECIFIED, which the backend treats as COMBINED.
+export function toExportLayout(s: string | undefined | null): CostSheetExportLayout {
+  switch ((s || "").toUpperCase()) {
+    case "COMBINED":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_COMBINED
+    case "HORIZONTAL":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_HORIZONTAL
+    case "VERTICAL":
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_VERTICAL
+    default:
+      return CostSheetExportLayout.COST_SHEET_EXPORT_LAYOUT_UNSPECIFIED
   }
 }

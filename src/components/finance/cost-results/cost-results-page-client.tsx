@@ -256,19 +256,26 @@ export function CostResultsPageClient() {
 
   const rowActions: RowAction<CostResult>[] = useMemo(
     () => [
-      {
-        id: "export",
-        label: "Export cost sheet",
-        icon: <FileSpreadsheet className="h-4 w-4" />,
-        disabled: () => exportMutation.isPending,
-        onClick: (r) => {
-          exportMutation.mutate({
-            period: r.period,
-            calculationType: r.calculationType,
-            productSysIds: [r.productSysId],
-          })
-        },
-      },
+      ...([
+        { layout: "COMBINED", label: "Export — Combined" },
+        { layout: "HORIZONTAL", label: "Export — Horizontal (all data)" },
+        { layout: "VERTICAL", label: "Export — Vertical (cost sheet)" },
+      ] as const).map(
+        (o): RowAction<CostResult> => ({
+          id: `export-${o.layout.toLowerCase()}`,
+          label: o.label,
+          icon: <FileSpreadsheet className="h-4 w-4" />,
+          disabled: () => exportMutation.isPending,
+          onClick: (r) => {
+            exportMutation.mutate({
+              period: r.period,
+              calculationType: r.calculationType,
+              productSysIds: [r.productSysId],
+              layout: o.layout,
+            })
+          },
+        }),
+      ),
     ],
     [exportMutation],
   )

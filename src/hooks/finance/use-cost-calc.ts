@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+import { normalizeExportLayout, type ExportLayout } from "@/lib/finance/export-layout"
 import { useNotificationEventStore } from "@/stores/notification-event-store"
 import { NotificationSeverity } from "@/types/iam/notification"
 import {
@@ -449,6 +450,8 @@ export interface RequestCostSheetExportInput {
   rmGroupCodes?: string[]
   // Explicit selection; when non-empty the filters above are ignored server-side.
   productSysIds?: number[]
+  // Workbook layout; absent = COMBINED.
+  layout?: ExportLayout
 }
 
 export interface CostSheetExportJobInfo {
@@ -462,6 +465,7 @@ export interface CostSheetExportJobInfo {
   totalChildren: number
   completedChildren: number
   failedChildren: number
+  layout: ExportLayout
 }
 
 export function useRequestCostSheetExport() {
@@ -483,6 +487,7 @@ export function useRequestCostSheetExport() {
         totalChildren: Number(data?.totalChildren ?? data?.total_children ?? 0),
         completedChildren: Number(data?.completedChildren ?? data?.completed_children ?? 0),
         failedChildren: Number(data?.failedChildren ?? data?.failed_children ?? 0),
+        layout: normalizeExportLayout(data?.layout),
       }
     },
     onSuccess: (info) => {
@@ -528,6 +533,7 @@ export function useExportJobStatus(
         totalChildren: Number(data?.totalChildren ?? data?.total_children ?? 0),
         completedChildren: Number(data?.completedChildren ?? data?.completed_children ?? 0),
         failedChildren: Number(data?.failedChildren ?? data?.failed_children ?? 0),
+        layout: normalizeExportLayout(data?.layout),
       }
     },
     refetchInterval: (query) => {
@@ -736,6 +742,7 @@ export interface ExportJobSummaryItem {
   failedChildren: number
   queuedAt: string
   isBatch: boolean
+  layout: ExportLayout
 }
 
 export interface ListExportJobsResult {
@@ -767,6 +774,7 @@ export function useExportJobsList(params: ListExportJobsParams = {}) {
         failedChildren: Number(row.failedChildren ?? row.failed_children ?? 0),
         queuedAt: String(row.queuedAt ?? row.queued_at ?? ""),
         isBatch: Boolean(row.isBatch ?? row.is_batch ?? false),
+        layout: normalizeExportLayout(row.layout),
       }))
       const pag = json.pagination
       return {

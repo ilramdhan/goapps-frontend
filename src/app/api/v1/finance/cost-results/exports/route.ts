@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getCostCalcClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { normalizeExportLayout } from "@/lib/finance/export-layout"
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       base: response.base,
-      data: response.jobs,
+      data: (response.jobs ?? []).map((j) => ({ ...j, layout: normalizeExportLayout(j.layout) })),
       pagination: response.pagination
         ? {
             currentPage: response.pagination.currentPage,
