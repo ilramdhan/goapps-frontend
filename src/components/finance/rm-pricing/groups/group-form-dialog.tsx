@@ -86,6 +86,8 @@ const groupFormSchema = z.object({
   // Global (head-level, not period-versioned) — marks this group as an
   // OIL_NAME option for product types with a matching oil class (D2/D12).
   isOilGroup: z.boolean(),
+  // Nominal denier (spandex 20/40/70). null = not set. Backend: 0 clears.
+  denier: z.coerce.number().min(0, "Must be >= 0").nullable(),
 })
 
 /** Convert decimal-stored value (0.05) → whole-percent UI value (5). */
@@ -117,6 +119,7 @@ const DEFAULT_VALUES: GroupFormValues = {
   marketingFlag: RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED,
   isActive: true,
   isOilGroup: false,
+  denier: null,
 }
 
 interface GroupFormDialogProps {
@@ -163,6 +166,7 @@ export function GroupFormDialog({
             (group.marketingFlag ?? RMMarketingFlag.RM_MARKETING_FLAG_UNSPECIFIED) as RMMarketingFlag,
           isActive: group.isActive ?? true,
           isOilGroup: group.isOilGroup ?? false,
+          denier: group.denier ? group.denier : null,
         })
       } else {
         form.reset(DEFAULT_VALUES)
@@ -197,6 +201,8 @@ export function GroupFormDialog({
           valuationFlag: values.valuationFlag,
           marketingFlag: values.marketingFlag,
           isOilGroup: values.isOilGroup,
+          // Empty input clears an existing value (0); otherwise set it.
+          denier: values.denier ?? 0,
           // Clear flags so empty inputs become NULL on backend.
           clearMarketingFreightRate: values.marketingFreightRate === null,
           clearMarketingAntiDumpingPct: values.marketingAntiDumpingPct === null,
@@ -223,6 +229,7 @@ export function GroupFormDialog({
           valuationFlag: values.valuationFlag,
           marketingFlag: values.marketingFlag,
           isOilGroup: values.isOilGroup,
+          denier: values.denier ? values.denier : undefined,
         })
 
         const newId = created?.groupHeadId
@@ -565,6 +572,34 @@ export function GroupFormDialog({
               </div>
 
               <Separator />
+
+              <FormField
+                control={form.control}
+                name="denier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Denier</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        placeholder="e.g. 20 / 40 / 70"
+                        disabled={isPending}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === "" ? null : e.target.value)
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Nominal denier for spandex groups; used by DENIER-ratio products (denier ÷
+                      Spandex Draft). Leave empty if not applicable.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Oil group toggle — global (not per period); settable at create. */}
               <FormField
