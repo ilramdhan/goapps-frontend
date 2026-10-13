@@ -33,3 +33,14 @@ export function prettyJson(s: string): string {
     return s
   }
 }
+
+/** Extracts the `notes` string[] from a calculation log JSON; [] if absent/invalid. */
+export function parseCalcNotes(s: string): string[] {
+  if (!s) return []
+  try {
+    const notes = (JSON.parse(s) as { notes?: unknown } | null)?.notes
+    return Array.isArray(notes) ? notes.filter((n): n is string => typeof n === "string" && n !== "") : []
+  } catch {
+    return []
+  }
+}

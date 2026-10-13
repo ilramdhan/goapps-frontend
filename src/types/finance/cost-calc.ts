@@ -343,6 +343,9 @@ export interface CostRmDetail {
   // Route level this RM edge feeds (1 = FG; 2..N upstream). Newly populated
   // by the backend — previously always 0/blank.
   routeLevel: number
+  // Only set for DENIER ratio-mode products (0 / "" otherwise).
+  denier: number
+  ratioSource: string
 }
 
 export interface FormulaEval {
@@ -507,6 +510,8 @@ export function normalizeCostRmDetail(raw: Record<string, unknown>): CostRmDetai
     ratio: fieldStr(raw, "ratio", "ratio", "0"),
     contribution: fieldStr(raw, "contribution", "contribution", "0"),
     routeLevel: fieldNum(raw, "routeLevel", "route_level"),
+    denier: fieldNum(raw, "denier", "denier"),
+    ratioSource: fieldStr(raw, "ratioSource", "ratio_source"),
   }
 }
 

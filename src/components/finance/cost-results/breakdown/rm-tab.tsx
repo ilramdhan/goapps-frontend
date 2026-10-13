@@ -22,6 +22,7 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No RM data.</p>
   }
+  const showDenier = rows.some((r) => !!r.ratioSource)
   return (
     <div className="overflow-x-auto rounded-md border">
       <Table>
@@ -32,6 +33,8 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
             <TableHead>Shade</TableHead>
             <TableHead className="w-20 text-right">Level</TableHead>
             <TableHead className="text-right">Unit cost</TableHead>
+            {showDenier && <TableHead className="text-right">Denier</TableHead>}
+            {showDenier && <TableHead>Ratio Src</TableHead>}
             <TableHead className="text-right">Ratio</TableHead>
             <TableHead className="text-right">Contribution</TableHead>
           </TableRow>
@@ -57,6 +60,16 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatNumeric(r.unitCost)}
               </TableCell>
+              {showDenier && (
+                <TableCell className="text-right font-mono text-sm tabular-nums">
+                  {r.ratioSource ? r.denier : "—"}
+                </TableCell>
+              )}
+              {showDenier && (
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {r.ratioSource || "—"}
+                </TableCell>
+              )}
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatNumeric(r.ratio)}
               </TableCell>
