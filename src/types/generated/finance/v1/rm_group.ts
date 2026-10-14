@@ -411,6 +411,8 @@ export interface RMGroupHead {
   isOilGroup: boolean;
   /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
   denier: number;
+  /** When true the group denier is divided by the product's SPANDEX_DRAFT (spandex). False: denier used as-is (bought-out POY/FDY). */
+  denierUseDraft: boolean;
   /**
    * Carry-forward provenance of the per-period values overlaid on this head
    * (only meaningful when the head is read for a specific period).
@@ -582,7 +584,11 @@ export interface CreateRMGroupRequest {
   /** Mark the new group as an oil group (global, not per period). Defaults to false. */
   isOilGroup: boolean;
   /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
-  denier?: number | undefined;
+  denier?:
+    | number
+    | undefined;
+  /** When true the group denier is divided by the product's SPANDEX_DRAFT (spandex). False: denier used as-is (bought-out POY/FDY). */
+  denierUseDraft?: boolean | undefined;
 }
 
 /** Create response. */
@@ -713,7 +719,11 @@ export interface UpdateRMGroupRequest {
     | boolean
     | undefined;
   /** Nominal denier of the RM group (e.g. spandex 20/40/70). Optional; used by DENIER ratio-mode products: spandex denier = denier / SPANDEX_DRAFT. */
-  denier?: number | undefined;
+  denier?:
+    | number
+    | undefined;
+  /** When true the group denier is divided by the product's SPANDEX_DRAFT (spandex). False: denier used as-is (bought-out POY/FDY). */
+  denierUseDraft?: boolean | undefined;
 }
 
 /** Update response. */
@@ -1166,6 +1176,7 @@ function createBaseRMGroupHead(): RMGroupHead {
     marketingFlag: 0,
     isOilGroup: false,
     denier: 0,
+    denierUseDraft: false,
     inheritedFromPeriod: "",
   };
 }
@@ -1240,6 +1251,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     }
     if (message.denier !== 0) {
       writer.uint32(193).double(message.denier);
+    }
+    if (message.denierUseDraft !== false) {
+      writer.uint32(200).bool(message.denierUseDraft);
     }
     if (message.inheritedFromPeriod !== "") {
       writer.uint32(186).string(message.inheritedFromPeriod);
@@ -1438,6 +1452,14 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
           message.denier = reader.double();
           continue;
         }
+        case 25: {
+          if (tag !== 200) {
+            break;
+          }
+
+          message.denierUseDraft = reader.bool();
+          continue;
+        }
         case 23: {
           if (tag !== 186) {
             break;
@@ -1556,6 +1578,11 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
         ? globalThis.Boolean(object.is_oil_group)
         : false,
       denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
+      denierUseDraft: isSet(object.denierUseDraft)
+        ? globalThis.Boolean(object.denierUseDraft)
+        : isSet(object.denier_use_draft)
+        ? globalThis.Boolean(object.denier_use_draft)
+        : false,
       inheritedFromPeriod: isSet(object.inheritedFromPeriod)
         ? globalThis.String(object.inheritedFromPeriod)
         : isSet(object.inherited_from_period)
@@ -1635,6 +1662,9 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     if (message.denier !== 0) {
       obj.denier = message.denier;
     }
+    if (message.denierUseDraft !== false) {
+      obj.denierUseDraft = message.denierUseDraft;
+    }
     if (message.inheritedFromPeriod !== "") {
       obj.inheritedFromPeriod = message.inheritedFromPeriod;
     }
@@ -1671,6 +1701,7 @@ export const RMGroupHead: MessageFns<RMGroupHead> = {
     message.marketingFlag = object.marketingFlag ?? 0;
     message.isOilGroup = object.isOilGroup ?? false;
     message.denier = object.denier ?? 0;
+    message.denierUseDraft = object.denierUseDraft ?? false;
     message.inheritedFromPeriod = object.inheritedFromPeriod ?? "";
     return message;
   },
@@ -2635,6 +2666,7 @@ function createBaseCreateRMGroupRequest(): CreateRMGroupRequest {
     marketingFlag: 0,
     isOilGroup: false,
     denier: undefined,
+    denierUseDraft: undefined,
   };
 }
 
@@ -2681,6 +2713,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     }
     if (message.denier !== undefined) {
       writer.uint32(113).double(message.denier);
+    }
+    if (message.denierUseDraft !== undefined) {
+      writer.uint32(120).bool(message.denierUseDraft);
     }
     return writer;
   },
@@ -2804,6 +2839,14 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
           message.denier = reader.double();
           continue;
         }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.denierUseDraft = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2873,6 +2916,11 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
         ? globalThis.Boolean(object.is_oil_group)
         : false,
       denier: isSet(object.denier) ? globalThis.Number(object.denier) : undefined,
+      denierUseDraft: isSet(object.denierUseDraft)
+        ? globalThis.Boolean(object.denierUseDraft)
+        : isSet(object.denier_use_draft)
+        ? globalThis.Boolean(object.denier_use_draft)
+        : undefined,
     };
   },
 
@@ -2920,6 +2968,9 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     if (message.denier !== undefined) {
       obj.denier = message.denier;
     }
+    if (message.denierUseDraft !== undefined) {
+      obj.denierUseDraft = message.denierUseDraft;
+    }
     return obj;
   },
 
@@ -2942,6 +2993,7 @@ export const CreateRMGroupRequest: MessageFns<CreateRMGroupRequest> = {
     message.marketingFlag = object.marketingFlag ?? 0;
     message.isOilGroup = object.isOilGroup ?? false;
     message.denier = object.denier ?? undefined;
+    message.denierUseDraft = object.denierUseDraft ?? undefined;
     return message;
   },
 };
@@ -3216,6 +3268,7 @@ function createBaseUpdateRMGroupRequest(): UpdateRMGroupRequest {
     period: "",
     isOilGroup: undefined,
     denier: undefined,
+    denierUseDraft: undefined,
   };
 }
 
@@ -3304,6 +3357,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     }
     if (message.denier !== undefined) {
       writer.uint32(225).double(message.denier);
+    }
+    if (message.denierUseDraft !== undefined) {
+      writer.uint32(232).bool(message.denierUseDraft);
     }
     return writer;
   },
@@ -3539,6 +3595,14 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
           message.denier = reader.double();
           continue;
         }
+        case 29: {
+          if (tag !== 232) {
+            break;
+          }
+
+          message.denierUseDraft = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3674,6 +3738,11 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
         ? globalThis.Boolean(object.is_oil_group)
         : undefined,
       denier: isSet(object.denier) ? globalThis.Number(object.denier) : undefined,
+      denierUseDraft: isSet(object.denierUseDraft)
+        ? globalThis.Boolean(object.denierUseDraft)
+        : isSet(object.denier_use_draft)
+        ? globalThis.Boolean(object.denier_use_draft)
+        : undefined,
     };
   },
 
@@ -3763,6 +3832,9 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     if (message.denier !== undefined) {
       obj.denier = message.denier;
     }
+    if (message.denierUseDraft !== undefined) {
+      obj.denierUseDraft = message.denierUseDraft;
+    }
     return obj;
   },
 
@@ -3799,6 +3871,7 @@ export const UpdateRMGroupRequest: MessageFns<UpdateRMGroupRequest> = {
     message.period = object.period ?? "";
     message.isOilGroup = object.isOilGroup ?? undefined;
     message.denier = object.denier ?? undefined;
+    message.denierUseDraft = object.denierUseDraft ?? undefined;
     return message;
   },
 };
