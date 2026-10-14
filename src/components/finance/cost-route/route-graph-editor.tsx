@@ -85,6 +85,12 @@ import {
   type RmRefType,
   type RouteGraph,
 } from "@/types/finance/cost-route"
+import {
+  DENIER_RATIO_DISABLED_HINT,
+  denierFormula,
+  displayRatio,
+  isDenierLine,
+} from "@/components/finance/cost-route/rm-ratio-display"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -812,7 +818,15 @@ export function RouteGraphEditor({ headId }: Props) {
                                   ? rm.rmProductName || rm.rmProductCode || rm.routeRmName || "—"
                                   : rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || "—"}
                               </div>
-                              <div className="text-[10px] text-muted-foreground">×{rm.routeRmRatio}</div>
+                              <div
+                                className="text-[10px] text-muted-foreground"
+                                title={isDenierLine(rm) ? `${denierFormula(s, rm)} — ${DENIER_RATIO_DISABLED_HINT}` : undefined}
+                              >
+                                ×{displayRatio(rm)}
+                                {isDenierLine(rm) && (
+                                  <span className="ml-1 rounded border px-1 font-medium">Denier</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           {!locked && (

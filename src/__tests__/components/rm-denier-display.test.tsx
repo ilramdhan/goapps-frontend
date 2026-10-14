@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { RmTab } from "@/components/finance/cost-results/breakdown/rm-tab"
+import { formatNumeric } from "@/components/finance/cost-results/format"
 import { CalcNotesCallout } from "@/components/finance/calc-jobs/tabs/calc-notes-callout"
 import { parseCalcNotes } from "@/components/finance/calc-jobs/tabs/calc-job-tab-utils"
 import { normalizeCostRmDetail } from "@/types/finance/cost-calc"
@@ -25,7 +26,8 @@ describe("RmTab denier columns", () => {
     render(<RmTab rows={[{ ...base, denier: 40, ratioSource: "DENIER" }]} />)
     expect(screen.getByText("Denier")).toBeTruthy()
     expect(screen.getByText("Ratio Src")).toBeTruthy()
-    expect(screen.getByText("40")).toBeTruthy()
+    // Denier is formatted with formatNumeric, same as the ratio column.
+    expect(screen.getByText(formatNumeric(40))).toBeTruthy()
   })
 })
 

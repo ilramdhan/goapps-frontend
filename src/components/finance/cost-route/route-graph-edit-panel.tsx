@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  DENIER_RATIO_DISABLED_HINT,
+  denierFormula,
+  displayRatio,
+  isDenierLine,
+} from "@/components/finance/cost-route/rm-ratio-display"
 import type { CostRouteRm, CostRouteSeq } from "@/types/finance/cost-route"
 
 interface SeqPanelProps {
@@ -125,6 +132,9 @@ function SeqBody({
                 <span className="min-w-0 flex-1 truncate font-mono">
                   {rmRefLabel(rm)}
                 </span>
+                {isDenierLine(rm) ? (
+                  <DenierRatioBadge seq={seq} rm={rm} compact />
+                ) : (
                 <Input
                   type="number"
                   step="0.01"
@@ -139,6 +149,7 @@ function SeqBody({
                   }}
                   className="h-7 w-20 text-xs"
                 />
+                )}
                 {!locked && (
                   <Button
                     size="icon"
@@ -180,9 +191,19 @@ function SeqBody({
   )
 }
 
-function RmBody({ rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
+function RmBody({ seq, rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
+  const denier = isDenierLine(rm)
   return (
     <>
+      {denier && (
+        <div className="space-y-1">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Calculated ratio
+          </Label>
+          <DenierRatioBadge seq={seq} rm={rm} />
+          <p className="text-xs text-muted-foreground">{denierFormula(seq, rm)}</p>
+        </div>
+      )}
       <div>
         <Label htmlFor="rm-ratio" className="text-xs uppercase tracking-wide text-muted-foreground">
           Ratio per output unit
@@ -193,13 +214,19 @@ function RmBody({ rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
           step="0.01"
           min={0.0001}
           defaultValue={rm.routeRmRatio}
-          disabled={locked}
+          disabled={locked || denier}
+          title={denier ? DENIER_RATIO_DISABLED_HINT : undefined}
           onChange={(e) => {
             const next = Number(e.target.value)
             if (Number.isFinite(next) && next > 0) onChangeRatio(next)
           }}
           className="mt-1"
         />
+        {denier && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Stored ratio is ignored by the calculation. {DENIER_RATIO_DISABLED_HINT}
+          </p>
+        )}
       </div>
       {!locked && (
         <Button
@@ -212,6 +239,43 @@ function RmBody({ rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
         </Button>
       )}
     </>
+  )
+}
+
+// Read-only computed ratio for a denier-derived line: value + "Denier" badge,
+// with the formula (or backend note) and the edit hint in a tooltip.
+function DenierRatioBadge({
+  seq,
+  rm,
+  compact = false,
+}: {
+  seq: CostRouteSeq
+  rm: CostRouteRm
+  compact?: boolean
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex shrink-0 items-center gap-1"
+          data-testid="denier-ratio"
+          tabIndex={0}
+        >
+          <span className={compact ? "font-mono text-xs" : "font-mono text-sm font-semibold"}>
+            {displayRatio(rm)}
+          </span>
+          <Badge variant="secondary" className="text-[10px]">
+            Denier
+          </Badge>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <div className="space-y-1 text-xs">
+          <div className="font-mono">{denierFormula(seq, rm)}</div>
+          <div>{DENIER_RATIO_DISABLED_HINT}</div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
