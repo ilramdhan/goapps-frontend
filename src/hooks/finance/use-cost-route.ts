@@ -158,10 +158,13 @@ export function useSaveRouteGraph() {
       const data = ensureOK(json)
       return normalizeRouteGraph(data as Record<string, unknown>)
     },
-    onSuccess: (_data, { headId }) => {
+    // Returning the refetch keeps the mutation pending until the graph query
+    // holds the persisted values, so callers can safely drop their local
+    // working copy in their own onSuccess without flashing stale data.
+    onSuccess: async (_data, { headId }) => {
       toast.success("Route graph saved")
-      qc.invalidateQueries({ queryKey: KEYS.graphAll(headId) })
-      qc.invalidateQueries({ queryKey: KEYS.all })
+      await qc.invalidateQueries({ queryKey: KEYS.graphAll(headId) })
+      void qc.invalidateQueries({ queryKey: KEYS.all })
     },
     onError: (err: Error) => toast.error(err.message),
   })
