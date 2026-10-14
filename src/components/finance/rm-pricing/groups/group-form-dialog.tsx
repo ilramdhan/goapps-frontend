@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import {
   Select,
@@ -88,6 +89,8 @@ const groupFormSchema = z.object({
   isOilGroup: z.boolean(),
   // Nominal denier (spandex 20/40/70). null = not set. Backend: 0 clears.
   denier: z.coerce.number().min(0, "Must be >= 0").nullable(),
+  // true: denier is divided by the product's SPANDEX_DRAFT (spandex only).
+  denierUseDraft: z.boolean(),
 })
 
 /** Convert decimal-stored value (0.05) → whole-percent UI value (5). */
@@ -120,6 +123,7 @@ const DEFAULT_VALUES: GroupFormValues = {
   isActive: true,
   isOilGroup: false,
   denier: null,
+  denierUseDraft: false,
 }
 
 interface GroupFormDialogProps {
@@ -167,6 +171,7 @@ export function GroupFormDialog({
           isActive: group.isActive ?? true,
           isOilGroup: group.isOilGroup ?? false,
           denier: group.denier ? group.denier : null,
+          denierUseDraft: group.denierUseDraft ?? false,
         })
       } else {
         form.reset(DEFAULT_VALUES)
@@ -203,6 +208,7 @@ export function GroupFormDialog({
           isOilGroup: values.isOilGroup,
           // Empty input clears an existing value (0); otherwise set it.
           denier: values.denier ?? 0,
+          denierUseDraft: values.denier ? values.denierUseDraft : false,
           // Clear flags so empty inputs become NULL on backend.
           clearMarketingFreightRate: values.marketingFreightRate === null,
           clearMarketingAntiDumpingPct: values.marketingAntiDumpingPct === null,
@@ -230,6 +236,7 @@ export function GroupFormDialog({
           marketingFlag: values.marketingFlag,
           isOilGroup: values.isOilGroup,
           denier: values.denier ? values.denier : undefined,
+          denierUseDraft: values.denier ? values.denierUseDraft : false,
         })
 
         const newId = created?.groupHeadId
@@ -593,12 +600,39 @@ export function GroupFormDialog({
                       />
                     </FormControl>
                     <FormDescription>
-                      Nominal denier for spandex groups; used by DENIER-ratio products (denier ÷
-                      Spandex Draft). Leave empty if not applicable.
+                      Nominal denier of this RM group (e.g. spandex 20/40/70, POY 80, FDY 50). Used
+                      by DENIER-ratio products (MEL/ACY/ITY).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              <FormField
+                control={form.control}
+                name="denierUseDraft"
+                render={({ field }) => {
+                  const denierValue = form.watch("denier")
+                  const noDenier = !denierValue || Number(denierValue) === 0
+                  return (
+                    <FormItem className="flex flex-row items-start gap-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={!noDenier && (field.value ?? false)}
+                          onCheckedChange={(v) => field.onChange(v === true)}
+                          disabled={isPending || noDenier}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Divide denier by Spandex Draft</FormLabel>
+                        <FormDescription>
+                          Turn on for spandex groups only. Off: Denier is used as-is (bought-out
+                          POY/FDY).
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )
+                }}
               />
 
               {/* Oil group toggle — global (not per period); settable at create. */}

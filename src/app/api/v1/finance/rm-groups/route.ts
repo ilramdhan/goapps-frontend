@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       marketingFlag: item.marketingFlag ?? 0,
       isOilGroup: item.isOilGroup ?? false,
       denier: item.denier ?? 0,
+      denierUseDraft: item.denierUseDraft ?? false,
       audit: item.audit
         ? {
             createdAt: item.audit.createdAt || "",
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
           marketingFlag: head.marketingFlag ?? 0,
           isOilGroup: head.isOilGroup ?? false,
           denier: head.denier ?? 0,
+          denierUseDraft: head.denierUseDraft ?? false,
         }
       : undefined
 
