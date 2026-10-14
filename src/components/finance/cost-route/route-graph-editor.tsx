@@ -85,6 +85,12 @@ import {
   type RmRefType,
   type RouteGraph,
 } from "@/types/finance/cost-route"
+import {
+  DENIER_RATIO_DISABLED_HINT,
+  denierFormula,
+  displayRatio,
+  isDenierLine,
+} from "@/components/finance/cost-route/rm-ratio-display"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -345,6 +351,30 @@ export function RouteGraphEditor({ headId }: Props) {
     isSavingRef.current = saveM.isPending
   }, [saveM.isPending])
 
+  // Persist `toSave` and, once the server confirms it, drop the local working
+  // copy (+ dirty flag) when nothing changed while the save was in flight.
+  // Without this the editor kept rendering the stale pre-save `working` graph
+  // forever (rmId/seqId 0 for new rows, stale effectiveRatio on edge labels,
+  // "Save draft" never going away), so a successful save looked like a no-op.
+  const saveGraph = useCallback(
+    (toSave: RouteGraph, opts?: { onSaved?: () => void }) => {
+      saveM.mutate(
+        { headId, graph: toSave },
+        {
+          onSuccess: () => {
+            if (workingRef.current === toSave) {
+              workingRef.current = null
+              setWorking(null)
+              setDirty(false)
+            }
+            opts?.onSaved?.()
+          },
+        },
+      )
+    },
+    [headId, saveM],
+  )
+
   const positionAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const triggerPositionAutosave = useCallback(() => {
@@ -357,8 +387,8 @@ export function RouteGraphEditor({ headId }: Props) {
       // deferred to the next change instead of racing the in-flight save.
       return
     }
-    saveM.mutate({ headId, graph: current })
-  }, [locked, headId, saveM])
+    saveGraph(current)
+  }, [locked, saveGraph])
 
   // Debounced trigger for drag-stop — coalesces rapid multi-node drags into a
   // single save ~700ms after the last position change.
@@ -631,12 +661,21 @@ export function RouteGraphEditor({ headId }: Props) {
             </Button>
           )}
           {dirty && !locked && (
-            <Button onClick={() => saveM.mutate({ headId, graph: graph! })} disabled={saveM.isPending}>
+            <Button onClick={() => graph && saveGraph(graph)} disabled={saveM.isPending}>
               <Save className="mr-1 h-4 w-4" /> {saveM.isPending ? "Saving…" : "Save draft"}
             </Button>
           )}
           {head?.routingStatus === "DRAFT" && (
-            <Button onClick={() => completeM.mutate({ headId })} variant="outline">
+            <Button
+              onClick={() => {
+                // Unsaved edits would otherwise be silently left behind when
+                // the route is completed — persist them first.
+                if (dirty && working) saveGraph(working, { onSaved: () => completeM.mutate({ headId }) })
+                else completeM.mutate({ headId })
+              }}
+              disabled={saveM.isPending || completeM.isPending}
+              variant="outline"
+            >
               <CheckCircle2 className="mr-1 h-4 w-4" /> Mark complete
             </Button>
           )}
@@ -812,7 +851,15 @@ export function RouteGraphEditor({ headId }: Props) {
                                   ? rm.rmProductName || rm.rmProductCode || rm.routeRmName || "—"
                                   : rm.routeRmName || rm.rmItemCode || rm.rmGroupCode || "—"}
                               </div>
-                              <div className="text-[10px] text-muted-foreground">×{rm.routeRmRatio}</div>
+                              <div
+                                className="text-[10px] text-muted-foreground"
+                                title={isDenierLine(rm) ? `${denierFormula(s, rm)} — ${DENIER_RATIO_DISABLED_HINT}` : undefined}
+                              >
+                                ×{displayRatio(rm)}
+                                {isDenierLine(rm) && (
+                                  <span className="ml-1 rounded border px-1 font-medium">Denier</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           {!locked && (

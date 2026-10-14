@@ -62,7 +62,7 @@ export function RmTab({ rows }: { rows: CostRmDetail[] }) {
               </TableCell>
               {showDenier && (
                 <TableCell className="text-right font-mono text-sm tabular-nums">
-                  {r.ratioSource ? r.denier : "—"}
+                  {r.ratioSource ? formatNumeric(r.denier) : "—"}
                 </TableCell>
               )}
               {showDenier && (

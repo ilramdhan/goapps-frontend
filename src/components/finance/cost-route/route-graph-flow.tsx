@@ -46,6 +46,7 @@ import { LayoutGrid, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { CostRouteRm, CostRouteSeq, RouteGraph } from "@/types/finance/cost-route"
+import { displayRatio, isDenierLine } from "@/components/finance/cost-route/rm-ratio-display"
 import {
   STAGE_W,
   STAGE_H,
@@ -320,7 +321,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
           id: `e-${rm.rmType.toLowerCase()}-${rm.uid}`,
           source: rmId,
           target: id,
-          label: `×${rm.effectiveRatio ?? rm.routeRmRatio}`,
+          label: edgeRatioLabel(rm),
           labelStyle: { fontSize: 10 },
           animated: false,
           data: { rmUid: rm.uid, rmType: rm.rmType } satisfies EdgeData,
@@ -337,7 +338,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
           id: `e-product-${rm.uid}`,
           source: upstreamId,
           target: id,
-          label: `×${rm.effectiveRatio ?? rm.routeRmRatio}`,
+          label: edgeRatioLabel(rm),
           labelStyle: { fontSize: 10, fontWeight: 600 },
           animated: true,
           style: { stroke: "#10b981", strokeWidth: 1.5 },
@@ -348,6 +349,12 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
   }
 
   return { nodes, edges }
+}
+
+// Edge label: the ratio the calc engine uses. Denier-derived lines get a
+// trailing "D" marker so users know the value is computed, not entered.
+export function edgeRatioLabel(rm: CostRouteRm): string {
+  return `×${displayRatio(rm)}${isDenierLine(rm) ? " D" : ""}`
 }
 
 function rmLabel(rm: CostRouteRm): string {
