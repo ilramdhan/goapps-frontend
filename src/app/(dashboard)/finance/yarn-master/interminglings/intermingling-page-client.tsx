@@ -31,6 +31,7 @@ import {
   useInterminglings,
   useExportInterminglings,
 } from "@/hooks/finance/use-intermingling"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import type { Intermingling, ListInterminglingsParams } from "@/types/finance/intermingling"
 import { ActiveFilter } from "@/types/finance/intermingling"
@@ -52,6 +53,7 @@ function InterminglingPageContent() {
   const { data, isLoading } = useInterminglings(filters)
   const exportMutation = useExportInterminglings()
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("INTERMINGLING")
   const [selectedItem, setSelectedItem] = useState<Intermingling | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -116,6 +118,8 @@ function InterminglingPageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">Intermingling List</CardTitle>
@@ -148,6 +152,9 @@ function InterminglingPageContent() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         intermingling={selectedItem}
+        onSuccess={() => {
+          if (selectedItem) onLookupSaved(selectedItem.intmCode)
+        }}
       />
 
       <InterminglingDeleteDialog

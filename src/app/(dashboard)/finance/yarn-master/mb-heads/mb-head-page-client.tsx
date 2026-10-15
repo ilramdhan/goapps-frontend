@@ -28,6 +28,7 @@ import {
 } from "@/components/finance/mb-head"
 
 import { useMBHeads, useExportMBHeads } from "@/hooks/finance/use-mb-head"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import type { MBHead, ListMBHeadsParams } from "@/types/finance/mb-head"
 import { ActiveFilter } from "@/types/finance/mb-head"
@@ -49,6 +50,7 @@ function MBHeadPageContent() {
   const { data, isLoading } = useMBHeads(filters)
   const exportMutation = useExportMBHeads()
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("MB_HEAD")
   const [selectedItem, setSelectedItem] = useState<MBHead | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -127,6 +129,8 @@ function MBHeadPageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">MB Head List</CardTitle>
@@ -159,6 +163,9 @@ function MBHeadPageContent() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mbHead={selectedItem}
+        onSuccess={() => {
+          if (selectedItem) onLookupSaved(selectedItem.mbhMbCosting)
+        }}
       />
 
       <MBHeadDeleteDialog

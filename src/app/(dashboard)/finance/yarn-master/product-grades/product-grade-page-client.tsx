@@ -31,6 +31,7 @@ import {
   useProductGrades,
   useExportProductGrades,
 } from "@/hooks/finance/use-product-grade"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import type { ProductGrade, ListProductGradesParams } from "@/types/finance/product-grade"
 import { ActiveFilter } from "@/types/finance/product-grade"
@@ -49,6 +50,7 @@ function ProductGradePageContent() {
   const { data, isLoading } = useProductGrades(filters)
   const exportMutation = useExportProductGrades()
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("PRODUCT_GRADE")
   const [selectedItem, setSelectedItem] = useState<ProductGrade | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -112,6 +114,8 @@ function ProductGradePageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">Product Grades</CardTitle>
@@ -144,6 +148,9 @@ function ProductGradePageContent() {
         open={formOpen}
         onOpenChange={setFormOpen}
         productGrade={selectedItem}
+        onSuccess={() => {
+          if (selectedItem) onLookupSaved(selectedItem.pgCode)
+        }}
       />
 
       <ProductGradeDeleteDialog

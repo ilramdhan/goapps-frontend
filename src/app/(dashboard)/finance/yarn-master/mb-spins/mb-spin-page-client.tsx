@@ -29,6 +29,7 @@ import {
 } from "@/components/finance/mb-spin"
 
 import { useMBSpins, useExportMBSpins } from "@/hooks/finance/use-mb-spin"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import type { MBSpin, ListMBSpinsParams } from "@/types/finance/mb-spin"
 import { ActiveFilter } from "@/types/finance/mb-spin"
@@ -47,6 +48,7 @@ function MBSpinPageContent() {
   const { data, isLoading } = useMBSpins(filters)
   const exportMutation = useExportMBSpins()
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("MB_SPIN")
   const [selectedItem, setSelectedItem] = useState<MBSpin | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -116,6 +118,8 @@ function MBSpinPageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">MB Spin List</CardTitle>
@@ -147,6 +151,9 @@ function MBSpinPageContent() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mbSpin={selectedItem}
+        onSuccess={() => {
+          if (selectedItem) onLookupSaved(selectedItem.mbsId)
+        }}
       />
       <MBSpinDeleteDialog
         open={deleteDialogOpen}
