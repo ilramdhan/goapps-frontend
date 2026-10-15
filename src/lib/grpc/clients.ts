@@ -79,6 +79,7 @@ import { CostAuditLogServiceDefinition } from "@/types/generated/finance/v1/cost
 import { CostNotificationServiceDefinition } from "@/types/generated/finance/v1/cost_notification"
 import { CostProductParameterServiceDefinition } from "@/types/generated/finance/v1/cost_product_parameter"
 import { CostProductParamBulkServiceDefinition } from "@/types/generated/finance/v1/cost_product_param_bulk"
+import { CostProductLookupSyncServiceDefinition } from "@/types/generated/finance/v1/cost_product_lookup_sync"
 import { CostCalcServiceDefinition } from "@/types/generated/finance/v1/cost_calc"
 import {
   CostLevelAssignmentConfigServiceDefinition,
@@ -465,6 +466,14 @@ export function getCostProductParameterClient() {
 export function getCostProductParamBulkClient() {
   return getOrCreate("costProductParamBulk", () =>
     createServiceClient(CostProductParamBulkServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
+  )
+}
+
+// CostProductLookupSyncService — re-sync product params derived from master
+// lookups (usage count, preview plan, apply job, job status/failures).
+export function getCostProductLookupSyncClient() {
+  return getOrCreate("costProductLookupSync", () =>
+    createServiceClient(CostProductLookupSyncServiceDefinition, SERVICE_ADDRESSES.finance, insecure, CHANNEL_OPTIONS)
   )
 }
 

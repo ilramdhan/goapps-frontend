@@ -56,6 +56,7 @@ export {
   getCostNotificationClient,
   getCostProductParameterClient,
   getCostProductParamBulkClient,
+  getCostProductLookupSyncClient,
   getCostCalcClient,
   getWorkflowTemplateClient,
   getWorkflowInstanceClient,
