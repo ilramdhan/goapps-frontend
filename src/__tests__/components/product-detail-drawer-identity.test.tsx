@@ -13,6 +13,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@/__tests__/utils"
 
 const mockUseCostProductMaster = vi.fn()
+vi.mock("@/providers/permission-provider", () => ({
+  usePermissionContext: () => ({ hasPermission: () => true }),
+}))
+vi.mock("@/components/finance/lookup-sync", () => ({ LookupSyncPreviewDialog: () => null }))
+
 vi.mock("@/hooks/finance/use-cost-product-master", () => ({
   useCostProductMaster: (...args: unknown[]) => mockUseCostProductMaster(...args),
 }))

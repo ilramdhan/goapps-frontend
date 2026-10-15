@@ -16,6 +16,8 @@ import { ProductTypeName } from "@/components/common/product-type-name"
 import { StatusBadge } from "@/components/common/status-badge"
 import { UserName } from "@/components/common/user-name"
 import { formatDate, formatNumeric } from "@/components/finance/cost-results/format"
+import { productIdsScope } from "@/components/finance/lookup-sync/scope"
+import { SyncFromMasterButton } from "./sync-from-master-button"
 import { useCostProductMaster } from "@/hooks/finance/use-cost-product-master"
 import { useCostHistory } from "@/hooks/finance/use-cost-calc"
 import { useProductRequiredParams } from "@/hooks/finance/use-cost-product-parameter"
@@ -345,7 +347,14 @@ export function ProductDetailDrawer({ productSysId, open, onOpenChange }: Props)
         </div>
 
         {/* Sticky footer */}
-        <div className="flex shrink-0 items-center justify-end border-t bg-background px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-background px-6 py-4">
+          {id && (
+            <SyncFromMasterButton
+              scope={productIdsScope([id])}
+              title={`Sync dari master — ${product?.productCode ?? ""}`}
+              disabledReason={product?.isLocked ? "Product is locked; sync skips locked products." : undefined}
+            />
+          )}
           <Button asChild>
             <Link href={detailHref}>
               Open full detail <ArrowUpRight className="ml-1 h-4 w-4" />
