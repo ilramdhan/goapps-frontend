@@ -101,7 +101,7 @@ export function LookupSyncPreviewDialog({ open, onOpenChange, scope, title }: Lo
               checked={onlyActionable}
               onCheckedChange={(v) => { setOnlyActionable(v); setPage(1) }}
             />
-            <Label htmlFor="lookup-sync-only-actionable">Hanya yang berubah / dilewati</Label>
+            <Label htmlFor="lookup-sync-only-actionable">Hanya yang berubah / dilewati (sembunyikan yang sudah sesuai)</Label>
           </div>
 
           <div className="max-h-[50vh] overflow-auto rounded-md border">
@@ -123,7 +123,14 @@ export function LookupSyncPreviewDialog({ open, onOpenChange, scope, title }: Lo
                     </TableCell>
                   </TableRow>
                 )}
-                {!preview.isLoading && items.length === 0 && (
+                {preview.isError && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-destructive" data-testid="lookup-sync-preview-error">
+                      Gagal memuat preview: {preview.error instanceof Error ? preview.error.message : "terjadi kesalahan"}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!preview.isLoading && !preview.isError && items.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       Tidak ada data.

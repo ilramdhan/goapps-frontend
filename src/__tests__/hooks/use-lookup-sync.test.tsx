@@ -80,4 +80,17 @@ describe("LookupUsageBanner", () => {
     expect(screen.getByText(/Dipakai 4 product/)).toBeTruthy()
     expect(screen.getByRole("button", { name: /Lihat & Terapkan/ })).toBeTruthy()
   })
+  it("shows ambiguous MB Spin skips even with no changes", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      json: async () => ({
+        base: { isSuccess: true },
+        data: { totalProducts: 2, totalValueChanges: 0, lockedProducts: 0, skipCounts: { MB_SPIN_AMBIGUOUS: 2, KEY_EMPTY: 5 } },
+      }),
+    }) as never
+    renderWith(<LookupUsageBanner lookupMasterCode="MB_SPIN" masterKey="S1" />)
+    expect(await screen.findByTestId("lookup-usage-banner")).toBeTruthy()
+    expect(screen.getByText(/2 dilewati: MB Spin ambigu/)).toBeTruthy()
+    expect(screen.queryByText(/KEY_EMPTY/)).toBeNull()
+    expect(screen.getByRole("button", { name: /Lihat detail/ })).toBeTruthy()
+  })
 })
