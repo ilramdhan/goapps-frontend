@@ -11,6 +11,8 @@ import { ListChecks } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { productIdsScope } from "@/components/finance/lookup-sync/scope"
+import { SyncFromMasterButton } from "./sync-from-master-button"
 import { usePermissionContext } from "@/providers/permission-provider"
 
 // BulkEditProductParams is guarded by finance.product.route.create in
@@ -19,11 +21,13 @@ const BULK_EDIT_PARAMS_PERMISSION = "finance.product.route.create"
 
 interface Props {
   selectedCount: number
+  /** Selected product ids — enables "Sync dari master" for the selection. */
+  selectedIds?: number[]
   /** Invoked when the user clicks "Bulk Edit Params" — parent opens the operation-builder dialog. */
   onOpen: () => void
 }
 
-export function BulkEditParamsToolbar({ selectedCount, onOpen }: Props) {
+export function BulkEditParamsToolbar({ selectedCount, selectedIds, onOpen }: Props) {
   const { hasPermission } = usePermissionContext()
 
   if (selectedCount === 0) return null
@@ -36,6 +40,14 @@ export function BulkEditParamsToolbar({ selectedCount, onOpen }: Props) {
         {selectedCount} selected
       </span>
 
+      <div className="flex flex-wrap items-center gap-2">
+      {selectedIds && selectedIds.length > 0 && (
+        <SyncFromMasterButton
+          scope={productIdsScope(selectedIds)}
+          title="Sync dari master (produk terpilih)"
+          label="Sync dari master"
+        />
+      )}
       {canBulkEdit ? (
         <Button size="sm" variant="outline" onClick={onOpen}>
           <ListChecks className="mr-2 h-4 w-4" />
@@ -58,6 +70,7 @@ export function BulkEditParamsToolbar({ selectedCount, onOpen }: Props) {
           </TooltipContent>
         </Tooltip>
       )}
+      </div>
     </div>
   )
 }

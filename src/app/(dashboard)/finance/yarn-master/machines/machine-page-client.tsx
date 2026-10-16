@@ -28,6 +28,7 @@ import {
 } from "@/components/finance/machine"
 
 import { useMachines, useExportMachines } from "@/hooks/finance/use-machine"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import {
   type Machine,
@@ -49,6 +50,7 @@ function MachinePageContent() {
     defaultValues: defaultFilters,
   })
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("MACHINE")
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
@@ -128,6 +130,8 @@ function MachinePageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">Machine List</CardTitle>
@@ -168,6 +172,9 @@ function MachinePageContent() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         machine={selectedMachine}
+        onSuccess={() => {
+          if (selectedMachine) onLookupSaved(selectedMachine.machineCode)
+        }}
       />
 
       <MachineDeleteDialog

@@ -28,6 +28,7 @@ import {
 } from "@/components/finance/box-bobbin-cost"
 
 import { useBoxBobbinCosts, useExportBoxBobbinCosts } from "@/hooks/finance/use-box-bobbin-cost"
+import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
 import { ActiveFilter } from "@/types/finance/box-bobbin-cost"
 import type { BoxBobbinCost, ListBoxBobbinCostsParams } from "@/types/finance/box-bobbin-cost"
@@ -44,6 +45,7 @@ function BoxBobbinCostPageContent() {
   const { data, isLoading } = useBoxBobbinCosts(filters)
   const exportMutation = useExportBoxBobbinCosts()
 
+  const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("BOX_BOBBIN_COST")
   const [selectedItem, setSelectedItem] = useState<BoxBobbinCost | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -107,6 +109,8 @@ function BoxBobbinCostPageContent() {
         </div>
       </PageHeader>
 
+      {lookupSyncNotice}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-semibold">Box/Bobbin Cost List</CardTitle>
@@ -139,6 +143,9 @@ function BoxBobbinCostPageContent() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         boxBobbinCost={selectedItem}
+        onSuccess={() => {
+          if (selectedItem) onLookupSaved(selectedItem.bbcCode)
+        }}
       />
 
       <BoxBobbinCostDeleteDialog

@@ -28,12 +28,14 @@ import {
   ProductDetailDrawer,
   ProductMasterFormDialog,
   ProductMasterTable,
+  SyncFromMasterButton,
   useProductMasterTableColumns,
 } from "@/components/finance/cost-product-master"
 import { BulkImportDialog } from "@/components/finance/costing/bulk-import-dialog"
 import { ImportDialog } from "@/components/finance/costing/import-dialog"
 import { ProductTypeMultiCombobox } from "@/components/finance/comboboxes"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
+import { filterToSyncScope } from "@/components/finance/lookup-sync/scope"
 import { useCostProductMasterCounts, useCostProductMasters, costProductMasterKeys } from "@/hooks/finance/use-cost-product-master"
 import { useExportData } from "@/hooks/finance/use-cost-import"
 import { useUrlState } from "@/lib/hooks"
@@ -275,6 +277,12 @@ export default function ProductMasterPageClient() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <SyncFromMasterButton
+          scope={filterToSyncScope(filters)}
+          title="Sync dari master (semua produk terfilter)"
+          label="Sync dari master (filter)"
+        />
+
         <Button onClick={openCreate} aria-label="New product">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">New product</span>
@@ -340,7 +348,7 @@ export default function ProductMasterPageClient() {
         </div>
       ) : null}
 
-      <BulkEditParamsToolbar selectedCount={selectedIds.size} onOpen={() => setBulkEditOpen(true)} />
+      <BulkEditParamsToolbar selectedCount={selectedIds.size} selectedIds={[...selectedIds]} onOpen={() => setBulkEditOpen(true)} />
 
       <ProductMasterTable
         items={items}
