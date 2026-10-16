@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getCostProductLookupSyncClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { LookupSyncScope } from "@/types/generated/finance/v1/cost_product_lookup_sync"
 
 // POST /api/v1/finance/lookup-sync/preview
 export async function POST(request: NextRequest) {
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
         const client = getCostProductLookupSyncClient()
         const response = await client.previewLookupSync(
             {
-                scope: body.scope,
+                scope: LookupSyncScope.fromPartial(body.scope ?? {}),
                 pagination: body.pagination ?? { page: 1, pageSize: 20 },
                 onlyActionable: body.onlyActionable ?? false,
             },
