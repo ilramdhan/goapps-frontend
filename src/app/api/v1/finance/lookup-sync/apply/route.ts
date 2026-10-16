@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getCostProductLookupSyncClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
+import { LookupSyncScope } from "@/types/generated/finance/v1/cost_product_lookup_sync"
 
 // POST /api/v1/finance/lookup-sync/apply
 export async function POST(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
         const metadata = createMetadataFromRequest(request)
         const client = getCostProductLookupSyncClient()
         const response = await client.applyLookupSync(
-            { scope: body.scope, planFingerprint: body.planFingerprint ?? "" },
+            { scope: LookupSyncScope.fromPartial(body.scope ?? {}), planFingerprint: body.planFingerprint ?? "" },
             metadata
         )
         return NextResponse.json({ base: response.base, data: response.data, summary: response.summary })
