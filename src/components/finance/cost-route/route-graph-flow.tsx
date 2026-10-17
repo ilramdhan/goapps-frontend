@@ -354,7 +354,7 @@ function buildFlow(graph: RouteGraph, onAddRm?: (seqIdx: number) => void): { nod
 // Edge label: the ratio the calc engine uses. Denier-derived lines get a
 // trailing "D" marker so users know the value is computed, not entered.
 export function edgeRatioLabel(rm: CostRouteRm): string {
-  return `×${displayRatio(rm)}${isDenierLine(rm) ? " D" : ""}`
+  return `×${displayRatio(rm)}${isDenierLine(rm) ? (rm.denierOverridden ? " D*" : " D") : ""}`
 }
 
 function rmLabel(rm: CostRouteRm): string {
