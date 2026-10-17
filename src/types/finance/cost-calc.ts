@@ -346,6 +346,8 @@ export interface CostRmDetail {
   // Only set for DENIER ratio-mode products (0 / "" otherwise).
   denier: number
   ratioSource: string
+  // Denier provenance: "" | "MASTER" | "OVERRIDE" (per-product RM denier override).
+  denierSource?: string
 }
 
 export interface FormulaEval {
@@ -512,6 +514,7 @@ export function normalizeCostRmDetail(raw: Record<string, unknown>): CostRmDetai
     routeLevel: fieldNum(raw, "routeLevel", "route_level"),
     denier: fieldNum(raw, "denier", "denier"),
     ratioSource: fieldStr(raw, "ratioSource", "ratio_source"),
+    denierSource: fieldStr(raw, "denierSource", "denier_source"),
   }
 }
 

@@ -21,7 +21,7 @@ function omitKeys(obj: RawObj, keys: readonly string[]): RawObj {
 }
 const RM_READONLY_KEYS = [
   "computedRatio", "computed_ratio", "ratioSource", "ratio_source",
-  "denier", "ratioNote", "ratio_note",
+  "denier", "ratioNote", "ratio_note", "denierOverridden", "denier_overridden",
 ] as const
 const MODE_READONLY_KEYS = ["rmRatioMode", "rm_ratio_mode"] as const
 
