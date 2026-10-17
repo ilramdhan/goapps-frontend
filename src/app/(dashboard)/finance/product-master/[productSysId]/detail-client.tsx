@@ -20,6 +20,7 @@ import { CalculateButton } from "@/components/finance/calc-jobs/calculate-button
 import { ProductParametersTab } from "@/components/finance/cost-product-master/parameters-tab"
 import { ProductRoutingTab } from "@/components/finance/cost-product-master/routing-tab"
 import { ProductAuditTab } from "@/components/finance/cost-product-master/audit-tab"
+import { RmDenierOverrideTab } from "@/components/finance/cost-product-master/rm-denier-override-tab"
 import { CostHistoryTab } from "@/components/finance/cost-results/cost-history-tab"
 import { ProductTypeName } from "@/components/common/product-type-name"
 import { ProductMasterFormDialog } from "@/components/finance/cost-product-master/product-master-form-dialog"
@@ -28,11 +29,18 @@ import { MbRecipeLinkCard } from "@/components/finance/cost-product-master/mb-re
 import { exportBulkProductRouting } from "@/services/finance/cost-import-api"
 import type { CostProductMaster } from "@/types/finance/cost-product-master"
 
+const TAB_VALUES = ["parameters", "denier-rm", "routing", "cost-history", "audit"] as const
+
 interface Props {
   productSysId: number
+  /** Deep-link tab (`?tab=`); unknown values fall back to Parameters. */
+  initialTab?: string
+  /** Deep-link RM row for the Denier RM tab (`?rm=PRODUCT:<id>|GROUP:<code>`). */
+  highlightRm?: string
 }
 
-export default function ProductMasterDetailClient({ productSysId }: Props) {
+export default function ProductMasterDetailClient({ productSysId, initialTab, highlightRm }: Props) {
+  const defaultTab = (TAB_VALUES as readonly string[]).includes(initialTab ?? "") ? (initialTab as string) : "parameters"
   const { data: product, isLoading } = useCostProductMaster(productSysId)
   const router = useRouter()
   const [exporting, setExporting] = useState(false)
@@ -196,7 +204,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
           for the honest handling of the "recipe not yet validated" ambiguous case. */}
       {product && <MbRecipeLinkCard productSysId={product.productSysId} source={product.source} />}
 
-      <Tabs defaultValue="parameters">
+      <Tabs defaultValue={defaultTab}>
         {/* Sticky under the page header (z-20): tabs + Parameters toolbar stay visible.
             Opaque bg + z-10 keeps it above content but below header/dialogs/popovers. */}
         <div
@@ -205,6 +213,7 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         >
           <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="parameters">Parameters</TabsTrigger>
+            <TabsTrigger value="denier-rm">Denier RM</TabsTrigger>
             <TabsTrigger value="routing">Routing</TabsTrigger>
             <TabsTrigger value="cost-history">Cost history</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
@@ -213,6 +222,9 @@ export default function ProductMasterDetailClient({ productSysId }: Props) {
         </div>
         <TabsContent value="parameters" className="mt-4">
           <ProductParametersTab productSysId={productSysId} isLocked={!!product?.isLocked} toolbarSlot={toolbarSlot} />
+        </TabsContent>
+        <TabsContent value="denier-rm" className="mt-4">
+          <RmDenierOverrideTab productSysId={productSysId} highlightRm={highlightRm} />
         </TabsContent>
         <TabsContent value="routing" className="mt-4">
           <ProductRoutingTab productSysId={productSysId} />
