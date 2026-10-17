@@ -753,6 +753,8 @@ export interface CostRMDetail {
   denier: number;
   /** Source of the ratio (e.g. DENIER, SPANDEX_DRAFT). Only set for DENIER ratio-mode products. */
   ratioSource: string;
+  /** Denier provenance: "" | MASTER | OVERRIDE. Only set for DENIER ratio-mode lines. */
+  denierSource: string;
 }
 
 /** FormulaEval traces one formula evaluation step. */
@@ -3938,6 +3940,7 @@ function createBaseCostRMDetail(): CostRMDetail {
     routeLevel: 0,
     denier: 0,
     ratioSource: "",
+    denierSource: "",
   };
 }
 
@@ -3972,6 +3975,9 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     }
     if (message.ratioSource !== "") {
       writer.uint32(82).string(message.ratioSource);
+    }
+    if (message.denierSource !== "") {
+      writer.uint32(90).string(message.denierSource);
     }
     return writer;
   },
@@ -4063,6 +4069,14 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
           message.ratioSource = reader.string();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.denierSource = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4112,6 +4126,11 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
         : isSet(object.ratio_source)
         ? globalThis.String(object.ratio_source)
         : "",
+      denierSource: isSet(object.denierSource)
+        ? globalThis.String(object.denierSource)
+        : isSet(object.denier_source)
+        ? globalThis.String(object.denier_source)
+        : "",
     };
   },
 
@@ -4147,6 +4166,9 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     if (message.ratioSource !== "") {
       obj.ratioSource = message.ratioSource;
     }
+    if (message.denierSource !== "") {
+      obj.denierSource = message.denierSource;
+    }
     return obj;
   },
 
@@ -4165,6 +4187,7 @@ export const CostRMDetail: MessageFns<CostRMDetail> = {
     message.routeLevel = object.routeLevel ?? 0;
     message.denier = object.denier ?? 0;
     message.ratioSource = object.ratioSource ?? "";
+    message.denierSource = object.denierSource ?? "";
     return message;
   },
 };
