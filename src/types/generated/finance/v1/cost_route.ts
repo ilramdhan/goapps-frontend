@@ -179,6 +179,8 @@ export interface CostRouteRm {
   denier: number;
   /** Explanatory note, e.g. missing denier treated as 0. */
   ratioNote: string;
+  /** True when the denier used for this line comes from a per-product override. */
+  denierOverridden: boolean;
 }
 
 /** RouteGraph bundles the head + all seqs (with rms inline). */
@@ -1173,6 +1175,7 @@ function createBaseCostRouteRm(): CostRouteRm {
     ratioSource: "",
     denier: 0,
     ratioNote: "",
+    denierOverridden: false,
   };
 }
 
@@ -1264,6 +1267,9 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     }
     if (message.ratioNote !== "") {
       writer.uint32(234).string(message.ratioNote);
+    }
+    if (message.denierOverridden !== false) {
+      writer.uint32(240).bool(message.denierOverridden);
     }
     return writer;
   },
@@ -1507,6 +1513,14 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
           message.ratioNote = reader.string();
           continue;
         }
+        case 30: {
+          if (tag !== 240) {
+            break;
+          }
+
+          message.denierOverridden = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1655,6 +1669,11 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
         : isSet(object.ratio_note)
         ? globalThis.String(object.ratio_note)
         : "",
+      denierOverridden: isSet(object.denierOverridden)
+        ? globalThis.Boolean(object.denierOverridden)
+        : isSet(object.denier_overridden)
+        ? globalThis.Boolean(object.denier_overridden)
+        : false,
     };
   },
 
@@ -1747,6 +1766,9 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     if (message.ratioNote !== "") {
       obj.ratioNote = message.ratioNote;
     }
+    if (message.denierOverridden !== false) {
+      obj.denierOverridden = message.denierOverridden;
+    }
     return obj;
   },
 
@@ -1784,6 +1806,7 @@ export const CostRouteRm: MessageFns<CostRouteRm> = {
     message.ratioSource = object.ratioSource ?? "";
     message.denier = object.denier ?? 0;
     message.ratioNote = object.ratioNote ?? "";
+    message.denierOverridden = object.denierOverridden ?? false;
     return message;
   },
 };

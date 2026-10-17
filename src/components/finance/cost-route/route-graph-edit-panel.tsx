@@ -5,6 +5,7 @@
 // the previous "click jumps to Cards view" + window.prompt() flows.
 
 import { useState, type ComponentProps } from "react"
+import Link from "next/link"
 import { Plus, Trash2, X } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +21,7 @@ import {
   isDenierLine,
 } from "@/components/finance/cost-route/rm-ratio-display"
 import type { CostRouteRm, CostRouteSeq } from "@/types/finance/cost-route"
+import { routeRmKeyOf } from "@/types/finance/rm-denier-override"
 
 interface SeqPanelProps {
   mode: "seq"
@@ -187,6 +189,7 @@ function SeqBody({
 
 function RmBody({ seq, rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
   const denier = isDenierLine(rm)
+  const overrideKey = routeRmKeyOf(rm)
   return (
     <>
       {denier && (
@@ -196,6 +199,27 @@ function RmBody({ seq, rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
           </Label>
           <DenierRatioBadge seq={seq} rm={rm} />
           <p className="text-xs text-muted-foreground">{denierFormula(seq, rm)}</p>
+          {rm.denierOverridden && (
+            <Badge
+              variant="outline"
+              className="text-[10px]"
+              data-testid="denier-override-badge"
+              title="Denier di-override khusus product ini"
+            >
+              OVERRIDE
+            </Badge>
+          )}
+        </div>
+      )}
+      {overrideKey && seq.productSysId > 0 && (
+        <div>
+          <Link
+            href={`/finance/product-master/${seq.productSysId}?tab=denier-rm&rm=${encodeURIComponent(overrideKey)}`}
+            className="text-xs text-primary underline"
+            data-testid="denier-override-link"
+          >
+            Override denier untuk product ini
+          </Link>
         </div>
       )}
       <div>

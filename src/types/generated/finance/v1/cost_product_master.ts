@@ -216,6 +216,72 @@ export interface DuplicateProductResponse {
   newProductCode: string;
 }
 
+/** RMDenierOverride is a per-product denier override for one RM (product or group). */
+export interface RMDenierOverride {
+  id: number;
+  productSysId: number;
+  /** PRODUCT | GROUP. */
+  rmType: string;
+  rmProductSysId: number;
+  rmProductCode: string;
+  rmProductName: string;
+  rmGroupCode: string;
+  rmGroupName: string;
+  denier: number;
+  reason: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** DuplicateProductRef identifies a product sharing the same duplicate family. */
+export interface DuplicateProductRef {
+  productSysId: number;
+  productCode: string;
+  productName: string;
+}
+
+export interface ListRMDenierOverridesRequest {
+  productSysId: number;
+}
+
+export interface ListRMDenierOverridesResponse {
+  base: BaseResponse | undefined;
+  data: RMDenierOverride[];
+  duplicateProducts: DuplicateProductRef[];
+}
+
+export interface UpsertRMDenierOverrideRequest {
+  productSysId: number;
+  rmType: string;
+  rmProductSysId: number;
+  rmGroupCode: string;
+  denier: number;
+  reason: string;
+  applyToDuplicates: boolean;
+}
+
+export interface UpsertRMDenierOverrideResponse {
+  base: BaseResponse | undefined;
+  data: RMDenierOverride | undefined;
+  appliedProductSysIds: number[];
+}
+
+export interface DeleteRMDenierOverrideRequest {
+  productSysId: number;
+  rmType: string;
+  rmProductSysId: number;
+  rmGroupCode: string;
+  applyToDuplicates: boolean;
+}
+
+export interface DeleteRMDenierOverrideResponse {
+  base: BaseResponse | undefined;
+  deletedCount: number;
+  appliedProductSysIds: number[];
+}
+
 function createBaseCostProductMaster(): CostProductMaster {
   return {
     productSysId: 0,
@@ -3550,6 +3616,1153 @@ export const DuplicateProductResponse: MessageFns<DuplicateProductResponse> = {
   },
 };
 
+function createBaseRMDenierOverride(): RMDenierOverride {
+  return {
+    id: 0,
+    productSysId: 0,
+    rmType: "",
+    rmProductSysId: 0,
+    rmProductCode: "",
+    rmProductName: "",
+    rmGroupCode: "",
+    rmGroupName: "",
+    denier: 0,
+    reason: "",
+    createdAt: "",
+    createdBy: "",
+    updatedAt: "",
+    updatedBy: "",
+  };
+}
+
+export const RMDenierOverride: MessageFns<RMDenierOverride> = {
+  encode(message: RMDenierOverride, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== 0) {
+      writer.uint32(8).int64(message.id);
+    }
+    if (message.productSysId !== 0) {
+      writer.uint32(16).int64(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      writer.uint32(26).string(message.rmType);
+    }
+    if (message.rmProductSysId !== 0) {
+      writer.uint32(32).int64(message.rmProductSysId);
+    }
+    if (message.rmProductCode !== "") {
+      writer.uint32(42).string(message.rmProductCode);
+    }
+    if (message.rmProductName !== "") {
+      writer.uint32(50).string(message.rmProductName);
+    }
+    if (message.rmGroupCode !== "") {
+      writer.uint32(58).string(message.rmGroupCode);
+    }
+    if (message.rmGroupName !== "") {
+      writer.uint32(66).string(message.rmGroupName);
+    }
+    if (message.denier !== 0) {
+      writer.uint32(73).double(message.denier);
+    }
+    if (message.reason !== "") {
+      writer.uint32(82).string(message.reason);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(90).string(message.createdAt);
+    }
+    if (message.createdBy !== "") {
+      writer.uint32(98).string(message.createdBy);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(106).string(message.updatedAt);
+    }
+    if (message.updatedBy !== "") {
+      writer.uint32(114).string(message.updatedBy);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RMDenierOverride {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRMDenierOverride();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.id = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rmType = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.rmProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.rmProductCode = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.rmProductName = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.rmGroupCode = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.rmGroupName = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 73) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.createdBy = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.updatedBy = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RMDenierOverride {
+    return {
+      id: isSet(object.id) ? globalThis.Number(object.id) : 0,
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      rmType: isSet(object.rmType)
+        ? globalThis.String(object.rmType)
+        : isSet(object.rm_type)
+        ? globalThis.String(object.rm_type)
+        : "",
+      rmProductSysId: isSet(object.rmProductSysId)
+        ? globalThis.Number(object.rmProductSysId)
+        : isSet(object.rm_product_sys_id)
+        ? globalThis.Number(object.rm_product_sys_id)
+        : 0,
+      rmProductCode: isSet(object.rmProductCode)
+        ? globalThis.String(object.rmProductCode)
+        : isSet(object.rm_product_code)
+        ? globalThis.String(object.rm_product_code)
+        : "",
+      rmProductName: isSet(object.rmProductName)
+        ? globalThis.String(object.rmProductName)
+        : isSet(object.rm_product_name)
+        ? globalThis.String(object.rm_product_name)
+        : "",
+      rmGroupCode: isSet(object.rmGroupCode)
+        ? globalThis.String(object.rmGroupCode)
+        : isSet(object.rm_group_code)
+        ? globalThis.String(object.rm_group_code)
+        : "",
+      rmGroupName: isSet(object.rmGroupName)
+        ? globalThis.String(object.rmGroupName)
+        : isSet(object.rm_group_name)
+        ? globalThis.String(object.rm_group_name)
+        : "",
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      createdAt: isSet(object.createdAt)
+        ? globalThis.String(object.createdAt)
+        : isSet(object.created_at)
+        ? globalThis.String(object.created_at)
+        : "",
+      createdBy: isSet(object.createdBy)
+        ? globalThis.String(object.createdBy)
+        : isSet(object.created_by)
+        ? globalThis.String(object.created_by)
+        : "",
+      updatedAt: isSet(object.updatedAt)
+        ? globalThis.String(object.updatedAt)
+        : isSet(object.updated_at)
+        ? globalThis.String(object.updated_at)
+        : "",
+      updatedBy: isSet(object.updatedBy)
+        ? globalThis.String(object.updatedBy)
+        : isSet(object.updated_by)
+        ? globalThis.String(object.updated_by)
+        : "",
+    };
+  },
+
+  toJSON(message: RMDenierOverride): unknown {
+    const obj: any = {};
+    if (message.id !== 0) {
+      obj.id = Math.round(message.id);
+    }
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      obj.rmType = message.rmType;
+    }
+    if (message.rmProductSysId !== 0) {
+      obj.rmProductSysId = Math.round(message.rmProductSysId);
+    }
+    if (message.rmProductCode !== "") {
+      obj.rmProductCode = message.rmProductCode;
+    }
+    if (message.rmProductName !== "") {
+      obj.rmProductName = message.rmProductName;
+    }
+    if (message.rmGroupCode !== "") {
+      obj.rmGroupCode = message.rmGroupCode;
+    }
+    if (message.rmGroupName !== "") {
+      obj.rmGroupName = message.rmGroupName;
+    }
+    if (message.denier !== 0) {
+      obj.denier = message.denier;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.createdAt !== "") {
+      obj.createdAt = message.createdAt;
+    }
+    if (message.createdBy !== "") {
+      obj.createdBy = message.createdBy;
+    }
+    if (message.updatedAt !== "") {
+      obj.updatedAt = message.updatedAt;
+    }
+    if (message.updatedBy !== "") {
+      obj.updatedBy = message.updatedBy;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RMDenierOverride>): RMDenierOverride {
+    return RMDenierOverride.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RMDenierOverride>): RMDenierOverride {
+    const message = createBaseRMDenierOverride();
+    message.id = object.id ?? 0;
+    message.productSysId = object.productSysId ?? 0;
+    message.rmType = object.rmType ?? "";
+    message.rmProductSysId = object.rmProductSysId ?? 0;
+    message.rmProductCode = object.rmProductCode ?? "";
+    message.rmProductName = object.rmProductName ?? "";
+    message.rmGroupCode = object.rmGroupCode ?? "";
+    message.rmGroupName = object.rmGroupName ?? "";
+    message.denier = object.denier ?? 0;
+    message.reason = object.reason ?? "";
+    message.createdAt = object.createdAt ?? "";
+    message.createdBy = object.createdBy ?? "";
+    message.updatedAt = object.updatedAt ?? "";
+    message.updatedBy = object.updatedBy ?? "";
+    return message;
+  },
+};
+
+function createBaseDuplicateProductRef(): DuplicateProductRef {
+  return { productSysId: 0, productCode: "", productName: "" };
+}
+
+export const DuplicateProductRef: MessageFns<DuplicateProductRef> = {
+  encode(message: DuplicateProductRef, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.productCode !== "") {
+      writer.uint32(18).string(message.productCode);
+    }
+    if (message.productName !== "") {
+      writer.uint32(26).string(message.productName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DuplicateProductRef {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDuplicateProductRef();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.productCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.productName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DuplicateProductRef {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      productCode: isSet(object.productCode)
+        ? globalThis.String(object.productCode)
+        : isSet(object.product_code)
+        ? globalThis.String(object.product_code)
+        : "",
+      productName: isSet(object.productName)
+        ? globalThis.String(object.productName)
+        : isSet(object.product_name)
+        ? globalThis.String(object.product_name)
+        : "",
+    };
+  },
+
+  toJSON(message: DuplicateProductRef): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.productCode !== "") {
+      obj.productCode = message.productCode;
+    }
+    if (message.productName !== "") {
+      obj.productName = message.productName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DuplicateProductRef>): DuplicateProductRef {
+    return DuplicateProductRef.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DuplicateProductRef>): DuplicateProductRef {
+    const message = createBaseDuplicateProductRef();
+    message.productSysId = object.productSysId ?? 0;
+    message.productCode = object.productCode ?? "";
+    message.productName = object.productName ?? "";
+    return message;
+  },
+};
+
+function createBaseListRMDenierOverridesRequest(): ListRMDenierOverridesRequest {
+  return { productSysId: 0 };
+}
+
+export const ListRMDenierOverridesRequest: MessageFns<ListRMDenierOverridesRequest> = {
+  encode(message: ListRMDenierOverridesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRMDenierOverridesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRMDenierOverridesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListRMDenierOverridesRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+    };
+  },
+
+  toJSON(message: ListRMDenierOverridesRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListRMDenierOverridesRequest>): ListRMDenierOverridesRequest {
+    return ListRMDenierOverridesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListRMDenierOverridesRequest>): ListRMDenierOverridesRequest {
+    const message = createBaseListRMDenierOverridesRequest();
+    message.productSysId = object.productSysId ?? 0;
+    return message;
+  },
+};
+
+function createBaseListRMDenierOverridesResponse(): ListRMDenierOverridesResponse {
+  return { base: undefined, data: [], duplicateProducts: [] };
+}
+
+export const ListRMDenierOverridesResponse: MessageFns<ListRMDenierOverridesResponse> = {
+  encode(message: ListRMDenierOverridesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      RMDenierOverride.encode(v!, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.duplicateProducts) {
+      DuplicateProductRef.encode(v!, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRMDenierOverridesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRMDenierOverridesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(RMDenierOverride.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.duplicateProducts.push(DuplicateProductRef.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListRMDenierOverridesResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => RMDenierOverride.fromJSON(e)) : [],
+      duplicateProducts: globalThis.Array.isArray(object?.duplicateProducts)
+        ? object.duplicateProducts.map((e: any) => DuplicateProductRef.fromJSON(e))
+        : globalThis.Array.isArray(object?.duplicate_products)
+        ? object.duplicate_products.map((e: any) => DuplicateProductRef.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListRMDenierOverridesResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => RMDenierOverride.toJSON(e));
+    }
+    if (message.duplicateProducts?.length) {
+      obj.duplicateProducts = message.duplicateProducts.map((e) => DuplicateProductRef.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListRMDenierOverridesResponse>): ListRMDenierOverridesResponse {
+    return ListRMDenierOverridesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListRMDenierOverridesResponse>): ListRMDenierOverridesResponse {
+    const message = createBaseListRMDenierOverridesResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => RMDenierOverride.fromPartial(e)) || [];
+    message.duplicateProducts = object.duplicateProducts?.map((e) => DuplicateProductRef.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseUpsertRMDenierOverrideRequest(): UpsertRMDenierOverrideRequest {
+  return {
+    productSysId: 0,
+    rmType: "",
+    rmProductSysId: 0,
+    rmGroupCode: "",
+    denier: 0,
+    reason: "",
+    applyToDuplicates: false,
+  };
+}
+
+export const UpsertRMDenierOverrideRequest: MessageFns<UpsertRMDenierOverrideRequest> = {
+  encode(message: UpsertRMDenierOverrideRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      writer.uint32(18).string(message.rmType);
+    }
+    if (message.rmProductSysId !== 0) {
+      writer.uint32(24).int64(message.rmProductSysId);
+    }
+    if (message.rmGroupCode !== "") {
+      writer.uint32(34).string(message.rmGroupCode);
+    }
+    if (message.denier !== 0) {
+      writer.uint32(41).double(message.denier);
+    }
+    if (message.reason !== "") {
+      writer.uint32(50).string(message.reason);
+    }
+    if (message.applyToDuplicates !== false) {
+      writer.uint32(56).bool(message.applyToDuplicates);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpsertRMDenierOverrideRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpsertRMDenierOverrideRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rmType = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.rmProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.rmGroupCode = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 41) {
+            break;
+          }
+
+          message.denier = reader.double();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.applyToDuplicates = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpsertRMDenierOverrideRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      rmType: isSet(object.rmType)
+        ? globalThis.String(object.rmType)
+        : isSet(object.rm_type)
+        ? globalThis.String(object.rm_type)
+        : "",
+      rmProductSysId: isSet(object.rmProductSysId)
+        ? globalThis.Number(object.rmProductSysId)
+        : isSet(object.rm_product_sys_id)
+        ? globalThis.Number(object.rm_product_sys_id)
+        : 0,
+      rmGroupCode: isSet(object.rmGroupCode)
+        ? globalThis.String(object.rmGroupCode)
+        : isSet(object.rm_group_code)
+        ? globalThis.String(object.rm_group_code)
+        : "",
+      denier: isSet(object.denier) ? globalThis.Number(object.denier) : 0,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      applyToDuplicates: isSet(object.applyToDuplicates)
+        ? globalThis.Boolean(object.applyToDuplicates)
+        : isSet(object.apply_to_duplicates)
+        ? globalThis.Boolean(object.apply_to_duplicates)
+        : false,
+    };
+  },
+
+  toJSON(message: UpsertRMDenierOverrideRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      obj.rmType = message.rmType;
+    }
+    if (message.rmProductSysId !== 0) {
+      obj.rmProductSysId = Math.round(message.rmProductSysId);
+    }
+    if (message.rmGroupCode !== "") {
+      obj.rmGroupCode = message.rmGroupCode;
+    }
+    if (message.denier !== 0) {
+      obj.denier = message.denier;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.applyToDuplicates !== false) {
+      obj.applyToDuplicates = message.applyToDuplicates;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpsertRMDenierOverrideRequest>): UpsertRMDenierOverrideRequest {
+    return UpsertRMDenierOverrideRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpsertRMDenierOverrideRequest>): UpsertRMDenierOverrideRequest {
+    const message = createBaseUpsertRMDenierOverrideRequest();
+    message.productSysId = object.productSysId ?? 0;
+    message.rmType = object.rmType ?? "";
+    message.rmProductSysId = object.rmProductSysId ?? 0;
+    message.rmGroupCode = object.rmGroupCode ?? "";
+    message.denier = object.denier ?? 0;
+    message.reason = object.reason ?? "";
+    message.applyToDuplicates = object.applyToDuplicates ?? false;
+    return message;
+  },
+};
+
+function createBaseUpsertRMDenierOverrideResponse(): UpsertRMDenierOverrideResponse {
+  return { base: undefined, data: undefined, appliedProductSysIds: [] };
+}
+
+export const UpsertRMDenierOverrideResponse: MessageFns<UpsertRMDenierOverrideResponse> = {
+  encode(message: UpsertRMDenierOverrideResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.data !== undefined) {
+      RMDenierOverride.encode(message.data, writer.uint32(18).fork()).join();
+    }
+    writer.uint32(26).fork();
+    for (const v of message.appliedProductSysIds) {
+      writer.int64(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpsertRMDenierOverrideResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpsertRMDenierOverrideResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data = RMDenierOverride.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag === 24) {
+            message.appliedProductSysIds.push(longToNumber(reader.int64()));
+
+            continue;
+          }
+
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.appliedProductSysIds.push(longToNumber(reader.int64()));
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpsertRMDenierOverrideResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: isSet(object.data) ? RMDenierOverride.fromJSON(object.data) : undefined,
+      appliedProductSysIds: globalThis.Array.isArray(object?.appliedProductSysIds)
+        ? object.appliedProductSysIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.applied_product_sys_ids)
+        ? object.applied_product_sys_ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: UpsertRMDenierOverrideResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data !== undefined) {
+      obj.data = RMDenierOverride.toJSON(message.data);
+    }
+    if (message.appliedProductSysIds?.length) {
+      obj.appliedProductSysIds = message.appliedProductSysIds.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpsertRMDenierOverrideResponse>): UpsertRMDenierOverrideResponse {
+    return UpsertRMDenierOverrideResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpsertRMDenierOverrideResponse>): UpsertRMDenierOverrideResponse {
+    const message = createBaseUpsertRMDenierOverrideResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = (object.data !== undefined && object.data !== null)
+      ? RMDenierOverride.fromPartial(object.data)
+      : undefined;
+    message.appliedProductSysIds = object.appliedProductSysIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseDeleteRMDenierOverrideRequest(): DeleteRMDenierOverrideRequest {
+  return { productSysId: 0, rmType: "", rmProductSysId: 0, rmGroupCode: "", applyToDuplicates: false };
+}
+
+export const DeleteRMDenierOverrideRequest: MessageFns<DeleteRMDenierOverrideRequest> = {
+  encode(message: DeleteRMDenierOverrideRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.productSysId !== 0) {
+      writer.uint32(8).int64(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      writer.uint32(18).string(message.rmType);
+    }
+    if (message.rmProductSysId !== 0) {
+      writer.uint32(24).int64(message.rmProductSysId);
+    }
+    if (message.rmGroupCode !== "") {
+      writer.uint32(34).string(message.rmGroupCode);
+    }
+    if (message.applyToDuplicates !== false) {
+      writer.uint32(40).bool(message.applyToDuplicates);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteRMDenierOverrideRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteRMDenierOverrideRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.productSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rmType = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.rmProductSysId = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.rmGroupCode = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.applyToDuplicates = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteRMDenierOverrideRequest {
+    return {
+      productSysId: isSet(object.productSysId)
+        ? globalThis.Number(object.productSysId)
+        : isSet(object.product_sys_id)
+        ? globalThis.Number(object.product_sys_id)
+        : 0,
+      rmType: isSet(object.rmType)
+        ? globalThis.String(object.rmType)
+        : isSet(object.rm_type)
+        ? globalThis.String(object.rm_type)
+        : "",
+      rmProductSysId: isSet(object.rmProductSysId)
+        ? globalThis.Number(object.rmProductSysId)
+        : isSet(object.rm_product_sys_id)
+        ? globalThis.Number(object.rm_product_sys_id)
+        : 0,
+      rmGroupCode: isSet(object.rmGroupCode)
+        ? globalThis.String(object.rmGroupCode)
+        : isSet(object.rm_group_code)
+        ? globalThis.String(object.rm_group_code)
+        : "",
+      applyToDuplicates: isSet(object.applyToDuplicates)
+        ? globalThis.Boolean(object.applyToDuplicates)
+        : isSet(object.apply_to_duplicates)
+        ? globalThis.Boolean(object.apply_to_duplicates)
+        : false,
+    };
+  },
+
+  toJSON(message: DeleteRMDenierOverrideRequest): unknown {
+    const obj: any = {};
+    if (message.productSysId !== 0) {
+      obj.productSysId = Math.round(message.productSysId);
+    }
+    if (message.rmType !== "") {
+      obj.rmType = message.rmType;
+    }
+    if (message.rmProductSysId !== 0) {
+      obj.rmProductSysId = Math.round(message.rmProductSysId);
+    }
+    if (message.rmGroupCode !== "") {
+      obj.rmGroupCode = message.rmGroupCode;
+    }
+    if (message.applyToDuplicates !== false) {
+      obj.applyToDuplicates = message.applyToDuplicates;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteRMDenierOverrideRequest>): DeleteRMDenierOverrideRequest {
+    return DeleteRMDenierOverrideRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteRMDenierOverrideRequest>): DeleteRMDenierOverrideRequest {
+    const message = createBaseDeleteRMDenierOverrideRequest();
+    message.productSysId = object.productSysId ?? 0;
+    message.rmType = object.rmType ?? "";
+    message.rmProductSysId = object.rmProductSysId ?? 0;
+    message.rmGroupCode = object.rmGroupCode ?? "";
+    message.applyToDuplicates = object.applyToDuplicates ?? false;
+    return message;
+  },
+};
+
+function createBaseDeleteRMDenierOverrideResponse(): DeleteRMDenierOverrideResponse {
+  return { base: undefined, deletedCount: 0, appliedProductSysIds: [] };
+}
+
+export const DeleteRMDenierOverrideResponse: MessageFns<DeleteRMDenierOverrideResponse> = {
+  encode(message: DeleteRMDenierOverrideResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.deletedCount !== 0) {
+      writer.uint32(16).int32(message.deletedCount);
+    }
+    writer.uint32(26).fork();
+    for (const v of message.appliedProductSysIds) {
+      writer.int64(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteRMDenierOverrideResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteRMDenierOverrideResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.deletedCount = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag === 24) {
+            message.appliedProductSysIds.push(longToNumber(reader.int64()));
+
+            continue;
+          }
+
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.appliedProductSysIds.push(longToNumber(reader.int64()));
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteRMDenierOverrideResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      deletedCount: isSet(object.deletedCount)
+        ? globalThis.Number(object.deletedCount)
+        : isSet(object.deleted_count)
+        ? globalThis.Number(object.deleted_count)
+        : 0,
+      appliedProductSysIds: globalThis.Array.isArray(object?.appliedProductSysIds)
+        ? object.appliedProductSysIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.applied_product_sys_ids)
+        ? object.applied_product_sys_ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: DeleteRMDenierOverrideResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.deletedCount !== 0) {
+      obj.deletedCount = Math.round(message.deletedCount);
+    }
+    if (message.appliedProductSysIds?.length) {
+      obj.appliedProductSysIds = message.appliedProductSysIds.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteRMDenierOverrideResponse>): DeleteRMDenierOverrideResponse {
+    return DeleteRMDenierOverrideResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteRMDenierOverrideResponse>): DeleteRMDenierOverrideResponse {
+    const message = createBaseDeleteRMDenierOverrideResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.deletedCount = object.deletedCount ?? 0;
+    message.appliedProductSysIds = object.appliedProductSysIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
 export type CostProductMasterServiceDefinition = typeof CostProductMasterServiceDefinition;
 export const CostProductMasterServiceDefinition = {
   name: "CostProductMasterService",
@@ -3648,6 +4861,30 @@ export const CostProductMasterServiceDefinition = {
       requestType: DuplicateProductRequest,
       requestStream: false,
       responseType: DuplicateProductResponse,
+      responseStream: false,
+      options: {},
+    },
+    listRMDenierOverrides: {
+      name: "ListRMDenierOverrides",
+      requestType: ListRMDenierOverridesRequest,
+      requestStream: false,
+      responseType: ListRMDenierOverridesResponse,
+      responseStream: false,
+      options: {},
+    },
+    upsertRMDenierOverride: {
+      name: "UpsertRMDenierOverride",
+      requestType: UpsertRMDenierOverrideRequest,
+      requestStream: false,
+      responseType: UpsertRMDenierOverrideResponse,
+      responseStream: false,
+      options: {},
+    },
+    deleteRMDenierOverride: {
+      name: "DeleteRMDenierOverride",
+      requestType: DeleteRMDenierOverrideRequest,
+      requestStream: false,
+      responseType: DeleteRMDenierOverrideResponse,
       responseStream: false,
       options: {},
     },

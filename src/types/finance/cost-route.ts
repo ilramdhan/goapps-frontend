@@ -74,6 +74,9 @@ export interface CostRouteRm {
   ratioSource?: RmRatioSource
   denier?: number
   ratioNote?: string
+  // True when `denier` comes from a per-product RM denier override (the seq
+  // product's override for this RM). Read-only; false on older backends.
+  denierOverridden?: boolean
 }
 
 export type RmRatioSource = "" | "DENIER" | "INPUT"
@@ -194,6 +197,7 @@ export function normalizeCostRouteRm(raw: Record<string, unknown>): CostRouteRm 
     ratioSource,
     denier: numOpt(raw.denier),
     ratioNote: str(raw.ratioNote ?? raw.ratio_note) || undefined,
+    denierOverridden: (raw.denierOverridden ?? raw.denier_overridden) === true,
   }
 }
 
