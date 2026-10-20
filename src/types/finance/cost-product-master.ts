@@ -1,4 +1,6 @@
 // Canonical Phase B — CostProductMaster (PRD §7.4.1, CPM_).
+export type RmRatioModeOverride = "" | "INPUT" | "DENIER"
+
 export interface CostProductMaster {
   productSysId: number
   productCode: string
@@ -19,6 +21,10 @@ export interface CostProductMaster {
   erpMsBatchItem?: string
   erpItemType?: string
   erpPrdPerDay?: string
+  /** Per-product override of the RM ratio mode; "" = follow product type. */
+  rmRatioModeOverride: RmRatioModeOverride
+  /** Effective mode (override else type default); "" when backend did not send it. */
+  effectiveRmRatioMode: string
   isActive: boolean
   source: string
   isLocked: boolean
@@ -70,6 +76,8 @@ export interface UpdateCostProductMasterPayload {
   erpMsBatchItem?: string
   erpItemType?: string
   erpPrdPerDay?: string
+  /** "" clears the override (follow product type). Omit to leave unchanged. */
+  rmRatioModeOverride?: RmRatioModeOverride
 }
 
 type Raw = Record<string, unknown> & {
@@ -83,6 +91,11 @@ type Raw = Record<string, unknown> & {
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0))
+
+function normalizeRmOverride(v: unknown): RmRatioModeOverride {
+  const s = str(v).toUpperCase()
+  return s === "INPUT" || s === "DENIER" ? s : ""
+}
 
 export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
   return {
@@ -105,6 +118,8 @@ export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
     erpMsBatchItem: str(raw.erpMsBatchItem ?? raw.erp_ms_batch_item),
     erpItemType: str(raw.erpItemType ?? raw.erp_item_type),
     erpPrdPerDay: str(raw.erpPrdPerDay ?? raw.erp_prd_per_day),
+    rmRatioModeOverride: normalizeRmOverride(raw.rmRatioModeOverride ?? raw.rm_ratio_mode_override),
+    effectiveRmRatioMode: str(raw.effectiveRmRatioMode ?? raw.effective_rm_ratio_mode),
     isActive: (raw.isActive ?? raw.is_active ?? true) as boolean,
     source: str(raw.source),
     isLocked: (raw.isLocked ?? raw.is_locked ?? false) as boolean,

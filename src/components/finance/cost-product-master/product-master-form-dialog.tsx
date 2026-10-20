@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ProductTypeCombobox } from "@/components/finance/comboboxes"
 import { useCreateCostProductMaster, useUpdateCostProductMaster } from "@/hooks/finance/use-cost-product-master"
@@ -28,12 +29,15 @@ const schema = z.object({
   flex01: z.string().max(255, "Max 255 chars"),
   flex02: z.string().max(100, "Max 100 chars"),
   flex03: z.string().max(100, "Max 100 chars"),
+  rmRatioModeOverride: z.enum(["", "INPUT", "DENIER"]).optional(),
   erpFgType: z.string().max(15, "Max 15 chars").optional(),
   erpChpItemCode: z.string().max(50, "Max 50 chars").optional(),
   erpMsBatchItem: z.string().max(12, "Max 12 chars").optional(),
   erpItemType: z.string().max(20, "Max 20 chars").optional(),
   erpPrdPerDay: z.string().regex(/^$|^\d{1,15}(\.\d{1,5})?$/, "Up to 15 digits, max 5 decimals").optional(),
 })
+
+const FOLLOW_TYPE = "__follow_type__"
 
 type FormValues = z.infer<typeof schema>
 
@@ -56,6 +60,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
       productTypeId: 0, productName: "", shadeCode: "", gradeCode: "AX", description: "",
       flex01: "", flex02: "", flex03: "",
       erpFgType: "", erpChpItemCode: "", erpMsBatchItem: "", erpItemType: "", erpPrdPerDay: "",
+      rmRatioModeOverride: "",
     },
   })
 
@@ -75,6 +80,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
         erpMsBatchItem: product?.erpMsBatchItem ?? "",
         erpItemType: product?.erpItemType ?? "",
         erpPrdPerDay: product?.erpPrdPerDay ?? "",
+        rmRatioModeOverride: product?.rmRatioModeOverride ?? "",
       })
     }
   }, [open, product, form])
@@ -96,6 +102,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
           erpMsBatchItem: values.erpMsBatchItem,
           erpItemType: values.erpItemType,
           erpPrdPerDay: values.erpPrdPerDay,
+          rmRatioModeOverride: values.rmRatioModeOverride ?? "",
         })
       } else {
         await createMutation.mutateAsync({
@@ -214,6 +221,36 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
                 </FormItem>
               )}
             />
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="rmRatioModeOverride"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mode Rasio RM</FormLabel>
+                    <Select
+                      value={field.value || FOLLOW_TYPE}
+                      onValueChange={(v) => field.onChange(v === FOLLOW_TYPE ? "" : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger aria-label="Mode Rasio RM">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={FOLLOW_TYPE}>Ikut tipe product</SelectItem>
+                        <SelectItem value="INPUT">INPUT</SelectItem>
+                        <SelectItem value="DENIER">DENIER</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Khusus product ini. &quot;Ikut tipe product&quot; memakai mode bawaan tipe product.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <details className="rounded border p-3 text-sm">
               <summary className="cursor-pointer select-none font-medium text-muted-foreground">
                 Legacy / Import identifiers (optional)

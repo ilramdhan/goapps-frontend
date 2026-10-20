@@ -190,6 +190,15 @@ export default function ProductMasterDetailClient({ productSysId, initialTab, hi
             <Field label="Grade" value={product.gradeCode || "—"} />
             <Field label="Oracle Sys ID" value={product.flex02 || "—"} mono />
             <Field label="ERP Compound Key" value={product.flex01 || "—"} mono />
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Mode Rasio RM</div>
+              <div className="text-sm flex items-center gap-2">
+                <span>{product.effectiveRmRatioMode || product.rmRatioModeOverride || "—"}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {product.rmRatioModeOverride ? "khusus product" : "ikut tipe"}
+                </Badge>
+              </div>
+            </div>
             {product.description && (
               <div className="col-span-full">
                 <Field label="Description" value={product.description} />
