@@ -44,6 +44,10 @@ export interface CostProductMaster {
   erpItemType: string;
   /** decimal string */
   erpPrdPerDay: string;
+  /** Per-product RM ratio mode: "" = follow product type, INPUT or DENIER (migration 000579). */
+  rmRatioModeOverride: string;
+  /** COALESCE(product override, product type mode); read-only. */
+  effectiveRmRatioMode: string;
 }
 
 export interface CreateCostProductMasterRequest {
@@ -109,6 +113,8 @@ export interface UpdateCostProductMasterRequest {
   erpItemType: string;
   /** decimal string */
   erpPrdPerDay: string;
+  /** Per-product RM ratio mode override. Absent = unchanged; "" = clear (follow product type). */
+  rmRatioModeOverride?: string | undefined;
 }
 
 export interface UpdateCostProductMasterResponse {
@@ -311,6 +317,8 @@ function createBaseCostProductMaster(): CostProductMaster {
     erpMsBatchItem: "",
     erpItemType: "",
     erpPrdPerDay: "",
+    rmRatioModeOverride: "",
+    effectiveRmRatioMode: "",
   };
 }
 
@@ -396,6 +404,12 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     }
     if (message.erpPrdPerDay !== "") {
       writer.uint32(218).string(message.erpPrdPerDay);
+    }
+    if (message.rmRatioModeOverride !== "") {
+      writer.uint32(226).string(message.rmRatioModeOverride);
+    }
+    if (message.effectiveRmRatioMode !== "") {
+      writer.uint32(234).string(message.effectiveRmRatioMode);
     }
     return writer;
   },
@@ -623,6 +637,22 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
           message.erpPrdPerDay = reader.string();
           continue;
         }
+        case 28: {
+          if (tag !== 226) {
+            break;
+          }
+
+          message.rmRatioModeOverride = reader.string();
+          continue;
+        }
+        case 29: {
+          if (tag !== 234) {
+            break;
+          }
+
+          message.effectiveRmRatioMode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -757,6 +787,16 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
         : isSet(object.erp_prd_per_day)
         ? globalThis.String(object.erp_prd_per_day)
         : "",
+      rmRatioModeOverride: isSet(object.rmRatioModeOverride)
+        ? globalThis.String(object.rmRatioModeOverride)
+        : isSet(object.rm_ratio_mode_override)
+        ? globalThis.String(object.rm_ratio_mode_override)
+        : "",
+      effectiveRmRatioMode: isSet(object.effectiveRmRatioMode)
+        ? globalThis.String(object.effectiveRmRatioMode)
+        : isSet(object.effective_rm_ratio_mode)
+        ? globalThis.String(object.effective_rm_ratio_mode)
+        : "",
     };
   },
 
@@ -843,6 +883,12 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     if (message.erpPrdPerDay !== "") {
       obj.erpPrdPerDay = message.erpPrdPerDay;
     }
+    if (message.rmRatioModeOverride !== "") {
+      obj.rmRatioModeOverride = message.rmRatioModeOverride;
+    }
+    if (message.effectiveRmRatioMode !== "") {
+      obj.effectiveRmRatioMode = message.effectiveRmRatioMode;
+    }
     return obj;
   },
 
@@ -880,6 +926,8 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     message.erpMsBatchItem = object.erpMsBatchItem ?? "";
     message.erpItemType = object.erpItemType ?? "";
     message.erpPrdPerDay = object.erpPrdPerDay ?? "";
+    message.rmRatioModeOverride = object.rmRatioModeOverride ?? "";
+    message.effectiveRmRatioMode = object.effectiveRmRatioMode ?? "";
     return message;
   },
 };
@@ -1581,6 +1629,7 @@ function createBaseUpdateCostProductMasterRequest(): UpdateCostProductMasterRequ
     erpMsBatchItem: "",
     erpItemType: "",
     erpPrdPerDay: "",
+    rmRatioModeOverride: undefined,
   };
 }
 
@@ -1624,6 +1673,9 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     }
     if (message.erpPrdPerDay !== "") {
       writer.uint32(106).string(message.erpPrdPerDay);
+    }
+    if (message.rmRatioModeOverride !== undefined) {
+      writer.uint32(114).string(message.rmRatioModeOverride);
     }
     return writer;
   },
@@ -1739,6 +1791,14 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
           message.erpPrdPerDay = reader.string();
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.rmRatioModeOverride = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1811,6 +1871,11 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
         : isSet(object.erp_prd_per_day)
         ? globalThis.String(object.erp_prd_per_day)
         : "",
+      rmRatioModeOverride: isSet(object.rmRatioModeOverride)
+        ? globalThis.String(object.rmRatioModeOverride)
+        : isSet(object.rm_ratio_mode_override)
+        ? globalThis.String(object.rm_ratio_mode_override)
+        : undefined,
     };
   },
 
@@ -1855,6 +1920,9 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     if (message.erpPrdPerDay !== "") {
       obj.erpPrdPerDay = message.erpPrdPerDay;
     }
+    if (message.rmRatioModeOverride !== undefined) {
+      obj.rmRatioModeOverride = message.rmRatioModeOverride;
+    }
     return obj;
   },
 
@@ -1876,6 +1944,7 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     message.erpMsBatchItem = object.erpMsBatchItem ?? "";
     message.erpItemType = object.erpItemType ?? "";
     message.erpPrdPerDay = object.erpPrdPerDay ?? "";
+    message.rmRatioModeOverride = object.rmRatioModeOverride ?? undefined;
     return message;
   },
 };
