@@ -40,14 +40,23 @@ npm install
 
 ### Clone Repository
 
-```bash
-# Clone with SSH
-git clone git@github.com:mutugading/goapps-frontend.git
-cd goapps-frontend
+GoApps uses a **fork + upstream** model: `origin` is your fork (you push here), `upstream` is `mutugading/goapps-frontend` (fetch only, changes go in through PRs). The full guide is in [Git Workflow](https://github.com/mutugading/goapps-workspace/blob/main/docs/GIT-WORKFLOW.md).
 
-# Or with HTTPS
-git clone https://github.com/mutugading/goapps-frontend.git
+Recommended: set up all four repos at once with the workspace tool:
+
+```bash
+git clone https://github.com/mutugading/goapps-workspace.git
+cd goapps-workspace
+make setup        # forks, clones and adds the upstream remote for every repo
+```
+
+Working on this repo only: fork it on GitHub, then
+
+```bash
+git clone https://github.com/<your-user>/goapps-frontend.git
 cd goapps-frontend
+git remote add upstream https://github.com/mutugading/goapps-frontend.git
+git remote set-url --push upstream DISABLED   # never push to the org directly
 ```
 
 ### VSCode Extensions
@@ -112,19 +121,22 @@ For major changes, create an issue first using available templates:
 
 ### 2. Create Feature Branch
 
+Never work on `main`; it only mirrors `upstream/main`. Always branch from the latest `upstream/main`:
+
 ```bash
-# Update main branch
-git checkout main
-git pull origin main
+# From goapps-workspace (add REPOS=... to span several repos with the same branch name)
+make feat NAME=finance-dashboard REPOS=frontend
 
-# Create feature branch
-git checkout -b <type>/<description>
+# Or manually in this repo
+git fetch upstream
+git switch -c feat/finance-dashboard upstream/main
 
-# Examples:
-git checkout -b feat/finance-dashboard
-git checkout -b fix/sidebar-collapse
-git checkout -b refactor/chart-components
+# Other examples:
+#   fix/sidebar-collapse
+#   refactor/chart-components
 ```
+
+Branch types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `ci`.
 
 ### 3. Make Changes
 
@@ -152,6 +164,10 @@ git push origin <branch-name>
 ### 5. Create Pull Request
 
 Create PR via GitHub UI using the PR template.
+
+Shortcut from goapps-workspace: `make push && make pr` opens the PR form for every repo whose branch has new commits.
+
+> **Keeping up to date**: rebase on the latest org code with `make update` (or `git fetch upstream && git rebase upstream/main`), then `git push --force-with-lease`. After your PR is merged, run `make sync && make cleanup` from goapps-workspace. Do **not** use GitHub's "Sync fork → Update branch" on `main` after a squash merge; it creates duplicate commits. Conflicts and other edge cases: see [Git Workflow](https://github.com/mutugading/goapps-workspace/blob/main/docs/GIT-WORKFLOW.md#6-konflik-dan-kasus-yang-sering-terjadi).
 
 ---
 
