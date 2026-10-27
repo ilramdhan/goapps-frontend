@@ -1,0 +1,5 @@
+# CODEOWNERS — every change to this repo needs review from the owners below.
+# The "Main Branch Protection" ruleset requires code owner approval on PRs to main.
+# Later patterns take precedence over earlier ones.
+
+* @ilramdhan
