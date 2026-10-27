@@ -20,12 +20,15 @@ import { CompareMode } from "@/types/generated/finance/v1/bi"
  * Converts a YYYYMM string to [firstDay, lastDay] of that month as Date objects.
  * Returns undefined if the input is not a 6-digit string.
  */
-function yyyymmToRange(s: string): [Date, Date] | undefined {
+function yyyymmToRange(s: string, payroll = false): [Date, Date] | undefined {
   if (!/^\d{6}$/.test(s)) return undefined
   const year = parseInt(s.slice(0, 4), 10)
   const month = parseInt(s.slice(4, 6), 10) - 1 // 0-indexed
-  const from = new Date(Date.UTC(year, month, 1))
-  const to = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
+  // PAYROLL_26_25 (HD-06): label YYYYMM = 26th of previous month .. 25th of that month.
+  const from = payroll ? new Date(Date.UTC(year, month - 1, 26)) : new Date(Date.UTC(year, month, 1))
+  const to = payroll
+    ? new Date(Date.UTC(year, month, 25, 23, 59, 59, 999))
+    : new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
   return [from, to]
 }
 
@@ -63,7 +66,7 @@ export async function GET(
     // CUSTOM range so ResolvePeriod on the backend applies the correct single-month filter.
     // Otherwise forward the preset string (L12M, L24M, THIS_YEAR, etc.) verbatim.
     const periodParam = sp.get("period") ?? "L12M"
-    const yyyymmRange = yyyymmToRange(periodParam)
+    const yyyymmRange = yyyymmToRange(periodParam, sp.get("period_calendar") === "PAYROLL_26_25")
     let periodPreset = periodParam
     let periodFrom: Date | undefined
     let periodTo: Date | undefined

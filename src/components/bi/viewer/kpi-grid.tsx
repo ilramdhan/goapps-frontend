@@ -2,7 +2,7 @@
 
 // KPI grid — renders the KpiResult[] from a chart-data payload as responsive cards.
 
-import { ArrowDown, ArrowUp } from "lucide-react"
+import { ArrowDown, ArrowUp, Minus } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,8 @@ export function KpiGrid({ kpis }: KpiGridProps) {
     <div className={`grid gap-4 ${gridCols}`}>
       {kpis.map((k, i) => {
         const hasDelta = k.comparePeriodLabel !== ""
+        // 0 vs 0 (e.g. Holiday with no OT in both months) is neutral, not an improvement.
+        const flat = k.deltaPct === 0
         return (
           <Card key={`${k.label}-${i}`}>
             <CardContent className={compactCard ? "p-3" : "p-4"}>
@@ -44,11 +46,11 @@ export function KpiGrid({ kpis }: KpiGridProps) {
                 <div
                   className={cn(
                     "mt-1 flex items-center gap-1 text-xs",
-                    k.improving ? "text-emerald-600" : "text-red-600"
+                    flat ? "text-muted-foreground" : k.improving ? "text-emerald-600" : "text-red-600"
                   )}
                 >
-                  {k.improving ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {k.deltaPct >= 0 ? "+" : ""}
+                  {flat ? <Minus className="h-3 w-3" /> : k.improving ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {k.deltaPct > 0 ? "+" : ""}
                   {k.deltaPct.toFixed(1)}% vs {k.comparePeriodLabel}
                 </div>
               )}

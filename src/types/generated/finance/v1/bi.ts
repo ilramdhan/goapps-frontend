@@ -19,6 +19,7 @@ export enum PeriodeGrain {
   PERIODE_GRAIN_MONTHLY = 2,
   PERIODE_GRAIN_QUARTERLY = 3,
   PERIODE_GRAIN_YEARLY = 4,
+  PERIODE_GRAIN_WEEKLY = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -39,6 +40,9 @@ export function periodeGrainFromJSON(object: any): PeriodeGrain {
     case 4:
     case "PERIODE_GRAIN_YEARLY":
       return PeriodeGrain.PERIODE_GRAIN_YEARLY;
+    case 5:
+    case "PERIODE_GRAIN_WEEKLY":
+      return PeriodeGrain.PERIODE_GRAIN_WEEKLY;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -58,6 +62,8 @@ export function periodeGrainToJSON(object: PeriodeGrain): string {
       return "PERIODE_GRAIN_QUARTERLY";
     case PeriodeGrain.PERIODE_GRAIN_YEARLY:
       return "PERIODE_GRAIN_YEARLY";
+    case PeriodeGrain.PERIODE_GRAIN_WEEKLY:
+      return "PERIODE_GRAIN_WEEKLY";
     case PeriodeGrain.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -328,6 +334,8 @@ export interface Dashboard {
   audit: AuditInfo | undefined;
   isFeatured: boolean;
   featureOrder: number;
+  /** Kalender periode: CALENDAR (bulan kalender) atau PAYROLL_26_25 (periode payroll 26-25). HD-06. */
+  periodCalendar: string;
 }
 
 export interface DataSource {
@@ -462,6 +470,8 @@ export interface CreateDashboardRequest {
   groupId: string;
   allowedRoleCodes: string[];
   isActive: boolean;
+  /** Kosong = CALENDAR. */
+  periodCalendar: string;
 }
 
 export interface CreateDashboardResponse {
@@ -526,6 +536,7 @@ export interface UpdateDashboardRequest {
   isActive?: boolean | undefined;
   isFeatured?: boolean | undefined;
   featureOrder?: number | undefined;
+  periodCalendar?: string | undefined;
 }
 
 export interface UpdateDashboardResponse {
@@ -660,6 +671,22 @@ export interface BiJobLog {
   errorMessage: string;
   triggeredBy: string;
   durationMs: number;
+}
+
+/** EtlJobStatus is the operational status of one ETL_HR_* job (HD-27). No raw error text. */
+export interface EtlJobStatus {
+  jobName: string;
+  lastRunAt: Date | undefined;
+  lastStatus: string;
+  lastSuccessAt: Date | undefined;
+}
+
+export interface GetEtlStatusRequest {
+}
+
+export interface GetEtlStatusResponse {
+  base: BaseResponse | undefined;
+  data: EtlJobStatus[];
 }
 
 export interface ListJobsRequest {
@@ -1062,6 +1089,7 @@ function createBaseDashboard(): Dashboard {
     audit: undefined,
     isFeatured: false,
     featureOrder: 0,
+    periodCalendar: "",
   };
 }
 
@@ -1146,6 +1174,9 @@ export const Dashboard: MessageFns<Dashboard> = {
     }
     if (message.featureOrder !== 0) {
       writer.uint32(208).int32(message.featureOrder);
+    }
+    if (message.periodCalendar !== "") {
+      writer.uint32(218).string(message.periodCalendar);
     }
     return writer;
   },
@@ -1375,6 +1406,14 @@ export const Dashboard: MessageFns<Dashboard> = {
           message.featureOrder = reader.int32();
           continue;
         }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.periodCalendar = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1508,6 +1547,11 @@ export const Dashboard: MessageFns<Dashboard> = {
         : isSet(object.feature_order)
         ? globalThis.Number(object.feature_order)
         : 0,
+      periodCalendar: isSet(object.periodCalendar)
+        ? globalThis.String(object.periodCalendar)
+        : isSet(object.period_calendar)
+        ? globalThis.String(object.period_calendar)
+        : "",
     };
   },
 
@@ -1591,6 +1635,9 @@ export const Dashboard: MessageFns<Dashboard> = {
     if (message.featureOrder !== 0) {
       obj.featureOrder = Math.round(message.featureOrder);
     }
+    if (message.periodCalendar !== "") {
+      obj.periodCalendar = message.periodCalendar;
+    }
     return obj;
   },
 
@@ -1627,6 +1674,7 @@ export const Dashboard: MessageFns<Dashboard> = {
       : undefined;
     message.isFeatured = object.isFeatured ?? false;
     message.featureOrder = object.featureOrder ?? 0;
+    message.periodCalendar = object.periodCalendar ?? "";
     return message;
   },
 };
@@ -3556,6 +3604,7 @@ function createBaseCreateDashboardRequest(): CreateDashboardRequest {
     groupId: "",
     allowedRoleCodes: [],
     isActive: false,
+    periodCalendar: "",
   };
 }
 
@@ -3622,6 +3671,9 @@ export const CreateDashboardRequest: MessageFns<CreateDashboardRequest> = {
     }
     if (message.isActive !== false) {
       writer.uint32(160).bool(message.isActive);
+    }
+    if (message.periodCalendar !== "") {
+      writer.uint32(170).string(message.periodCalendar);
     }
     return writer;
   },
@@ -3803,6 +3855,14 @@ export const CreateDashboardRequest: MessageFns<CreateDashboardRequest> = {
           message.isActive = reader.bool();
           continue;
         }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.periodCalendar = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3910,6 +3970,11 @@ export const CreateDashboardRequest: MessageFns<CreateDashboardRequest> = {
         : isSet(object.is_active)
         ? globalThis.Boolean(object.is_active)
         : false,
+      periodCalendar: isSet(object.periodCalendar)
+        ? globalThis.String(object.periodCalendar)
+        : isSet(object.period_calendar)
+        ? globalThis.String(object.period_calendar)
+        : "",
     };
   },
 
@@ -3975,6 +4040,9 @@ export const CreateDashboardRequest: MessageFns<CreateDashboardRequest> = {
     if (message.isActive !== false) {
       obj.isActive = message.isActive;
     }
+    if (message.periodCalendar !== "") {
+      obj.periodCalendar = message.periodCalendar;
+    }
     return obj;
   },
 
@@ -4003,6 +4071,7 @@ export const CreateDashboardRequest: MessageFns<CreateDashboardRequest> = {
     message.groupId = object.groupId ?? "";
     message.allowedRoleCodes = object.allowedRoleCodes?.map((e) => e) || [];
     message.isActive = object.isActive ?? false;
+    message.periodCalendar = object.periodCalendar ?? "";
     return message;
   },
 };
@@ -4693,6 +4762,7 @@ function createBaseUpdateDashboardRequest(): UpdateDashboardRequest {
     isActive: undefined,
     isFeatured: undefined,
     featureOrder: undefined,
+    periodCalendar: undefined,
   };
 }
 
@@ -4762,6 +4832,9 @@ export const UpdateDashboardRequest: MessageFns<UpdateDashboardRequest> = {
     }
     if (message.featureOrder !== undefined) {
       writer.uint32(208).int32(message.featureOrder);
+    }
+    if (message.periodCalendar !== undefined) {
+      writer.uint32(218).string(message.periodCalendar);
     }
     return writer;
   },
@@ -4951,6 +5024,14 @@ export const UpdateDashboardRequest: MessageFns<UpdateDashboardRequest> = {
           message.featureOrder = reader.int32();
           continue;
         }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.periodCalendar = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5063,6 +5144,11 @@ export const UpdateDashboardRequest: MessageFns<UpdateDashboardRequest> = {
         : isSet(object.feature_order)
         ? globalThis.Number(object.feature_order)
         : undefined,
+      periodCalendar: isSet(object.periodCalendar)
+        ? globalThis.String(object.periodCalendar)
+        : isSet(object.period_calendar)
+        ? globalThis.String(object.period_calendar)
+        : undefined,
     };
   },
 
@@ -5131,6 +5217,9 @@ export const UpdateDashboardRequest: MessageFns<UpdateDashboardRequest> = {
     if (message.featureOrder !== undefined) {
       obj.featureOrder = Math.round(message.featureOrder);
     }
+    if (message.periodCalendar !== undefined) {
+      obj.periodCalendar = message.periodCalendar;
+    }
     return obj;
   },
 
@@ -5160,6 +5249,7 @@ export const UpdateDashboardRequest: MessageFns<UpdateDashboardRequest> = {
     message.isActive = object.isActive ?? undefined;
     message.isFeatured = object.isFeatured ?? undefined;
     message.featureOrder = object.featureOrder ?? undefined;
+    message.periodCalendar = object.periodCalendar ?? undefined;
     return message;
   },
 };
@@ -7459,6 +7549,251 @@ export const BiJobLog: MessageFns<BiJobLog> = {
     message.errorMessage = object.errorMessage ?? "";
     message.triggeredBy = object.triggeredBy ?? "";
     message.durationMs = object.durationMs ?? 0;
+    return message;
+  },
+};
+
+function createBaseEtlJobStatus(): EtlJobStatus {
+  return { jobName: "", lastRunAt: undefined, lastStatus: "", lastSuccessAt: undefined };
+}
+
+export const EtlJobStatus: MessageFns<EtlJobStatus> = {
+  encode(message: EtlJobStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.jobName !== "") {
+      writer.uint32(10).string(message.jobName);
+    }
+    if (message.lastRunAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.lastRunAt), writer.uint32(18).fork()).join();
+    }
+    if (message.lastStatus !== "") {
+      writer.uint32(26).string(message.lastStatus);
+    }
+    if (message.lastSuccessAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.lastSuccessAt), writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EtlJobStatus {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEtlJobStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.jobName = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.lastRunAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.lastStatus = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.lastSuccessAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EtlJobStatus {
+    return {
+      jobName: isSet(object.jobName)
+        ? globalThis.String(object.jobName)
+        : isSet(object.job_name)
+        ? globalThis.String(object.job_name)
+        : "",
+      lastRunAt: isSet(object.lastRunAt)
+        ? fromJsonTimestamp(object.lastRunAt)
+        : isSet(object.last_run_at)
+        ? fromJsonTimestamp(object.last_run_at)
+        : undefined,
+      lastStatus: isSet(object.lastStatus)
+        ? globalThis.String(object.lastStatus)
+        : isSet(object.last_status)
+        ? globalThis.String(object.last_status)
+        : "",
+      lastSuccessAt: isSet(object.lastSuccessAt)
+        ? fromJsonTimestamp(object.lastSuccessAt)
+        : isSet(object.last_success_at)
+        ? fromJsonTimestamp(object.last_success_at)
+        : undefined,
+    };
+  },
+
+  toJSON(message: EtlJobStatus): unknown {
+    const obj: any = {};
+    if (message.jobName !== "") {
+      obj.jobName = message.jobName;
+    }
+    if (message.lastRunAt !== undefined) {
+      obj.lastRunAt = message.lastRunAt.toISOString();
+    }
+    if (message.lastStatus !== "") {
+      obj.lastStatus = message.lastStatus;
+    }
+    if (message.lastSuccessAt !== undefined) {
+      obj.lastSuccessAt = message.lastSuccessAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<EtlJobStatus>): EtlJobStatus {
+    return EtlJobStatus.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<EtlJobStatus>): EtlJobStatus {
+    const message = createBaseEtlJobStatus();
+    message.jobName = object.jobName ?? "";
+    message.lastRunAt = object.lastRunAt ?? undefined;
+    message.lastStatus = object.lastStatus ?? "";
+    message.lastSuccessAt = object.lastSuccessAt ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGetEtlStatusRequest(): GetEtlStatusRequest {
+  return {};
+}
+
+export const GetEtlStatusRequest: MessageFns<GetEtlStatusRequest> = {
+  encode(_: GetEtlStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetEtlStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetEtlStatusRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): GetEtlStatusRequest {
+    return {};
+  },
+
+  toJSON(_: GetEtlStatusRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetEtlStatusRequest>): GetEtlStatusRequest {
+    return GetEtlStatusRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<GetEtlStatusRequest>): GetEtlStatusRequest {
+    const message = createBaseGetEtlStatusRequest();
+    return message;
+  },
+};
+
+function createBaseGetEtlStatusResponse(): GetEtlStatusResponse {
+  return { base: undefined, data: [] };
+}
+
+export const GetEtlStatusResponse: MessageFns<GetEtlStatusResponse> = {
+  encode(message: GetEtlStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.data) {
+      EtlJobStatus.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetEtlStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetEtlStatusResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.data.push(EtlJobStatus.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetEtlStatusResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => EtlJobStatus.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: GetEtlStatusResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.data?.length) {
+      obj.data = message.data.map((e) => EtlJobStatus.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetEtlStatusResponse>): GetEtlStatusResponse {
+    return GetEtlStatusResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetEtlStatusResponse>): GetEtlStatusResponse {
+    const message = createBaseGetEtlStatusResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.data = object.data?.map((e) => EtlJobStatus.fromPartial(e)) || [];
     return message;
   },
 };
@@ -10367,6 +10702,15 @@ export const BiJobServiceDefinition = {
       requestType: ListJobsRequest,
       requestStream: false,
       responseType: ListJobsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** GetEtlStatus returns last-run status of ETL_HR_* jobs only (HD-27, finance.bi.etlstatus.view). */
+    getEtlStatus: {
+      name: "GetEtlStatus",
+      requestType: GetEtlStatusRequest,
+      requestStream: false,
+      responseType: GetEtlStatusResponse,
       responseStream: false,
       options: {},
     },

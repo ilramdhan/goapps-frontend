@@ -15,8 +15,8 @@ import { usePermission } from "@/lib/hooks/use-permission"
 import { useDashboardByCode } from "@/hooks/bi/use-dashboard"
 import { useDashboardData } from "@/hooks/bi/use-chart-data"
 import { useFactDistincts } from "@/hooks/bi/use-fact-distincts"
-import { chartTypeToString, periodeGrainToString, type ViewerState, DEFAULT_VIEWER_STATE, type CompareKey, type ViewModeConfig } from "@/types/bi"
-import { isEmpty } from "@/lib/bi/data-adapter"
+import { chartTypeToString, periodeGrainToString, type ViewerState, DEFAULT_VIEWER_STATE, presetsForGrain, type CompareKey, type ViewModeConfig } from "@/types/bi"
+import { isEmpty, toRechartsRows } from "@/lib/bi/data-adapter"
 
 import { ChartEngine } from "@/components/bi/chart-engine/chart-engine"
 import { ExportPngButton } from "@/components/bi/chart-engine/export-png-button"
@@ -26,7 +26,12 @@ import { FilterChips } from "./filter-chips"
 import { KpiGrid } from "./kpi-grid"
 import { DrillBreadcrumb } from "./drill-breadcrumb"
 import { SecondaryGrid } from "./secondary-grid"
+import { WorkforceNav } from "./workforce-nav"
+import { OtOverMonthSection, type OtOverMonthConfig } from "./ot-over-month-section"
+import { EmployeeOTControls } from "./employee-ot-controls"
+import { EMPLOYEE_OT_MODE, EMPLOYEE_OT_PRESETS, readEmployeeOTBlock } from "@/lib/bi/employee-ot"
 import { ViewerEmptyState, ViewerErrorState, DataFreshnessBadge } from "./states"
+import { JobStatusBanner } from "./job-status-banner"
 
 export function ViewerPage({ code }: { code: string }) {
   const chartCardRef = useRef<HTMLDivElement>(null)
@@ -86,7 +91,22 @@ export function ViewerPage({ code }: { code: string }) {
     isError: dataError,
     error,
     refetch,
-  } = useDashboardData(code, stateWithFilters, refreshMs, earlyIsTrend)
+    isPlaceholderData,
+  } = useDashboardData(code, stateWithFilters, refreshMs, earlyIsTrend, dashboard?.periodCalendar, Boolean(dashboard))
+
+  // NIK → name, remembered from employee rows (point meta __name) so the breadcrumb of a day drill
+  // can read "NIK — Nama" (HD-07). Names are only present when the user may see employee level.
+  // Merged while rendering when chartData changes (React "adjust state on prop change"), not in an effect.
+  const [nikNames, setNikNames] = useState<Record<string, string>>({})
+  const [namesFrom, setNamesFrom] = useState(chartData)
+  if (chartData !== namesFrom) {
+    setNamesFrom(chartData)
+    const found: Record<string, string> = {}
+    for (const r of chartData ? toRechartsRows(chartData) : []) {
+      if (typeof r.__name === "string" && r.__name) found[String(r.category)] = r.__name
+    }
+    if (Object.keys(found).length) setNikNames((prev) => ({ ...prev, ...found }))
+  }
 
   // Toggle helpers — use local state for immediate refetch.
   const toggleGroup1 = useCallback((v: string) => {
@@ -133,6 +153,12 @@ export function ViewerPage({ code }: { code: string }) {
   // Categories from chart data — used to drive the month selector in FilterBar.
   const categories = chartData?.categories ?? []
 
+  // Employee Overtime (HD-18): payroll-period presets only, no month selector (selected_month would
+  // turn the period into CUSTOM, which the backend rejects), group-by controls on the table level.
+  const isWorkforce = dashboard?.filterType?.startsWith("HR_") === true
+  const isEmployeeOT =
+    (dataConfig?.["table_mode"] ?? dashConfig?.["table_mode"] ?? dashConfig?.["tableMode"]) === EMPLOYEE_OT_MODE
+
   // Effective selected period: use URL state only when it's a valid YYYYMM string.
   // Ignore stale non-period values (e.g. group_2 names from a previous navigation).
   const periodCategories = categories.filter(c => /^\d{6}$/.test(c))
@@ -151,7 +177,7 @@ export function ViewerPage({ code }: { code: string }) {
 
   // Pass period list to FilterBar: trend charts use period-labelled categories from data;
   // categorical charts use the derived month list.
-  const monthSelectorCategories = isTrendChart ? periodCategories : derivedPeriodOptions
+  const monthSelectorCategories = isEmployeeOT ? [] : isTrendChart ? periodCategories : derivedPeriodOptions
 
   // effectiveSelectedPeriod is undefined when no month is explicitly selected
   // (default "All Months"). In that case the chart shows the full period range
@@ -193,6 +219,12 @@ export function ViewerPage({ code }: { code: string }) {
     return `${months[m - 1] ?? ""} ${yyyymm.slice(0, 4)}`
   }
 
+  // Over-limit trend section on top of Kepatuhan 14 Jam (H042, HD-22), declared in layout_config.top_section.
+  const topSection = (dashboard.layoutConfig as Record<string, unknown> | null)?.["top_section"] as
+    | (OtOverMonthConfig & { type?: string })
+    | undefined
+  const topOverMonth = topSection?.type === "ot_over_month" ? topSection : undefined
+
   const chartTitle = (activeViewConfig.titleTemplate
     ? activeViewConfig.titleTemplate.replace("{period}", formatPeriodLabel(effectiveSelectedPeriod ?? "")).trim()
     : "") || (dashboard.dashboardTitle ?? "")
@@ -203,14 +235,38 @@ export function ViewerPage({ code }: { code: string }) {
         <DataFreshnessBadge timestamp={chartData?.meta?.asOf} />
       </PageHeader>
 
+      {isWorkforce && <JobStatusBanner />}
+
+      <WorkforceNav code={code} />
+
+      {topOverMonth && (
+        <OtOverMonthSection
+          config={topOverMonth}
+          selectedPeriod={effectiveSelectedPeriod}
+          onSelectMonth={(p) => setState({ ...state, selectedPeriod: p })}
+        />
+      )}
+
       <FilterBar
         state={state}
         onChange={setState}
         compareModes={compareModes}
         primaryChartType={primaryChartType}
         availableChartTypes={availableChartTypes}
+        periodCalendar={dashboard.periodCalendar}
         categories={monthSelectorCategories}
+        allowedPresets={isEmployeeOT ? EMPLOYEE_OT_PRESETS : presetsForGrain(dashboard.periodeGrain)}
       />
+
+      {isEmployeeOT && state.drillPath.length === 0 && (
+        <EmployeeOTControls
+          state={state}
+          onChange={setState}
+          block={readEmployeeOTBlock(dataConfig)}
+          data={chartData}
+          stale={isPlaceholderData || dataLoading}
+        />
+      )}
 
       {(group1Values.length > 0 || group2Values.length > 0) && (
         <div className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
@@ -259,6 +315,7 @@ export function ViewerPage({ code }: { code: string }) {
             rootLabel={dashboard.dashboardTitle}
             path={state.drillPath}
             onJump={(newPath) => setState({ ...state, drillPath: newPath })}
+            labelFor={(seg) => (nikNames[seg] ? `${seg} — ${nikNames[seg]}` : seg)}
           />
 
           {dataError ? (

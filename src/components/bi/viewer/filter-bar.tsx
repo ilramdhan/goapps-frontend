@@ -9,8 +9,8 @@ import {
   type ViewerState,
   type PeriodPreset,
   type CompareKey,
-  PERIOD_PRESETS,
-  PERIOD_PRESET_LABELS,
+  presetsForGrain,
+  periodPresetLabel,
   COMPARE_LABELS,
 } from "@/types/bi"
 import { TREND_CHART_TYPES } from "@/hooks/bi/use-chart-data"
@@ -29,6 +29,10 @@ interface FilterBarProps {
    * Used to populate the Month selector when the active chart is categorical.
    */
   categories?: string[]
+  /** Dashboard period calendar (CALENDAR | PAYROLL_26_25) — only changes preset wording. */
+  periodCalendar?: string
+  /** Restricts the period dropdown (e.g. employee_ot accepts payroll-period presets only). Default: all. */
+  allowedPresets?: PeriodPreset[]
 }
 
 /** Human-readable label for a chart type string. */
@@ -59,6 +63,8 @@ export function FilterBar({
   primaryChartType = "",
   availableChartTypes = [],
   categories = [],
+  periodCalendar,
+  allowedPresets = presetsForGrain(),
 }: FilterBarProps) {
   const availableCompares: CompareKey[] = ["NONE", ...compareModes.filter((c) => c !== "NONE")]
   const activeChartType = state.chartType || primaryChartType
@@ -92,9 +98,9 @@ export function FilterBar({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PERIOD_PRESETS.map((p) => (
+            {allowedPresets.map((p) => (
               <SelectItem key={p} value={p}>
-                {PERIOD_PRESET_LABELS[p]}
+                {periodPresetLabel(p, periodCalendar)}
               </SelectItem>
             ))}
           </SelectContent>

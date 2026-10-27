@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
-import { apiClient } from "@/lib/api"
+import { apiClient, ApiError } from "@/lib/api"
 import type {
   BiJob,
   BiJobLog,
@@ -36,6 +36,8 @@ export function useBiJobs(includeInactive = false) {
       return parsed.data
     },
     staleTime: 30_000,
+    // A 4xx (e.g. 403 for roles without finance.bi.job.view) will not heal on retry.
+    retry: (count, err) => !(err instanceof ApiError && err.statusCode >= 400 && err.statusCode < 500) && count < 2,
   })
 }
 

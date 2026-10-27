@@ -14,6 +14,9 @@ import type { ChartDataResponse } from "@/types/bi"
 import { ChartEngine } from "@/components/bi/chart-engine/chart-engine"
 import { ComponentDetailTable } from "./component-detail-table"
 import { MonthlyDetailTable } from "./monthly-detail-table"
+import { OtCompareCard } from "./ot-compare-card"
+import { OtMixCard } from "./ot-mix-card"
+import { OtParetoCard } from "./ot-pareto-card"
 
 interface ComputedRatioDef {
   numerator: string
@@ -489,6 +492,59 @@ export function SecondaryGrid({ layoutConfig, data, dashboardCode, selectedPerio
           )
         }
 
+        // OT type mix (H036): stacked 100% share per month from the primary data.
+        if (s.chart_type === "ot_mix") {
+          const cfg = (s.chart_config ?? {}) as Record<string, unknown>
+          return (
+            <OtMixCard
+              key={`${s.title ?? "ot-mix"}-${i}`}
+              title={s.title}
+              data={data}
+              decimals={cfg.decimals as number | undefined}
+              span={s.span}
+            />
+          )
+        }
+
+        // OT concentration trend (H037): top-10% share of OT hours per month, from companion dashboard.
+        if (s.chart_type === "ot_pareto") {
+          const cfg = (s.chart_config ?? {}) as Record<string, unknown>
+          // Companion dashboard comes from the seeded chart_config (000566); no hardcoded fallback.
+          const sourceCode = cfg.source_dashboard_code as string | undefined
+          if (!sourceCode) return null
+          return (
+            <OtParetoCard
+              key={`${s.title ?? "ot-pareto"}-${i}`}
+              title={s.title}
+              sourceDashboardCode={sourceCode}
+              topKey={cfg.top_key as string | undefined}
+              totalKey={cfg.total_key as string | undefined}
+              periodCalendar={cfg.period_calendar as string | undefined}
+              decimals={cfg.decimals as number | undefined}
+              span={s.span}
+            />
+          )
+        }
+
+        // OT period comparison (H041): grouped bar + Δ tables, fetched per period via /computed.
+        if (s.chart_type === "ot_compare" && dashboardCode) {
+          const cfg = (s.chart_config ?? {}) as Record<string, unknown>
+          return (
+            <OtCompareCard
+              key={`${s.title ?? "ot-compare"}-${i}`}
+              title={s.title}
+              dashboardCode={dashboardCode}
+              metric={(cfg.metric as string | undefined) ?? "VALUE"}
+              periodCalendar={cfg.period_calendar as string | undefined}
+              decimals={cfg.decimals as number | undefined}
+              selectedPeriod={selectedPeriod ?? [...(data.categories ?? [])].reverse().find((c) => /^\d{6}$/.test(c))}
+              span={s.span}
+              group1Filter={group1Filter}
+              group2Filter={group2Filter}
+            />
+          )
+        }
+
         // Cross-dashboard cards get their own component that fetches secondary data.
         if (s.source_dashboard_code) {
           return (
@@ -549,8 +605,12 @@ export function SecondaryGrid({ layoutConfig, data, dashboardCode, selectedPerio
         const activeType = getActiveType(s, i)
 
         // For data_table charts, filter points to the selected period (client-side only).
+        // Pivot tables (WORKFORCE: categories are dept / IYYY-Www, not YYYYMM) are skipped.
+        const isPeriodKeyed = (data.series ?? []).some((ser) =>
+          (ser.points ?? []).some((p) => /^\d{6}$/.test(p.category ?? "")),
+        )
         const filteredData =
-          selectedPeriod && activeType === "data_table"
+          selectedPeriod && activeType === "data_table" && isPeriodKeyed
             ? {
                 ...data,
                 series:

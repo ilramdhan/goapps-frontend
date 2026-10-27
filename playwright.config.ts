@@ -16,6 +16,8 @@ import { defineConfig, devices } from "@playwright/test"
  */
 export default defineConfig({
   testDir: "./e2e",
+  // HR specs depend on dev data (not hermetic): manual only, run with E2E_HR=1.
+  testIgnore: process.env.E2E_HR ? undefined : /hr-.*\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

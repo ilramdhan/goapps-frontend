@@ -20,8 +20,9 @@ import {
   ChartType,
   PeriodeGrain,
   CompareMode,
-  PERIOD_PRESETS,
-  PERIOD_PRESET_LABELS,
+  presetsForGrain,
+  PERIOD_CALENDAR_LABELS,
+  periodPresetLabel,
   type DashboardFormData,
   type KpiEntry,
   type ViewModeConfig,
@@ -195,9 +196,25 @@ export function StepDataBinding({ form, setForm }: StepProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={String(PeriodeGrain.PERIODE_GRAIN_DAILY)}>Daily</SelectItem>
+            <SelectItem value={String(PeriodeGrain.PERIODE_GRAIN_WEEKLY)}>Weekly</SelectItem>
             <SelectItem value={String(PeriodeGrain.PERIODE_GRAIN_MONTHLY)}>Monthly</SelectItem>
             <SelectItem value={String(PeriodeGrain.PERIODE_GRAIN_QUARTERLY)}>Quarterly</SelectItem>
             <SelectItem value={String(PeriodeGrain.PERIODE_GRAIN_YEARLY)}>Yearly</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field label="Period Calendar">
+        <Select value={form.periodCalendar} onValueChange={(v) => setForm((p) => ({ ...p, periodCalendar: v as DashboardFormData["periodCalendar"] }))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PERIOD_CALENDAR_LABELS) as DashboardFormData["periodCalendar"][]).map((c) => (
+              <SelectItem key={c} value={c}>
+                {PERIOD_CALENDAR_LABELS[c]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </Field>
@@ -208,9 +225,9 @@ export function StepDataBinding({ form, setForm }: StepProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PERIOD_PRESETS.map((preset) => (
+            {presetsForGrain(form.periodeGrain).map((preset) => (
               <SelectItem key={preset} value={preset}>
-                {PERIOD_PRESET_LABELS[preset]}
+                {periodPresetLabel(preset, form.periodCalendar)}
               </SelectItem>
             ))}
           </SelectContent>

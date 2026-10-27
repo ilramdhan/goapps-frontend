@@ -80,6 +80,8 @@ export type {
   GetFactDistinctsResponse,
   ListJobsRequest,
   ListJobsResponse,
+  EtlJobStatus,
+  GetEtlStatusResponse,
   ListJobLogsRequest,
   ListJobLogsResponse,
   TriggerJobRequest,
@@ -118,6 +120,7 @@ export {
   ListDataSourcesResponse as ListDataSourcesResponseParser,
   GetFactDistinctsResponse as GetFactDistinctsResponseParser,
   ListJobsResponse as ListJobsResponseParser,
+  GetEtlStatusResponse as GetEtlStatusResponseParser,
   ListJobLogsResponse as ListJobLogsResponseParser,
   TriggerJobResponse as TriggerJobResponseParser,
 } from "@/types/generated/finance/v1/bi"
@@ -126,24 +129,55 @@ export {
 // Local UI types
 // ============================================================================
 
+import { PeriodeGrain } from "@/types/generated/finance/v1/bi"
 import type {
   Dashboard,
   CompareMode,
-  PeriodeGrain,
   ChartType,
 } from "@/types/generated/finance/v1/bi"
 
 /** Period preset enum (canonical string keys matching backend ResolvePeriod). */
-export type PeriodPreset = "L12M" | "L24M" | "THIS_YEAR" | "THIS_QTR" | "THIS_MONTH" | "ALL" | "CUSTOM"
-export const PERIOD_PRESETS: PeriodPreset[] = ["L12M", "L24M", "THIS_YEAR", "THIS_QTR", "THIS_MONTH", "ALL", "CUSTOM"]
+export type PeriodPreset = "L12M" | "L24M" | "THIS_YEAR" | "THIS_QTR" | "THIS_MONTH" | "LAST_MONTH" | "THIS_WEEK" | "LAST_WEEK" | "YESTERDAY" | "ALL" | "CUSTOM"
+export const PERIOD_PRESETS: PeriodPreset[] = ["L12M", "L24M", "THIS_YEAR", "THIS_QTR", "THIS_MONTH", "LAST_MONTH", "THIS_WEEK", "LAST_WEEK", "YESTERDAY", "ALL", "CUSTOM"]
+/** Short-window presets: only meaningful for DAILY/WEEKLY dashboards. */
+export const SHORT_WINDOW_PRESETS: PeriodPreset[] = ["THIS_WEEK", "LAST_WEEK", "YESTERDAY", "LAST_MONTH"]
+
+/** Presets offered for a dashboard grain; the global list stays as before unless DAILY/WEEKLY. */
+export function presetsForGrain(grain?: PeriodeGrain | number): PeriodPreset[] {
+  if (grain === PeriodeGrain.PERIODE_GRAIN_DAILY || grain === PeriodeGrain.PERIODE_GRAIN_WEEKLY) return PERIOD_PRESETS
+  return PERIOD_PRESETS.filter((p) => !SHORT_WINDOW_PRESETS.includes(p))
+}
+
 export const PERIOD_PRESET_LABELS: Record<PeriodPreset, string> = {
   L12M: "Last 12 Months",
   L24M: "Last 24 Months",
   THIS_YEAR: "This Year",
   THIS_QTR: "This Quarter",
   THIS_MONTH: "This Month",
+  LAST_MONTH: "Last Month",
+  YESTERDAY: "Yesterday",
+  THIS_WEEK: "This Week",
+  LAST_WEEK: "Last Week",
   ALL: "All Periods",
   CUSTOM: "Custom Range",
+}
+
+/** Period calendar (HD-06): calendar month or payroll period 26th..25th. */
+export type PeriodCalendar = "CALENDAR" | "PAYROLL_26_25"
+export const PERIOD_CALENDAR_LABELS: Record<PeriodCalendar, string> = {
+  CALENDAR: "Calendar month",
+  PAYROLL_26_25: "Payroll period (26–25)",
+}
+
+/** Preset label, using "Period" wording for payroll-calendar dashboards. */
+export function periodPresetLabel(p: PeriodPreset, calendar?: string): string {
+  if (calendar === "PAYROLL_26_25") {
+    if (p === "THIS_MONTH") return "This Period"
+    if (p === "LAST_MONTH") return "Last Period"
+    if (p === "L12M") return "Last 12 Periods"
+    if (p === "L24M") return "Last 24 Periods"
+  }
+  return PERIOD_PRESET_LABELS[p]
 }
 
 /** Compare-mode string keys (matches CompareMode enum). */
@@ -171,6 +205,12 @@ export interface ViewerState {
   group1Filter: string[]
   /** Selected group_2 values from filter chips (Category). Empty = show all. */
   group2Filter: string[]
+  /** Employee Overtime table (table_mode=employee_ot, HD-18): group-by key (DIVISION | DEPT | COMPANY). "" = no grouping. */
+  groupBy?: string
+  /** Employee Overtime table: selected values of the groupBy attribute. Empty = all. */
+  groupFilter?: string[]
+  /** Employee Overtime table (HD-25): payroll period YYYYMM to compare against. "" = previous period. */
+  comparePeriod?: string
   /**
    * Selected period (YYYYMM) for waterfall/bar breakdown and secondary data_table filtering.
    * Defaults to the latest available period in the loaded chart data.
@@ -186,6 +226,9 @@ export const DEFAULT_VIEWER_STATE: ViewerState = {
   chartType: "",
   group1Filter: [],
   group2Filter: [],
+  groupBy: "",
+  groupFilter: [],
+  comparePeriod: "",
   selectedPeriod: undefined,
 }
 
@@ -226,6 +269,7 @@ export interface DashboardFormData {
   filterType: string
   filterGroup1: string
   periodeGrain: PeriodeGrain
+  periodCalendar: PeriodCalendar
   defaultPeriod: PeriodPreset
   chartType: ChartType
   chartConfig: Record<string, unknown>
@@ -291,6 +335,7 @@ export function periodeGrainToString(g: PeriodeGrain): string {
     case 2: return "MONTHLY"
     case 3: return "QUARTERLY"
     case 4: return "YEARLY"
+    case 5: return "WEEKLY"
     default: return ""
   }
 }

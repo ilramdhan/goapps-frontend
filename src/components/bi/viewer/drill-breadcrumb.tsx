@@ -13,9 +13,11 @@ interface DrillBreadcrumbProps {
   path: string[]
   /** Called with the truncated path when an ancestor crumb is clicked. Root → []. */
   onJump: (newPath: string[]) => void
+  /** Optional display label for a path segment (e.g. NIK → "NIK — Nama"); defaults to the segment. */
+  labelFor?: (segment: string) => string
 }
 
-export function DrillBreadcrumb({ rootLabel, path, onJump }: DrillBreadcrumbProps) {
+export function DrillBreadcrumb({ rootLabel, path, onJump, labelFor }: DrillBreadcrumbProps) {
   if (path.length === 0) {
     return <div className="text-sm font-medium text-muted-foreground">{rootLabel}</div>
   }
@@ -42,7 +44,7 @@ export function DrillBreadcrumb({ rootLabel, path, onJump }: DrillBreadcrumbProp
                 isLast ? "font-semibold text-foreground" : "text-primary"
               )}
             >
-              {segment}
+              {labelFor ? labelFor(segment) : segment}
             </button>
           </span>
         )

@@ -13,6 +13,7 @@ export {
   dashboardKeys,
 } from "./use-dashboard"
 
+export { useEtlStatus, etlStatusKeys } from "./use-etl-status"
 export { useDashboardData } from "./use-chart-data"
 export { usePreviewDashboard } from "./use-preview"
 export {

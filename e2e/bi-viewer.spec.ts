@@ -14,11 +14,12 @@ test.describe("BI viewer", () => {
 
   test("landing lists dashboards and links to the viewer", async ({ page }) => {
     await page.goto("/finance/bi")
-    await expect(page.getByText("Executive Dashboards")).toBeVisible()
-    // Seeded EBITDA card should be present and navigable.
-    const ebitda = page.getByRole("link", { name: /EBITDA Performance/i })
-    await expect(ebitda).toBeVisible()
-    await ebitda.click()
+    await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible()
+    // Seeded EBITDA is featured: its landing section links to the viewer ("View Full").
+    // Match by href — the section title is configurable via layout_config.landing_sections.
+    const viewFull = page.locator('section a[href="/finance/bi/EBITDA"]').first()
+    await expect(viewFull).toBeVisible({ timeout: 15_000 })
+    await viewFull.click()
     await expect(page).toHaveURL(/\/finance\/bi\/EBITDA/)
   })
 
@@ -26,7 +27,7 @@ test.describe("BI viewer", () => {
     await page.goto("/finance/bi/EBITDA")
 
     // Title + at least one KPI card value.
-    await expect(page.getByText("EBITDA Performance")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "EBITDA Performance" })).toBeVisible()
     await expect(page.getByText(/Current Month EBITDA/i)).toBeVisible()
 
     // The chart card renders (waterfall via ECharts → a canvas/svg appears).
@@ -45,6 +46,6 @@ test.describe("BI viewer", () => {
   test("period preset is reflected in the URL", async ({ page }) => {
     await page.goto("/finance/bi/EBITDA?period=L24M")
     await expect(page).toHaveURL(/period=L24M/)
-    await expect(page.getByText("EBITDA Performance")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "EBITDA Performance" })).toBeVisible()
   })
 })

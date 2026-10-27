@@ -45,3 +45,8 @@ global storage state.
   `<canvas>`); they assert the chart element + URL state rather than pixel content.
 - CI integration is deferred: wire these into a workflow that boots the stack (compose +
   migrate + seed) before `npm run test:e2e`.
+
+## HR / Workforce specs (`hr-*.spec.ts`) — manual
+
+These depend on seeded dev data and are skipped by default (so `test:e2e` in CI ignores them).
+Run explicitly: `E2E_HR=1 npx playwright test hr-`.

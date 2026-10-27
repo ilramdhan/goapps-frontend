@@ -30,6 +30,7 @@ function dashboardToForm(d: Dashboard): DashboardFormData {
     filterType: d.filterType,
     filterGroup1: d.filterGroup1,
     periodeGrain: d.periodeGrain,
+    periodCalendar: (d.periodCalendar || "CALENDAR") as DashboardFormData["periodCalendar"],
     defaultPeriod: (d.defaultPeriod || "L12M") as DashboardFormData["defaultPeriod"],
     chartType: d.chartType,
     chartConfig: (d.chartConfig as Record<string, unknown>) ?? {},
