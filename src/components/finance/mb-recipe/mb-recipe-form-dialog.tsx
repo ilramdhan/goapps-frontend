@@ -415,9 +415,12 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                           MB Costing Code <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="MBH-2024-001" disabled={isEditing || isPending} />
+                          <Input {...field} placeholder="MBH-2024-001" disabled={isPending} />
                         </FormControl>
-                        <FormDescription>Unique batch cost identifier</FormDescription>
+                        <FormDescription>
+                          Unique batch cost identifier
+                          {isEditing ? ". Changing it renames the MB product in Product Master and its spins." : ""}
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -561,12 +564,14 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                                   shouldDirty: true,
                                 })
                               }}
+                              allowCreate
                               disabled={isPending}
                             />
                           </FormControl>
                           <FormDescription>
-                            Picked from the shade master. Older recipes may show a shade code/name that no longer
-                            exists in master — it stays as-is until you pick a new one.
+                            Pick from the shade master or enter a new shade (auto-saved to master on save). Older
+                            recipes may show a shade code/name that no longer exists in master — it stays as-is
+                            until you pick a new one.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
