@@ -38,7 +38,7 @@ function defaultSerialize<T extends object>(key: keyof T, value: T[keyof T]): st
 /**
  * Default deserializer - converts URL string back to typed value
  */
-function defaultDeserialize<T extends object>(
+export function defaultDeserialize<T extends object>(
   key: keyof T,
   value: string | null,
   defaultValue: T[keyof T]

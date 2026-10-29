@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/common/page-header"
 import { useUrlState } from "@/lib/hooks"
+import { defaultDeserialize } from "@/lib/hooks/use-url-state"
 import { usePermission } from "@/lib/hooks/use-permission"
 import { useDashboardByCode } from "@/hooks/bi/use-dashboard"
 import { useDashboardData } from "@/hooks/bi/use-chart-data"
@@ -33,12 +34,25 @@ import { EMPLOYEE_OT_MODE, EMPLOYEE_OT_PRESETS, readEmployeeOTBlock } from "@/li
 import { ViewerEmptyState, ViewerErrorState, DataFreshnessBadge } from "./states"
 import { JobStatusBanner } from "./job-status-banner"
 
+// Optional string param defaults to undefined, so useUrlState cannot infer their type and would JSON.parse
+// "202608" into a number (crash at selectedPeriod.slice). Keep them as raw strings.
+const STRING_PARAMS: ReadonlySet<string> = new Set(["selectedPeriod"])
+export function deserializeViewerParam(
+  key: keyof ViewerState,
+  value: string | null,
+  defaultValue: ViewerState[keyof ViewerState],
+): ViewerState[keyof ViewerState] {
+  if (STRING_PARAMS.has(key)) return value ?? defaultValue
+  return defaultDeserialize(key, value, defaultValue)
+}
+
 export function ViewerPage({ code }: { code: string }) {
   const chartCardRef = useRef<HTMLDivElement>(null)
   const { hasPermission } = usePermission()
 
   const [state, setState] = useUrlState<ViewerState>({
     defaultValues: DEFAULT_VIEWER_STATE,
+    deserialize: deserializeViewerParam,
     serialize: (key, value) => {
       // Suppress empty arrays so they don't pollute the URL.
       if (Array.isArray(value)) return value.length > 0 ? JSON.stringify(value) : undefined
