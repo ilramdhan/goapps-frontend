@@ -29,6 +29,7 @@ import {
   denierFormula,
   displayRatio,
   isDenierLine,
+  isGroupMissingDenier,
 } from "@/components/finance/cost-route/rm-ratio-display"
 import { RouteGraphEditPanel } from "@/components/finance/cost-route/route-graph-edit-panel"
 import { edgeRatioLabel } from "@/components/finance/cost-route/route-graph-flow"
@@ -123,6 +124,30 @@ describe("rm-ratio-display helper", () => {
     const noted = rm({ ratioSource: "DENIER", computedRatio: 0, ratioNote: "Missing DENIER → 0" })
     expect(denierFormula(seqOf([noted]), noted)).toBe("Missing DENIER → 0")
     expect(denierFormula(seqOf([inputLine]), inputLine)).toBe("")
+  })
+})
+
+describe("isGroupMissingDenier", () => {
+  const yarn = { ratioSource: "DENIER" as const }
+  const denierSeq = { rmRatioMode: "DENIER" as const, rms: [yarn] as CostRouteRm[] }
+  it("flags a GROUP line without denier next to a denier line", () => {
+    expect(isGroupMissingDenier(denierSeq, { rmType: "GROUP", ratioSource: "INPUT" })).toBe(true)
+  })
+  it("does not flag a GROUP line with denier", () => {
+    expect(isGroupMissingDenier(denierSeq, { rmType: "GROUP", ratioSource: "DENIER" })).toBe(false)
+  })
+  it("does not flag a seq without any denier line (chip / additive groups)", () => {
+    const chipSeq = { rmRatioMode: "DENIER" as const, rms: [{ ratioSource: "INPUT" }] as CostRouteRm[] }
+    expect(isGroupMissingDenier(chipSeq, { rmType: "GROUP", ratioSource: "INPUT" })).toBe(false)
+  })
+  it("does not flag in INPUT mode", () => {
+    expect(isGroupMissingDenier({ ...denierSeq, rmRatioMode: "INPUT" }, { rmType: "GROUP", ratioSource: "INPUT" })).toBe(false)
+  })
+  it("does not flag PRODUCT lines", () => {
+    expect(isGroupMissingDenier(denierSeq, { rmType: "PRODUCT", ratioSource: "INPUT" })).toBe(false)
+  })
+  it("does not flag when seq is undefined", () => {
+    expect(isGroupMissingDenier(undefined, { rmType: "GROUP", ratioSource: "INPUT" })).toBe(false)
   })
 })
 
