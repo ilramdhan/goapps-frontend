@@ -6,7 +6,7 @@
 
 import { useState, type ComponentProps } from "react"
 import Link from "next/link"
-import { Plus, Trash2, X } from "lucide-react"
+import { AlertTriangle, Plus, Trash2, X } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,11 @@ import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   DENIER_RATIO_DISABLED_HINT,
+  GROUP_MISSING_DENIER_HINT,
   denierFormula,
   displayRatio,
   isDenierLine,
+  isGroupMissingDenier,
 } from "@/components/finance/cost-route/rm-ratio-display"
 import type { CostRouteRm, CostRouteSeq } from "@/types/finance/cost-route"
 import { routeRmKeyOf } from "@/types/finance/rm-denier-override"
@@ -135,6 +137,7 @@ function SeqBody({
                 <span className="min-w-0 flex-1 truncate font-mono">
                   {rmRefLabel(rm)}
                 </span>
+                {isGroupMissingDenier(seq, rm) && <MissingDenierBadge />}
                 {isDenierLine(rm) ? (
                   <DenierRatioBadge seq={seq} rm={rm} compact />
                 ) : (
@@ -226,6 +229,12 @@ function RmBody({ seq, rm, locked, onChangeRatio, onRemove }: RmPanelProps) {
         <Label htmlFor="rm-ratio" className="text-xs uppercase tracking-wide text-muted-foreground">
           Ratio per output unit
         </Label>
+        {isGroupMissingDenier(seq, rm) && (
+          <div className="mb-1 space-y-1">
+            <MissingDenierBadge />
+            <p className="text-xs text-amber-600 dark:text-amber-500">{GROUP_MISSING_DENIER_HINT}</p>
+          </div>
+        )}
         <RatioInput
           // Keyed on the RM so switching edges never shows the previous RM's value.
           key={rm.uid}
@@ -306,6 +315,25 @@ function RatioInput({
 
 // Read-only computed ratio for a denier-derived line: value + "Denier" badge,
 // with the formula (or backend note) and the edit hint in a tooltip.
+function MissingDenierBadge() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant="outline"
+          className="shrink-0 gap-1 border-amber-500 text-[10px] text-amber-600 dark:text-amber-500"
+          data-testid="group-missing-denier"
+          tabIndex={0}
+        >
+          <AlertTriangle className="h-3 w-3" />
+          Denier kosong
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{GROUP_MISSING_DENIER_HINT}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function DenierRatioBadge({
   seq,
   rm,

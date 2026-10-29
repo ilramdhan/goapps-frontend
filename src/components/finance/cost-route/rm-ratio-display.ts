@@ -13,6 +13,28 @@ import type { CostRouteRm, CostRouteSeq } from "@/types/finance/cost-route"
 export const DENIER_RATIO_DISABLED_HINT =
   "Calculated from denier (DENIER ratio mode). Change DENIER on the yarn product, the RM group Denier, or SPANDEX_DRAFT on this product."
 
+export const GROUP_MISSING_DENIER_HINT =
+  "RM Group belum punya denier — rasio tidak dihitung dari denier dan memakai rasio input. Isi Denier di master RM Group lalu hitung ulang."
+
+/**
+ * True when the product is in DENIER mode and a GROUP line has no denier while
+ * another line in the same seq is denier-derived: the backend treats the group
+ * as non-denier (keeps the stored ratio), so it is left out of the denier sum
+ * and the yarn ratios no longer add up. Seqs with no denier line at all (e.g.
+ * chip + additive groups) are not flagged — those groups never carry denier.
+ */
+export function isGroupMissingDenier(
+  seq: Pick<CostRouteSeq, "rmRatioMode" | "rms"> | null | undefined,
+  rm: Pick<CostRouteRm, "rmType" | "ratioSource">,
+): boolean {
+  return (
+    seq?.rmRatioMode === "DENIER" &&
+    rm.rmType === "GROUP" &&
+    !isDenierLine(rm) &&
+    (seq.rms ?? []).some(isDenierLine)
+  )
+}
+
 /** True when the backend derived this line's ratio from denier (read-only). */
 export function isDenierLine(rm: Pick<CostRouteRm, "ratioSource">): boolean {
   return rm.ratioSource === "DENIER"
