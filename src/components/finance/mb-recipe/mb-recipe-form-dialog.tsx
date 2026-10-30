@@ -379,7 +379,7 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
               {isEditing && Number(mbHead?.costProductId ?? 0) > 0 && (
                 <Alert className="mb-4" data-testid="mb-recipe-cascade-warning">
                   <AlertDescription>
-                    Changes will be applied to all MB Spins of this recipe, the MB product (parameters are re-frozen)
+                    Changes will be applied to all MB Spins of this recipe, the MB product (parameters are re-frozen when the machine changes)
                     and the yarn products that use those spins (lookups sync in the background). Manual entries in
                     MB Spin will be overwritten.
                   </AlertDescription>
