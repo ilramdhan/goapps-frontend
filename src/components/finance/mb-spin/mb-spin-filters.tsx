@@ -64,7 +64,7 @@ export function MBSpinFilters({ filters, onFiltersChange }: MBSpinFiltersProps) 
       <DebouncedSearchInput
         value={filters.search || ""}
         onValueChange={handleSearchChange}
-        placeholder="Search code or name..."
+        placeholder="Search code, name, or Orion Item Code..."
         debounceMs={300}
         containerClassName="flex-1 sm:max-w-sm"
       />
