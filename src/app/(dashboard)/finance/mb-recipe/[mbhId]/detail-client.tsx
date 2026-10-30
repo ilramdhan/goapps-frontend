@@ -118,6 +118,7 @@ export default function MbRecipeDetailClient({ mbhId }: Props) {
           <Field label="Shade Code" value={mbHead.shadeCode || "—"} mono />
           <Field label="Shade Name" value={mbHead.shadeName || "—"} />
           <Field label="MB Costing" value={mbHead.mbhMbCosting || "—"} mono />
+          <Field label="Orion Item Code" value={mbHead.mbhOrionItemCode || "—"} mono />
           <Field label="Cross Section" value={mbHead.crossSection || "—"} />
           <Field label="Lusture Code" value={mbHead.lustureCode || "—"} mono />
           <Field label="Bought-out" value={mbHead.isBoughtout ? "Yes" : "No"} />

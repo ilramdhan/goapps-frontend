@@ -44,7 +44,7 @@ import type { MBHead } from "@/types/finance/mb-head"
 
 const EXISTING_ROW = {
   mbhId: "mbh-1",
-  mbhOracleSysId: "ORA-1",
+  mbhOracleSysId: "ORA-1", mbhOrionItemCode: "",
   mbhMbCosting: "MBH-2024-001",
   mbhMgtName: "Mgt One",
   mbhDenier: 150.5,

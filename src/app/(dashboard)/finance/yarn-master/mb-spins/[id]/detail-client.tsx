@@ -125,6 +125,7 @@ export default function MbSpinDetailClient({ id }: Props) {
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <Field label="Mgt Name" value={mbSpin.mbsMgtName || "—"} />
           <Field label="MB Costing" value={mbSpin.mbsMbCosting || "—"} mono />
+          <Field label="Orion Item Code" value={mbSpin.mbsOrionItemCode || "—"} mono />
           <Field label="Shade Code" value={mbSpin.mbsShadeCode || "—"} mono />
           <Field label="Shade Name" value={mbSpin.mbsShadeName || "—"} />
           <Field label="Cross Section" value={mbSpin.mbsCrossSection || "—"} />
