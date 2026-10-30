@@ -28,6 +28,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Loader2 } from "lucide-react"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -375,6 +376,15 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <ScrollableDialogBody>
+              {isEditing && Number(mbHead?.costProductId ?? 0) > 0 && (
+                <Alert className="mb-4" data-testid="mb-recipe-cascade-warning">
+                  <AlertDescription>
+                    Changes will be applied to all MB Spins of this recipe, the MB product (parameters are re-frozen when the machine changes)
+                    and the yarn products that use those spins (lookups sync in the background). Manual entries in
+                    MB Spin will be overwritten.
+                  </AlertDescription>
+                </Alert>
+              )}
               {/*
                 ~~UNCONTROLLED on purpose. The tab only needs to reset to the first
                 one each time the dialog opens on a different record, and `key`
