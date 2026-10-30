@@ -431,6 +431,14 @@ export function MBSpinFormDialog({ open, onOpenChange, mbSpin, headId, onSuccess
                   </FormItem>
                 )}
               />
+              {mbSpin?.mbsOrionItemCode && (
+                <FormItem className="flex h-full flex-col">
+                  <FormLabel>Orion Item Code</FormLabel>
+                  <FormControl>
+                    <Input value={mbSpin.mbsOrionItemCode} readOnly disabled />
+                  </FormControl>
+                </FormItem>
+              )}
               <FormField
                 control={form.control}
                 name="mbsMbCosting"

@@ -1504,7 +1504,11 @@ export interface MBHead {
    * workflow step (principle U-2) and is left untouched by RequestUnlockMBHead —
    * never substitute one for the other.
    */
-  mbhUnlockReason?: string | undefined;
+  mbhUnlockReason?:
+    | string
+    | undefined;
+  /** Oracle Orion item code (VARCHAR(200), optional; empty = none). */
+  mbhOrionItemCode: string;
 }
 
 /** CreateMBHeadRequest is the request for creating an MB Head record. */
@@ -1597,6 +1601,8 @@ export interface CreateMBHeadRequest {
     | undefined;
   /** Additional shades (max 2). */
   additionalShades: MBHeadShadeInput[];
+  /** Oracle Orion item code (optional, max 200; empty = none). */
+  mbhOrionItemCode?: string | undefined;
 }
 
 /** CreateMBHeadResponse is the response for creating an MB Head record. */
@@ -1721,7 +1727,11 @@ export interface UpdateMBHeadRequest {
    * Whether additional_shades should replace the stored shade list. Only when true is the
    * list rewritten. Legacy forms omit this flag, so their updates never wipe existing shades.
    */
-  replaceAdditionalShades?: boolean | undefined;
+  replaceAdditionalShades?:
+    | boolean
+    | undefined;
+  /** Oracle Orion item code (max 200). Absent = unchanged, "" = clear. */
+  mbhOrionItemCode?: string | undefined;
 }
 
 /** UpdateMBHeadResponse is the response for updating an MB Head record. */
@@ -2389,6 +2399,8 @@ export interface MBSpin {
   mbsShadeName: string;
   /** Cross section, copied down from MB Head at auto-gen. Read-only lineage field. */
   mbsCrossSection: string;
+  /** Oracle Orion item code (output-only, read-only; inherited from head when empty). */
+  mbsOrionItemCode: string;
 }
 
 /** CreateMBSpinRequest is the request for creating an MB Spin record. */
@@ -14501,6 +14513,7 @@ function createBaseMBHead(): MBHead {
     mbhUnlockRequestedBy: undefined,
     mbhCheckStatusCalc: undefined,
     mbhUnlockReason: undefined,
+    mbhOrionItemCode: "",
   };
 }
 
@@ -14640,6 +14653,9 @@ export const MBHead: MessageFns<MBHead> = {
     }
     if (message.mbhUnlockReason !== undefined) {
       writer.uint32(362).string(message.mbhUnlockReason);
+    }
+    if (message.mbhOrionItemCode !== "") {
+      writer.uint32(370).string(message.mbhOrionItemCode);
     }
     return writer;
   },
@@ -15011,6 +15027,14 @@ export const MBHead: MessageFns<MBHead> = {
           message.mbhUnlockReason = reader.string();
           continue;
         }
+        case 46: {
+          if (tag !== 370) {
+            break;
+          }
+
+          message.mbhOrionItemCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15243,6 +15267,11 @@ export const MBHead: MessageFns<MBHead> = {
         : isSet(object.mbh_unlock_reason)
         ? globalThis.String(object.mbh_unlock_reason)
         : undefined,
+      mbhOrionItemCode: isSet(object.mbhOrionItemCode)
+        ? globalThis.String(object.mbhOrionItemCode)
+        : isSet(object.mbh_orion_item_code)
+        ? globalThis.String(object.mbh_orion_item_code)
+        : "",
     };
   },
 
@@ -15383,6 +15412,9 @@ export const MBHead: MessageFns<MBHead> = {
     if (message.mbhUnlockReason !== undefined) {
       obj.mbhUnlockReason = message.mbhUnlockReason;
     }
+    if (message.mbhOrionItemCode !== "") {
+      obj.mbhOrionItemCode = message.mbhOrionItemCode;
+    }
     return obj;
   },
 
@@ -15438,6 +15470,7 @@ export const MBHead: MessageFns<MBHead> = {
     message.mbhUnlockRequestedBy = object.mbhUnlockRequestedBy ?? undefined;
     message.mbhCheckStatusCalc = object.mbhCheckStatusCalc ?? undefined;
     message.mbhUnlockReason = object.mbhUnlockReason ?? undefined;
+    message.mbhOrionItemCode = object.mbhOrionItemCode ?? "";
     return message;
   },
 };
@@ -15466,6 +15499,7 @@ function createBaseCreateMBHeadRequest(): CreateMBHeadRequest {
     mbhVsNumber: undefined,
     mbhNoOfProcess: undefined,
     additionalShades: [],
+    mbhOrionItemCode: undefined,
   };
 }
 
@@ -15536,6 +15570,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     }
     for (const v of message.additionalShades) {
       MBHeadShadeInput.encode(v!, writer.uint32(178).fork()).join();
+    }
+    if (message.mbhOrionItemCode !== undefined) {
+      writer.uint32(186).string(message.mbhOrionItemCode);
     }
     return writer;
   },
@@ -15723,6 +15760,14 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
           message.additionalShades.push(MBHeadShadeInput.decode(reader, reader.uint32()));
           continue;
         }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.mbhOrionItemCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15844,6 +15889,11 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
         : globalThis.Array.isArray(object?.additional_shades)
         ? object.additional_shades.map((e: any) => MBHeadShadeInput.fromJSON(e))
         : [],
+      mbhOrionItemCode: isSet(object.mbhOrionItemCode)
+        ? globalThis.String(object.mbhOrionItemCode)
+        : isSet(object.mbh_orion_item_code)
+        ? globalThis.String(object.mbh_orion_item_code)
+        : undefined,
     };
   },
 
@@ -15915,6 +15965,9 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     if (message.additionalShades?.length) {
       obj.additionalShades = message.additionalShades.map((e) => MBHeadShadeInput.toJSON(e));
     }
+    if (message.mbhOrionItemCode !== undefined) {
+      obj.mbhOrionItemCode = message.mbhOrionItemCode;
+    }
     return obj;
   },
 
@@ -15945,6 +15998,7 @@ export const CreateMBHeadRequest: MessageFns<CreateMBHeadRequest> = {
     message.mbhVsNumber = object.mbhVsNumber ?? undefined;
     message.mbhNoOfProcess = object.mbhNoOfProcess ?? undefined;
     message.additionalShades = object.additionalShades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
+    message.mbhOrionItemCode = object.mbhOrionItemCode ?? undefined;
     return message;
   },
 };
@@ -16194,6 +16248,7 @@ function createBaseUpdateMBHeadRequest(): UpdateMBHeadRequest {
     mbhNoOfProcess: undefined,
     additionalShades: [],
     replaceAdditionalShades: undefined,
+    mbhOrionItemCode: undefined,
   };
 }
 
@@ -16267,6 +16322,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     }
     if (message.replaceAdditionalShades !== undefined) {
       writer.uint32(184).bool(message.replaceAdditionalShades);
+    }
+    if (message.mbhOrionItemCode !== undefined) {
+      writer.uint32(194).string(message.mbhOrionItemCode);
     }
     return writer;
   },
@@ -16462,6 +16520,14 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
           message.replaceAdditionalShades = reader.bool();
           continue;
         }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.mbhOrionItemCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -16588,6 +16654,11 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
         : isSet(object.replace_additional_shades)
         ? globalThis.Boolean(object.replace_additional_shades)
         : undefined,
+      mbhOrionItemCode: isSet(object.mbhOrionItemCode)
+        ? globalThis.String(object.mbhOrionItemCode)
+        : isSet(object.mbh_orion_item_code)
+        ? globalThis.String(object.mbh_orion_item_code)
+        : undefined,
     };
   },
 
@@ -16662,6 +16733,9 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     if (message.replaceAdditionalShades !== undefined) {
       obj.replaceAdditionalShades = message.replaceAdditionalShades;
     }
+    if (message.mbhOrionItemCode !== undefined) {
+      obj.mbhOrionItemCode = message.mbhOrionItemCode;
+    }
     return obj;
   },
 
@@ -16693,6 +16767,7 @@ export const UpdateMBHeadRequest: MessageFns<UpdateMBHeadRequest> = {
     message.mbhNoOfProcess = object.mbhNoOfProcess ?? undefined;
     message.additionalShades = object.additionalShades?.map((e) => MBHeadShadeInput.fromPartial(e)) || [];
     message.replaceAdditionalShades = object.replaceAdditionalShades ?? undefined;
+    message.mbhOrionItemCode = object.mbhOrionItemCode ?? undefined;
     return message;
   },
 };
@@ -21036,6 +21111,7 @@ function createBaseMBSpin(): MBSpin {
     mbsShadeCode: "",
     mbsShadeName: "",
     mbsCrossSection: "",
+    mbsOrionItemCode: "",
   };
 }
 
@@ -21118,6 +21194,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.mbsCrossSection !== "") {
       writer.uint32(210).string(message.mbsCrossSection);
+    }
+    if (message.mbsOrionItemCode !== "") {
+      writer.uint32(218).string(message.mbsOrionItemCode);
     }
     return writer;
   },
@@ -21337,6 +21416,14 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.mbsCrossSection = reader.string();
           continue;
         }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.mbsOrionItemCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -21474,6 +21561,11 @@ export const MBSpin: MessageFns<MBSpin> = {
         : isSet(object.mbs_cross_section)
         ? globalThis.String(object.mbs_cross_section)
         : "",
+      mbsOrionItemCode: isSet(object.mbsOrionItemCode)
+        ? globalThis.String(object.mbsOrionItemCode)
+        : isSet(object.mbs_orion_item_code)
+        ? globalThis.String(object.mbs_orion_item_code)
+        : "",
     };
   },
 
@@ -21557,6 +21649,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.mbsCrossSection !== "") {
       obj.mbsCrossSection = message.mbsCrossSection;
     }
+    if (message.mbsOrionItemCode !== "") {
+      obj.mbsOrionItemCode = message.mbsOrionItemCode;
+    }
     return obj;
   },
 
@@ -21593,6 +21688,7 @@ export const MBSpin: MessageFns<MBSpin> = {
     message.mbsShadeCode = object.mbsShadeCode ?? "";
     message.mbsShadeName = object.mbsShadeName ?? "";
     message.mbsCrossSection = object.mbsCrossSection ?? "";
+    message.mbsOrionItemCode = object.mbsOrionItemCode ?? "";
     return message;
   },
 };

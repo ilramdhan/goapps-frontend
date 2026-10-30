@@ -50,6 +50,7 @@ export const MB_RECIPE_COLUMNS: ColumnDef<MBHead>[] = [
   { id: "is_boughtout", header: "Bought-out", defaultHidden: true },
   { id: "entry_status", header: "Entry Status" },
   { id: "current_version", header: "Version" },
+  { id: "mbh_orion_item_code", header: "Orion Item Code" },
 ]
 
 /** Page-level hook so the visibility toggle can live in the filter toolbar. */
@@ -190,7 +191,8 @@ export function MbRecipeTable({
               {show("mbh_lusture_code") && renderHeader(MB_RECIPE_COLUMNS[8], "w-24")}
               {show("is_boughtout") && renderHeader(MB_RECIPE_COLUMNS[9], "w-28")}
               {show("entry_status") && renderHeader(MB_RECIPE_COLUMNS[10], "w-32")}
-              {show("current_version") && renderHeader(MB_RECIPE_COLUMNS[11], "w-24 pr-4")}
+              {show("current_version") && renderHeader(MB_RECIPE_COLUMNS[11], "w-24")}
+              {show("mbh_orion_item_code") && renderHeader(MB_RECIPE_COLUMNS[12], "pr-4")}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -213,7 +215,8 @@ export function MbRecipeTable({
                   {show("mbh_lusture_code") && <TableCell><Skeleton className="h-4 w-16" /></TableCell>}
                   {show("is_boughtout") && <TableCell><Skeleton className="h-4 w-12" /></TableCell>}
                   {show("entry_status") && <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>}
-                  {show("current_version") && <TableCell className="pr-4"><Skeleton className="h-4 w-8" /></TableCell>}
+                  {show("current_version") && <TableCell><Skeleton className="h-4 w-8" /></TableCell>}
+                  {show("mbh_orion_item_code") && <TableCell className="pr-4"><Skeleton className="h-4 w-24" /></TableCell>}
                 </TableRow>
               ))}
             {!isLoading && items.length === 0 && (
@@ -277,7 +280,10 @@ export function MbRecipeTable({
                   </TableCell>
                 )}
                 {show("current_version") && (
-                  <TableCell className="pr-4 text-sm">{mb.currentVersion}</TableCell>
+                  <TableCell className="text-sm">{mb.currentVersion}</TableCell>
+                )}
+                {show("mbh_orion_item_code") && (
+                  <TableCell className="pr-4 font-mono text-xs">{mb.mbhOrionItemCode || "—"}</TableCell>
                 )}
               </TableRow>
             ))}

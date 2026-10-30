@@ -37,6 +37,12 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
       cell: (row) => row.mbsMbCosting || "-",
     },
     {
+      id: "mbsOrionItemCode",
+      header: "Orion Item Code",
+      hideOnMobile: true,
+      cell: (row) => row.mbsOrionItemCode || "-",
+    },
+    {
       id: "mbsStatus",
       header: "Status",
       width: "w-[100px]",
