@@ -31,6 +31,15 @@ const BASE: MbHeadStub = {
   costProductId: undefined,
 }
 
+vi.mock("@/components/finance/mb-head", () => ({
+  MBHeadDeleteDialog: () => null,
+}))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}))
+vi.mock("@/providers/permission-provider", () => ({
+  usePermissionContext: () => ({ hasPermission: () => true }),
+}))
 vi.mock("@/hooks/finance/use-mb-head", () => ({
   useMBHead: () => ({ data: { data: { ...BASE, ...mbHeadState.value } }, isLoading: false }),
   // R19 Bagian B: detail-client.tsx now always mounts MBRecipeFormDialog (Edit

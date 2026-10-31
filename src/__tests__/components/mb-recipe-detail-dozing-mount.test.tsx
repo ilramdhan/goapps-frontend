@@ -16,6 +16,15 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@/__tests__/utils"
 
+vi.mock("@/components/finance/mb-head", () => ({
+  MBHeadDeleteDialog: () => null,
+}))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}))
+vi.mock("@/providers/permission-provider", () => ({
+  usePermissionContext: () => ({ hasPermission: () => true }),
+}))
 vi.mock("@/hooks/finance/use-mb-head", () => ({
   useMBHead: () => ({
     data: {

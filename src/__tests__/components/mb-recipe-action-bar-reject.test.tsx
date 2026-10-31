@@ -83,7 +83,7 @@ describe("MbRecipeActionBar — Reject permission gate (K-25)", () => {
   })
 
   it("still renders the rest of the action bar when Reject is hidden", () => {
-    renderBar("SUBMITTED", [])
+    renderBar("SUBMITTED", ["finance.mb.head.approve"])
     expect(screen.getByRole("button", { name: /^approve$/i })).toBeInTheDocument()
     // ~~expect(screen.getByRole("button", { name: /^revoke$/i })).toBeInTheDocument()~~
     // 🔴 2026-08-26 (USER DECISION) — Revoke was removed from the bar. Approve is now the

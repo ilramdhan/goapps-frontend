@@ -97,6 +97,9 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   // K-30 (option A): Return to Draft reuses the existing submit permission — it hands the
   // MB Head back to whoever submits it. Deliberately NOT finance.mb.head.reject and NOT a new code.
   const canSubmitPerm = hasPermission("finance.mb.head.submit")
+  // Approve maps to its own code (SubmitMBHead / ApproveMBHead in auth_interceptor.go),
+  // so a drafter never sees an Approve button the backend would reject with 403.
+  const canApprovePerm = hasPermission("finance.mb.head.approve")
   // P10 (REVISED): the unlock RPCs no longer share ONE code. The user decided that a
   // requester must not be able to approve their own request, so the backend split the
   // interceptor mapping (auth_interceptor.go):
@@ -123,7 +126,7 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   const grantUnlockM = useGrantUnlockMBHead()
   const rejectUnlockM = useRejectUnlockMBHead()
 
-  const canSubmit = status === "DRAFT"
+  const canSubmit = status === "DRAFT" && canSubmitPerm
 
   // [R22] Block Submit in the UI when the composition total exceeds 100%. This is
   // a UI-side early warning, not a relaxation or replacement of the backend rule
@@ -147,7 +150,7 @@ export function MbRecipeActionBar({ mbHead, compositionTotalPct }: Props) {
   // Offering Approve on APPROVED would work technically (the backend accepts that origin),
   // but it is a NEW affordance, not part of the "remove the Validate button" decision, so
   // it is left for the user to decide rather than invented here.
-  const canApprove = status === "SUBMITTED" || status === "UN_APPROVED"
+  const canApprove = (status === "SUBMITTED" || status === "UN_APPROVED") && canApprovePerm
   // 2026-08-26: ~~canUnApprove~~ and ~~canRevoke~~ removed — both features are gone.
   // K-2/K-25: Reject is only offered from SUBMITTED, and only to holders of
   // finance.mb.head.reject.

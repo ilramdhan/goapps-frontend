@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/common/empty-state"
 import { ConfirmDialog } from "@/components/shared"
+import { usePermissionContext } from "@/providers/permission-provider"
 import { useMbCompositions, useDeleteMbComposition } from "@/hooks/finance/use-mb-composition"
 import { useRMGroup } from "@/hooks/finance/use-rm-group"
 import { useMBHead } from "@/hooks/finance/use-mb-head"
@@ -32,7 +33,10 @@ export function MbCompositionTab({ mbhId, entryStatus }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<MbComposition | null>(null)
 
   const items = data ?? []
-  const editable = entryStatus === "DRAFT"
+  const { hasPermission } = usePermissionContext()
+  // Composition writes map to finance.mb.head.update (auth_interceptor.go MbCompositionService),
+  // so read-only roles (approver/validator) get the table without the edit controls.
+  const editable = entryStatus === "DRAFT" && hasPermission("finance.mb.head.update")
   // Guards double-click/fast re-delete from hitting an already-deleted row before
   // the list refetch lands (the row is still rendered until invalidation resolves).
   const pendingDeleteId = deleteM.isPending ? deleteM.variables : undefined

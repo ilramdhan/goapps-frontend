@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Download, Upload, Loader2, FileSpreadsheet } from "lucide-react"
 
 import { PageHeader } from "@/components/common/page-header"
+import { usePermissionContext } from "@/providers/permission-provider"
 import { DebouncedSearchInput } from "@/components/common/debounced-search-input"
 import { Button } from "@/components/ui/button"
 import {
@@ -87,6 +88,9 @@ export default function MbRecipePageClient() {
   const exportFullMutation = useExportMBRecipeFull()
   const exportCostCalcDetailMutation = useExportMBCostCalcDetail()
   const queryClient = useQueryClient()
+  // Import and New both map to finance.mb.head.create (ImportMBHeads / CreateMBHead).
+  const { hasPermission } = usePermissionContext()
+  const canCreate = hasPermission("finance.mb.head.create")
 
   // Bulk MB Head lifecycle regenerate (Super Admin, Phase F) — selection lives here
   // (not inside MbRecipeTable) so both the table's checkboxes and the toolbar/dialog
@@ -243,17 +247,23 @@ export default function MbRecipePageClient() {
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export MB Cost Calc Detail
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setImportOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import from Excel
-              </DropdownMenuItem>
+              {canCreate && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import from Excel
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New MB Recipe
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> New MB Recipe
+            </Button>
+          )}
         </div>
       </PageHeader>
 

@@ -17,6 +17,15 @@ const mbHeadState: { costProductId: number | undefined; entryStatus: string } = 
   entryStatus: "VALIDATED",
 }
 
+vi.mock("@/components/finance/mb-head", () => ({
+  MBHeadDeleteDialog: () => null,
+}))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}))
+vi.mock("@/providers/permission-provider", () => ({
+  usePermissionContext: () => ({ hasPermission: () => true }),
+}))
 vi.mock("@/hooks/finance/use-mb-head", () => ({
   useMBHead: () => ({
     data: {

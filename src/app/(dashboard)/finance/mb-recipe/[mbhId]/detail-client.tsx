@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Beaker, Lock, Pencil, Unlock } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, Beaker, Lock, Pencil, Trash2, Unlock } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +13,8 @@ import { UserName } from "@/components/common/user-name"
 import { useBreadcrumbOverride } from "@/components/common/dynamic-breadcrumb"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/common/empty-state"
+import { MBHeadDeleteDialog } from "@/components/finance/mb-head"
+import { usePermissionContext } from "@/providers/permission-provider"
 import { useMBHead } from "@/hooks/finance/use-mb-head"
 import { useMbCompositions } from "@/hooks/finance/use-mb-composition"
 import { sumMbCompositionPct } from "@/lib/finance/mb-composition-total"
@@ -43,6 +46,14 @@ export default function MbRecipeDetailClient({ mbhId }: Props) {
   // (mb-composition-tab.tsx). Once submitted/approved this button disappears;
   // MbRecipeActionBar's Request Unlock flow is the only path back to editing.
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const router = useRouter()
+  const { hasPermission } = usePermissionContext()
+  const isDraft = mbHead?.entryStatus === "DRAFT"
+  // Same codes the backend checks (UpdateMBHead / DeleteMBHead). Delete is DRAFT-only
+  // on the backend too (DeleteHandler → ErrNotDeletable), so the button mirrors that.
+  const canEdit = isDraft && hasPermission("finance.mb.head.update")
+  const canDelete = isDraft && hasPermission("finance.mb.head.delete")
 
   useBreadcrumbOverride(mbHead ? mbHead.devCode || mbHead.mbhMbCosting || null : null)
 
@@ -95,10 +106,16 @@ export default function MbRecipeDetailClient({ mbhId }: Props) {
             di sana juga. Komponen MBDozingCalculatorDialog TIDAK dihapus; ia sekarang
             hanya dipakai oleh MB Spin (lihat mb-spin-form-dialog.tsx).
           */}
-          {mbHead.entryStatus === "DRAFT" && (
+          {canEdit && (
             <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4 mr-1" />
               Edit
+            </Button>
+          )}
+          {canDelete && (
+            <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
             </Button>
           )}
           <MbRecipeActionBar mbHead={mbHead} compositionTotalPct={compositionTotalPct} />
@@ -235,6 +252,12 @@ export default function MbRecipeDetailClient({ mbhId }: Props) {
       </Tabs>
 
       <MBRecipeFormDialog open={editOpen} onOpenChange={setEditOpen} mbHead={mbHead} />
+      <MBHeadDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        mbHead={mbHead}
+        onSuccess={() => router.push("/finance/mb-recipe")}
+      />
     </div>
   )
 }
