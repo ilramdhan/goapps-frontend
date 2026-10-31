@@ -31,6 +31,7 @@ import {
 import { useMBSpins, useExportMBSpins } from "@/hooks/finance/use-mb-spin"
 import { useLookupSyncAfterSave } from "@/hooks/finance/use-lookup-sync-after-save"
 import { useUrlState } from "@/lib/hooks"
+import { usePermissionContext } from "@/providers/permission-provider"
 import type { MBSpin, ListMBSpinsParams } from "@/types/finance/mb-spin"
 import { ActiveFilter } from "@/types/finance/mb-spin"
 
@@ -46,6 +47,11 @@ const defaultFilters: ListMBSpinsParams = {
 function MBSpinPageContent() {
   const [filters, setFilters] = useUrlState<ListMBSpinsParams>({ defaultValues: defaultFilters })
   const { data, isLoading } = useMBSpins(filters)
+  // Same codes as MBSpinService in auth_interceptor.go (Create/Import → .create).
+  const { hasPermission } = usePermissionContext()
+  const canCreate = hasPermission("finance.yarnmaster.mbspin.create")
+  const canUpdate = hasPermission("finance.yarnmaster.mbspin.update")
+  const canDelete = hasPermission("finance.yarnmaster.mbspin.delete")
   const exportMutation = useExportMBSpins()
 
   const { onSaved: onLookupSaved, notice: lookupSyncNotice } = useLookupSyncAfterSave("MB_SPIN")
@@ -105,16 +111,20 @@ function MBSpinPageContent() {
                 <Download className="mr-2 h-4 w-4" />
                 Export to Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setImportOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import from Excel
-              </DropdownMenuItem>
+              {canCreate && (
+                <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import from Excel
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> Add MB Spin
-          </Button>
+          {canCreate && (
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> Add MB Spin
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -132,8 +142,8 @@ function MBSpinPageContent() {
           <MBSpinTable
             data={items}
             isLoading={isLoading}
-            onEdit={openEdit}
-            onDelete={openDelete}
+            onEdit={canUpdate ? openEdit : undefined}
+            onDelete={canDelete ? openDelete : undefined}
             onDuplicate={openDuplicate}
           />
           <DataTablePagination

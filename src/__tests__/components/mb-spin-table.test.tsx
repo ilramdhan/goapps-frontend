@@ -91,3 +91,12 @@ describe("MBSpinTable row actions", () => {
     )
   })
 })
+
+describe("MBSpinTable optional row actions", () => {
+  it("omits Edit and Delete when the caller does not pass their handlers (no permission)", () => {
+    render(<MBSpinTable data={items} />)
+    expect(screen.getByTitle("View")).toBeInTheDocument()
+    expect(screen.queryByTitle("Edit")).not.toBeInTheDocument()
+    expect(screen.queryByTitle("Delete")).not.toBeInTheDocument()
+  })
+})

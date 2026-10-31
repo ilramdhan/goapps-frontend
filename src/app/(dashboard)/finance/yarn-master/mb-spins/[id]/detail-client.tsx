@@ -29,11 +29,12 @@ export default function MbSpinDetailClient({ id }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
 
-  // Same permission pattern as mb-spin-table.tsx (list page): Edit/Delete are
-  // NOT gated at all, Duplicate is gated on the "create" permission code
-  // because it produces a brand-new record — mirrored exactly, no new
-  // permission code invented.
+  // Same permission pattern as mb-spin-table.tsx (list page): each action is gated on
+  // the code its RPC maps to in auth_interceptor.go. Duplicate uses "create" because
+  // it produces a brand-new record — no new permission code invented.
   const canDuplicate = hasPermission("finance.yarnmaster.mbspin.create")
+  const canUpdate = hasPermission("finance.yarnmaster.mbspin.update")
+  const canDelete = hasPermission("finance.yarnmaster.mbspin.delete")
 
   useBreadcrumbOverride(mbSpin ? mbSpin.mbsMgtName || mbSpin.mbsMbCosting || null : null)
 
@@ -87,20 +88,24 @@ export default function MbSpinDetailClient({ id }: Props) {
           subtitle={mbSpin.mbsMbCosting || undefined}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
+          {canUpdate && (
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          )}
           {canDuplicate && (
             <Button size="sm" variant="outline" onClick={() => setDuplicateOpen(true)}>
               <Copy className="h-4 w-4 mr-1" />
               Duplicate
             </Button>
           )}
-          <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete
-          </Button>
+          {canDelete && (
+            <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
 

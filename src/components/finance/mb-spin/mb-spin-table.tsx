@@ -12,8 +12,10 @@ import type { MBSpin } from "@/types/finance/mb-spin"
 interface MBSpinTableProps {
   data: MBSpin[]
   isLoading?: boolean
-  onEdit: (mbSpin: MBSpin) => void
-  onDelete: (mbSpin: MBSpin) => void
+  /** Omit to hide the action (caller lacks finance.yarnmaster.mbspin.update). */
+  onEdit?: (mbSpin: MBSpin) => void
+  /** Omit to hide the action (caller lacks finance.yarnmaster.mbspin.delete). */
+  onDelete?: (mbSpin: MBSpin) => void
   onDuplicate?: (mbSpin: MBSpin) => void
 }
 
@@ -106,13 +108,15 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
       icon: <Eye className="h-4 w-4" />,
       onClick: (row) => router.push(`/finance/yarn-master/mb-spins/${row.mbsId}`),
     },
-    {
+  ]
+  if (onEdit) {
+    actions.push({
       id: "edit",
       label: "Edit",
       icon: <Pencil className="h-4 w-4" />,
       onClick: onEdit,
-    },
-  ]
+    })
+  }
   if (canDuplicate) {
     actions.push({
       id: "duplicate",
@@ -121,13 +125,15 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
       onClick: onDuplicate!,
     })
   }
-  actions.push({
-    id: "delete",
-    label: "Delete",
-    icon: <Trash2 className="h-4 w-4" />,
-    onClick: onDelete,
-    variant: "destructive",
-  })
+  if (onDelete) {
+    actions.push({
+      id: "delete",
+      label: "Delete",
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: onDelete,
+      variant: "destructive",
+    })
+  }
 
   return (
     <DataTable

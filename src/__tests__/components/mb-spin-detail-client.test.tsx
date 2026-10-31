@@ -191,8 +191,18 @@ describe("MbSpinDetailClient", () => {
   })
 
   describe("Action buttons & permissions (P5-T3)", () => {
-    it("always shows Edit and Delete, regardless of permission", () => {
+    it("hides Edit and Delete when the user lacks mbspin.update / mbspin.delete", () => {
       permissionState.hasPermission = () => false
+      mbSpinState.value = BASE_SPIN
+      render(<MbSpinDetailClient id={SPIN_ID} />)
+
+      expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument()
+    })
+
+    it("shows Edit and Delete when the user holds mbspin.update / mbspin.delete", () => {
+      permissionState.hasPermission = (code) =>
+        code === "finance.yarnmaster.mbspin.update" || code === "finance.yarnmaster.mbspin.delete"
       mbSpinState.value = BASE_SPIN
       render(<MbSpinDetailClient id={SPIN_ID} />)
 

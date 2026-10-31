@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/common/empty-state";
 import { KpiCard } from "@/components/common/kpi-card";
 import { KpiGrid } from "@/components/common/kpi-grid";
+import { usePermissionContext } from "@/providers/permission-provider";
 
 import {
   usePreviewPushToHead,
@@ -22,6 +23,9 @@ interface MbPushPreviewPanelProps {
 export function MbPushPreviewPanel({ period }: MbPushPreviewPanelProps) {
   const { data, isLoading, isFetching } = usePreviewPushToHead(period);
   const executeMutation = useExecutePushToHead();
+  // ExecutePushToHead → finance.mb.pushtohead.execute (auth_interceptor.go).
+  const { hasPermission } = usePermissionContext();
+  const canExecute = hasPermission("finance.mb.pushtohead.execute");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const pushable = data?.pushable ?? [];
@@ -160,18 +164,20 @@ export function MbPushPreviewPanel({ period }: MbPushPreviewPanelProps) {
                     </label>
                   ))}
                 </div>
-                <Button
-                  onClick={handleExecute}
-                  disabled={selected.size === 0 || executeMutation.isPending}
-                  className="w-full"
-                >
-                  {executeMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Push {selected.size} to Head
-                </Button>
+                {canExecute && (
+                  <Button
+                    onClick={handleExecute}
+                    disabled={selected.size === 0 || executeMutation.isPending}
+                    className="w-full"
+                  >
+                    {executeMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Push {selected.size} to Head
+                  </Button>
+                )}
               </>
             )}
           </CardContent>
