@@ -23,7 +23,7 @@ Thank you for your interest in contributing to `goapps-frontend`! This document 
 
 ### Prerequisites
 
-- **Node.js 20+** - [Download](https://nodejs.org/)
+- **Node.js 24+** - [Download](https://nodejs.org/)
 - **npm** - Package manager
 - **Git** - Version control
 - **VSCode** - Recommended editor

@@ -278,7 +278,7 @@ goapps-frontend/
 
 ### Prerequisites
 
-- **Node.js 20+** - [Download](https://nodejs.org/)
+- **Node.js 24+** - [Download](https://nodejs.org/)
 - **npm** or **pnpm** - Package manager
 - **Git** - Version control
 
