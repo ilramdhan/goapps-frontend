@@ -394,3 +394,5 @@ export default function Loading() {
 ---
 
 Thank you for contributing! 🚀
+
+> Found a vulnerability? Do not open a public issue; see [SECURITY.md](SECURITY.md) for how to report it privately.
