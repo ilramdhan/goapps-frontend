@@ -115,8 +115,8 @@ describe("MasterLookupField — duplicate master codes", () => {
     expect(within(items[1]).getByText("MGT SAMPLE B")).toBeInTheDocument()
 
     // React's "two children with the same key" warning must never fire.
-    const duplicateKeyWarning = consoleErrorSpy.mock.calls.some((args) =>
-      args.some((a) => typeof a === "string" && a.includes("same key")),
+    const duplicateKeyWarning = consoleErrorSpy.mock.calls.some((args: unknown[]) =>
+      args.some((a: unknown) => typeof a === "string" && a.includes("same key")),
     )
     expect(duplicateKeyWarning).toBe(false)
   })
