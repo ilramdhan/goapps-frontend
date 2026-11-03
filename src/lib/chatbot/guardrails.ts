@@ -19,18 +19,25 @@ interface GuardrailOptions {
 export const INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?(previous|prior|above)\s+instructions/i,
   /pretend\s+(you\s+are|to\s+be)\s+(DAN|a\s+different|an?\s+AI)/i,
-  /\bDAN\b.*no\s+restrictions/i,
+  /\bDAN\b.{0,200}no\s{1,20}restrictions/i,
   /system\s+prompt/i,
   /you\s+are\s+now\s+(in\s+)?developer\s+mode/i,
   /\[system\]/i,
-  /\/\*.*override.*\*\//i,
+  /\/\*.{0,200}override.{0,200}\*\//i,
   /forget\s+your\s+previous\s+instructions/i,
   /new\s+instructions:/i,
   /disregard\s+(all\s+)?previous/i,
 ]
 
+export const MAX_MESSAGE_LENGTH = 10_000
+
 export async function checkGuardrails(opts: GuardrailOptions): Promise<GuardrailResult> {
   const { message } = opts
+
+  // Oversized input is rejected before any regex runs (bounds worst-case work).
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return { blocked: true, reason: "message too long" }
+  }
 
   // Layer 3: Prompt injection filter
   for (const pattern of INJECTION_PATTERNS) {

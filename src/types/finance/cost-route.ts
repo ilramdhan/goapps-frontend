@@ -1,3 +1,5 @@
+import { secureUid } from "@/lib/uid"
+
 // CostRoute types — persisted routing DAG (cost_route_head/seq/rm).
 // Replaces the dropped cost_product_order types as of S7.16.
 
@@ -130,10 +132,7 @@ export interface ListRoutesParams {
  * clickable/editable before save and deletes target exactly one element.
  */
 export function newUid(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID()
-  }
-  return `uid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return secureUid()
 }
 
 // ---------- normalizers (handle both camel + snake_case) ----------
