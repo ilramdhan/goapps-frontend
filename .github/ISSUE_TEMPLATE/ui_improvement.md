@@ -2,7 +2,7 @@
 name: 📱 UI/UX Improvement
 about: Suggest improvements to the user interface or experience
 title: '[UI] '
-labels: 'type: ui, status: needs-triage'
+labels: 'type:improvement, area:ui, needs-triage'
 assignees: ''
 ---
 
