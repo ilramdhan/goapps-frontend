@@ -39,6 +39,7 @@ import {
   type EdgeMouseHandler,
   type OnConnectEnd,
   type OnConnectStart,
+  type OnNodeDrag,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { LayoutGrid, Plus } from "lucide-react"
@@ -410,7 +411,7 @@ export function RouteGraphFlow({
     null | { sourceSeqUid: string; handleType: "source" | "target" }
   >(null)
 
-  const handleNodeDragStop = useCallback<NodeMouseHandler>(
+  const handleNodeDragStop = useCallback<OnNodeDrag>(
     (_event, node) => {
       if (locked) return
       if (node.type === "stage") {
