@@ -44,6 +44,15 @@ describe("DashboardTabs (nav_tab tanpa group = grup bawaan Workforce)", () => {
     expect(screen.queryByText("Karyawan")).toBeNull()
   })
 
+  it("shows a nav_tab without permission to everyone (list is already access-filtered; P012 d)", () => {
+    dashboards.mockReturnValue([
+      dash("A", 1, { label: "Pertama", permission: "a.view" }),
+      { dashboardCode: "N", displayOrder: 2, layoutConfig: { nav_tab: { label: "Terbuka" } } },
+    ])
+    render(<DashboardTabs code="A" />)
+    expect(screen.getByText("Terbuka")).toBeTruthy()
+  })
+
   it("renders nothing for a dashboard outside the nav group", () => {
     dashboards.mockReturnValue([
       dash("A", 1, { label: "Pertama", permission: "a.view" }),
