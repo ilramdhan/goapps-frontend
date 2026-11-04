@@ -3,18 +3,24 @@
 // Extracted verbatim from cost-breakdown-modal.tsx (P11 [G.6]).
 // Pure extraction — the props signature is unchanged.
 
+import { useState } from "react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UserName } from "@/components/common/user-name"
+import { DebouncedSearchInput } from "@/components/common/debounced-search-input"
+import { EmptyState } from "@/components/common/empty-state"
 import { useProductRequiredParams } from "@/hooks/finance/use-cost-product-parameter"
 import type { CostBreakdown } from "@/types/finance/cost-calc"
 
 import { formatDate, formatNumeric } from "../format"
 import { Field } from "./field"
+import { filterParamEntries } from "./search"
 
 // ── Summary tab ───────────────────────────────────────────────────────────────
 
 export function SummaryTab({ breakdown, productSysId }: { breakdown: CostBreakdown; productSysId: number }) {
   const s = breakdown.summary
+  const [query, setQuery] = useState("")
   const snapshotEntries = Object.entries(breakdown.paramSnapshot)
 
   // Fetch parameter definitions for this product (already sorted by display_group,
@@ -55,6 +61,8 @@ export function SummaryTab({ breakdown, productSysId }: { breakdown: CostBreakdo
     grouped[group].push([code, value])
   }
   // Sort groups by their minimum display_order: named groups first (by order), ungrouped last
+  const nameByCode = new Map(requiredParams.map((p) => [p.paramCode, p.paramName]))
+  const filtering = query.trim() !== ""
   const groupEntries = Object.keys(grouped)
     .sort((a, b) => {
       if (!a && !b) return 0
@@ -62,8 +70,10 @@ export function SummaryTab({ breakdown, productSysId }: { breakdown: CostBreakdo
       if (!b) return -1
       return (groupMinOrder[a] ?? 9999) - (groupMinOrder[b] ?? 9999)
     })
-    .map((g) => [g, grouped[g]] as [string, [string, string][]])
+    .map((g) => [g, filterParamEntries(grouped[g], query, nameByCode)] as [string, [string, string][]])
+    .filter(([, entries]) => entries.length > 0)
   const namedGroupCount = groupEntries.filter(([g]) => g !== "").length
+  const matchedCount = groupEntries.reduce((n, [, e]) => n + e.length, 0)
 
   return (
     <div className="space-y-5">
@@ -110,14 +120,27 @@ export function SummaryTab({ breakdown, productSysId }: { breakdown: CostBreakdo
           <CardTitle className="text-sm font-semibold">
             Parameter snapshot
             <span className="ml-2 text-xs font-normal text-muted-foreground">
-              {snapshotEntries.length} params
+              {filtering ? `${matchedCount} of ${snapshotEntries.length} params` : `${snapshotEntries.length} params`}
               {namedGroupCount > 0 ? ` · ${namedGroupCount} groups` : ""}
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-0">
+          {snapshotEntries.length > 0 && (
+            <DebouncedSearchInput
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search parameter code, name, or value…"
+              containerClassName="mb-4"
+            />
+          )}
           {snapshotEntries.length === 0 ? (
             <p className="text-sm text-muted-foreground">No parameters captured.</p>
+          ) : groupEntries.length === 0 ? (
+            <EmptyState
+              title="No matching parameters"
+              description={`No parameters match "${query.trim()}".`}
+            />
           ) : (
             groupEntries.map(([groupName, entries], idx) => (
               <div key={groupName || "__ungrouped__"} className={idx > 0 ? "mt-5" : ""}>

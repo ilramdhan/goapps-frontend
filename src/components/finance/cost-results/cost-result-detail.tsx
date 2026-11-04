@@ -13,8 +13,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   useApproveCost,
+  useCostBreakdown,
   useCostResult,
   useVerifyCost,
 } from "@/hooks/finance/use-cost-calc"
@@ -25,6 +27,7 @@ import type { CalculationType } from "@/types/finance/cost-calc"
 
 import { CostBreakdownModal } from "./cost-breakdown-modal"
 import { CostHistoryTab } from "./cost-history-tab"
+import { getConversionCostFields } from "./conversion-cost"
 import { calcTypeLabel, formatDate, formatNumeric } from "./format"
 
 interface Props {
@@ -38,6 +41,13 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const { hasPermission } = usePermissionContext()
   const { data: result, isLoading } = useCostResult(productSysId, period, calcType)
+  const breakdownQuery = useCostBreakdown(productSysId, period, calcType)
+  const conv = getConversionCostFields(breakdownQuery.data?.paramSnapshot)
+  const breakdownState: "loading" | "error" | "ready" = breakdownQuery.isLoading
+    ? "loading"
+    : breakdownQuery.isError
+      ? "error"
+      : "ready"
   // Period-lock badge: the BFF 403s without the ERP view permission, so only query then.
   const canViewErp = hasPermission("finance.cost.erpintegration.view")
   const { data: periodLock } = useErpPeriodLock(canViewErp ? period : "")
@@ -174,7 +184,7 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
                   </Field>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
                 <Field label="Cost per unit">
                   <span className="text-xl font-semibold tabular-nums">
                     {result.currencyCode ? `${result.currencyCode} ` : ""}
@@ -186,16 +196,20 @@ export function CostResultDetail({ productSysId, period, calcType }: Props) {
                     {formatNumeric(result.totalRmCost)}
                   </span>
                 </Field>
-                <Field label="Conversion">
-                  <span className="font-mono tabular-nums">
-                    {formatNumeric(result.totalConversion)}
-                  </span>
-                </Field>
-                <Field label="Total cost">
-                  <span className="font-mono font-semibold tabular-nums">
-                    {formatNumeric(result.totalCost)}
-                  </span>
-                </Field>
+                <ConvField label="Cap Cost" value={conv.capCost} state={breakdownState} />
+                <ConvField label="Del Cost" value={conv.delCost} state={breakdownState} />
+                <ConvField
+                  label="Total Conv. Cap (Route)"
+                  value={conv.totalCapConv}
+                  stage={conv.capConvStage}
+                  state={breakdownState}
+                />
+                <ConvField
+                  label="Total Conv. Del (Route)"
+                  value={conv.totalDelConv}
+                  stage={conv.delConvStage}
+                  state={breakdownState}
+                />
               </div>
 
               <div className="border-t pt-4">
@@ -305,5 +319,47 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
+  )
+}
+
+function ConvField({
+  label,
+  value,
+  stage,
+  state,
+}: {
+  label: string
+  value: string | null
+  stage?: string | null
+  state: "loading" | "error" | "ready"
+}) {
+  let body: React.ReactNode
+  if (state === "loading") {
+    body = <Skeleton className="h-5 w-20" />
+  } else if (state === "error" || value === null) {
+    const hint =
+      state === "error"
+        ? "Breakdown could not be loaded"
+        : "Not available for this product (no conversion setup)"
+    body = (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help font-mono text-muted-foreground">
+            —
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{hint}</TooltipContent>
+      </Tooltip>
+    )
+  } else {
+    body = <span className="font-mono tabular-nums">{formatNumeric(value)}</span>
+  }
+  return (
+    <Field label={label}>
+      {body}
+      {state === "ready" && value !== null && stage && (
+        <p className="text-xs text-muted-foreground">Stage: {stage}</p>
+      )}
+    </Field>
   )
 }

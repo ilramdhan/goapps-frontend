@@ -3,23 +3,46 @@
 // Extracted verbatim from cost-breakdown-modal.tsx (P11 [G.6]).
 // Pure extraction — the props signature is unchanged.
 
+import { useState } from "react"
 import { ArrowRight } from "lucide-react"
 
+import { DebouncedSearchInput } from "@/components/common/debounced-search-input"
+import { EmptyState } from "@/components/common/empty-state"
 import type { FormulaEval } from "@/types/finance/cost-calc"
 
 import { formatNumeric } from "../format"
+import { filterFormulaEvals } from "./search"
 
 // ── Formula trace tab — compact card per formula ──────────────────────────────
 
 export function FormulaTraceTab({ rows }: { rows: FormulaEval[] }) {
+  const [query, setQuery] = useState("")
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No formula evaluations.</p>
   }
+  const filtered = filterFormulaEvals(rows, query)
+  const filtering = query.trim() !== ""
   return (
     <div className="space-y-2">
-      {rows.map((f, i) => (
-        <FormulaCard key={`${f.formulaCode}-${i}`} formula={f} />
-      ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <DebouncedSearchInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Search formula, output, expression, input…"
+          containerClassName="min-w-0 flex-1"
+        />
+        <span className="text-xs text-muted-foreground">
+          {filtering ? `${filtered.length} of ${rows.length} formulas` : `${rows.length} formulas`}
+        </span>
+      </div>
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No matching formulas"
+          description={`No formulas match "${query.trim()}".`}
+        />
+      ) : (
+        filtered.map((f, i) => <FormulaCard key={`${f.formulaCode}-${i}`} formula={f} />)
+      )}
     </div>
   )
 }

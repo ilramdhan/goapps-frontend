@@ -21,6 +21,7 @@ vi.mock("@/hooks/finance/use-erp-integration", () => ({
 }))
 vi.mock("@/hooks/finance/use-cost-calc", () => ({
   useCostResult: () => ({ data: result, isLoading: false }),
+  useCostBreakdown: () => ({ data: undefined, isLoading: false, isError: false }),
   useVerifyCost: () => ({ mutate: vi.fn(), isPending: false }),
   useApproveCost: () => ({ mutate: vi.fn(), isPending: false }),
 }))
