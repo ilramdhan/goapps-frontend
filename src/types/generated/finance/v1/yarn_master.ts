@@ -98,13 +98,21 @@ export interface Machine {
   noOfPosition: number;
   /** Number of ends per position. */
   noOfEnd: number;
-  /** Machine speed in m/min. */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcSpeed: number;
   /** Optional machine RPM. */
   machineRpm?:
     | number
     | undefined;
-  /** Machine efficiency as a percentage (default 95). */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcEfficiency: number;
   /** Optional power cost per day in USD. */
   powerPerDay?:
@@ -192,13 +200,21 @@ export interface CreateMachineRequest {
   noOfPosition: number;
   /** Number of ends per position (≥ 1). */
   noOfEnd: number;
-  /** Machine speed in m/min (≥ 0). */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcSpeed: number;
   /** Optional machine RPM. */
   machineRpm?:
     | number
     | undefined;
-  /** Machine efficiency percentage (0-100). */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcEfficiency: number;
   /** Optional power cost per day in USD. */
   powerPerDay?:
@@ -316,7 +332,11 @@ export interface UpdateMachineRequest {
   noOfEnd?:
     | number
     | undefined;
-  /** Updated machine speed. */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcSpeed?:
     | number
     | undefined;
@@ -324,7 +344,11 @@ export interface UpdateMachineRequest {
   machineRpm?:
     | number
     | undefined;
-  /** Updated machine efficiency percentage. */
+  /**
+   * Deprecated (2026-11): speed/efficiency are per-product params (MC_SPEED / MC_EFFICIENCY), no longer stored via the machine master. Ignored by the server.
+   *
+   * @deprecated
+   */
   mcEfficiency?:
     | number
     | undefined;
@@ -2905,7 +2929,7 @@ export interface GetLookupFillValuesResponse {
   base:
     | BaseResponse
     | undefined;
-  /** param_code → numeric value to fill (e.g., {"MC_SPEED": 800.0, "MC_EFFICIENCY": 92.0}). */
+  /** param_code → numeric value to fill (e.g., {"NO_OF_POSITION": 504.0, "NO_OF_END": 2.0}). */
   numericFills: { [key: string]: number };
   /** param_code → text value to fill (e.g., {"MB_DYE_NAME": "CIBA RED"}). */
   textFills: { [key: string]: string };
