@@ -329,7 +329,7 @@ function AddColumnForm({
             <Input
               value={selectedCol}
               onChange={(e) => setSelectedCol(e.target.value)}
-              placeholder="mc_speed"
+              placeholder="no_of_position"
               className="font-mono"
             />
           )}

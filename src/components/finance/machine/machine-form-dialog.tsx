@@ -56,8 +56,6 @@ const sharedMachineFields = {
   mcLocation: z.string().max(100).optional(),
   noOfPosition: z.coerce.number().int().min(0).default(0),
   noOfEnd: z.coerce.number().int().min(1).default(1),
-  mcSpeed: z.coerce.number().min(0).default(0),
-  mcEfficiency: z.coerce.number().min(0).max(100).default(95),
   machineRpm: optionalNonNegativeNumber,
   powerPerDay: optionalNonNegativeNumber,
   mpPerDay: optionalNonNegativeNumber,
@@ -116,7 +114,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
     resolver: zodResolver(isEditing ? updateFormSchema : createFormSchema) as never,
     defaultValues: {
       machineCode: "", machineName: "", mcType: "", mcLocation: "",
-      noOfPosition: 0, noOfEnd: 1, mcSpeed: 0, mcEfficiency: 95,
+      noOfPosition: 0, noOfEnd: 1,
       machineRpm: null, powerPerDay: null,
       mpPerDay: null, ohsPerDay: null, sparesPerDay: null,
       kgsLostChange: null,
@@ -139,8 +137,6 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
               mcLocation: machine.mcLocation || "",
               noOfPosition: machine.noOfPosition ?? 0,
               noOfEnd: machine.noOfEnd ?? 1,
-              mcSpeed: machine.mcSpeed ?? 0,
-              mcEfficiency: machine.mcEfficiency ?? 95,
               machineRpm: machine.machineRpm ?? null,
               powerPerDay: machine.powerPerDay ?? null,
               mpPerDay: machine.mpPerDay ?? null,
@@ -163,7 +159,7 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
             }
           : {
               machineCode: "", machineName: "", mcType: "", mcLocation: "",
-              noOfPosition: 0, noOfEnd: 1, mcSpeed: 0, mcEfficiency: 95,
+              noOfPosition: 0, noOfEnd: 1,
               machineRpm: null, powerPerDay: null,
               mpPerDay: null, ohsPerDay: null, sparesPerDay: null,
               kgsLostChange: null,
@@ -189,8 +185,6 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
             mcLocation: values.mcLocation,
             noOfPosition: values.noOfPosition,
             noOfEnd: values.noOfEnd,
-            mcSpeed: values.mcSpeed,
-            mcEfficiency: values.mcEfficiency,
             machineRpm: values.machineRpm ?? undefined,
             powerPerDay: values.powerPerDay ?? undefined,
             mpPerDay: values.mpPerDay ?? undefined,
@@ -220,8 +214,9 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
           mcLocation: values.mcLocation || "",
           noOfPosition: values.noOfPosition,
           noOfEnd: values.noOfEnd,
-          mcSpeed: values.mcSpeed,
-          mcEfficiency: values.mcEfficiency,
+          // Deprecated proto fields (required by the generated type, ignored by server).
+          mcSpeed: 0,
+          mcEfficiency: 0,
           machineRpm: values.machineRpm ?? undefined,
           powerPerDay: values.powerPerDay ?? undefined,
           mpPerDay: values.mpPerDay ?? undefined,
@@ -339,32 +334,6 @@ export function MachineFormDialog({ open, onOpenChange, machine, onSuccess }: Ma
                     <FormLabel>Ends</FormLabel>
                     <FormControl>
                       <Input {...field} type="number" min="1" step="1" disabled={isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mcSpeed"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Speed (m/min)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="0" step="any" disabled={isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mcEfficiency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Efficiency (%)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="0" max="100" step="any" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
