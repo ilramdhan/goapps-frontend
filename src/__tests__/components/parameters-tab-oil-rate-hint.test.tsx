@@ -9,7 +9,7 @@
  * value as before (no regression).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { screen } from "@testing-library/react"
+import { fireEvent, screen } from "@testing-library/react"
 import { render } from "../utils"
 import type { RequiredParamEntry } from "@/types/finance/cost-product-parameter"
 
@@ -209,6 +209,18 @@ describe("ProductParametersTab — CALCULATED with machine default", () => {
     expect(screen.getByPlaceholderText("42.5")).toBeInTheDocument()
     expect(screen.getByText(/formula skipped/i)).toBeInTheDocument()
     expect(screen.queryByText(/Calculated by engine/i)).not.toBeInTheDocument()
+  })
+
+  it("resets an edited value back to the machine default", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [{ ...CALC, machineDefaultValue: "0.019", valueNumeric: "0" }],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    render(<ProductParametersTab productSysId={1} />)
+    fireEvent.click(screen.getByRole("button", { name: /reset to default/i }))
+    expect(screen.getByLabelText("Steam Cost CNG")).toHaveValue(0.019)
+    expect(screen.queryByRole("button", { name: /reset to default/i })).not.toBeInTheDocument()
   })
 
   it("keeps the engine box without a machine default", () => {

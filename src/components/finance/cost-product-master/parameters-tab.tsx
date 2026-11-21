@@ -668,9 +668,23 @@ function renderValueInput(
           onChange={(e) => onChange(entry.paramId, { valueNumeric: e.target.value })}
           disabled={disabled}
         />
-        <p className="text-[10px] text-muted-foreground">
-          Machine default: {entry.machineDefaultValue} — formula skipped for this machine
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] text-muted-foreground">
+            Machine default: {entry.machineDefaultValue} — formula skipped for this machine
+          </p>
+          {draft.valueNumeric !== entry.machineDefaultValue && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-[10px]"
+              onClick={() => onChange(entry.paramId, { valueNumeric: entry.machineDefaultValue })}
+              disabled={disabled}
+            >
+              Reset to default
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
