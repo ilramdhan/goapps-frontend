@@ -134,6 +134,12 @@ export interface RequiredParamEntry {
    * none. Never stored; the stored value stays editable.
    */
   displayValue: string;
+  /**
+   * Machine-specific initial value for a CALCULATED param (mst_machine_param_default), as a
+   * decimal string. Non-empty = the product's machine (MC_NAME) overrides the formula: the
+   * stored product value is used (editable), falling back to this default. Empty = normal.
+   */
+  machineDefaultValue: string;
 }
 
 export interface ListProductRequiredParamsRequest {
@@ -1063,6 +1069,7 @@ function createBaseRequiredParamEntry(): RequiredParamEntry {
     filledAt: "",
     filledBy: "",
     displayValue: "",
+    machineDefaultValue: "",
   };
 }
 
@@ -1139,6 +1146,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     }
     if (message.displayValue !== "") {
       writer.uint32(258).string(message.displayValue);
+    }
+    if (message.machineDefaultValue !== "") {
+      writer.uint32(266).string(message.machineDefaultValue);
     }
     return writer;
   },
@@ -1342,6 +1352,14 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
           message.displayValue = reader.string();
           continue;
         }
+        case 33: {
+          if (tag !== 266) {
+            break;
+          }
+
+          message.machineDefaultValue = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1473,6 +1491,11 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
         : isSet(object.display_value)
         ? globalThis.String(object.display_value)
         : "",
+      machineDefaultValue: isSet(object.machineDefaultValue)
+        ? globalThis.String(object.machineDefaultValue)
+        : isSet(object.machine_default_value)
+        ? globalThis.String(object.machine_default_value)
+        : "",
     };
   },
 
@@ -1550,6 +1573,9 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     if (message.displayValue !== "") {
       obj.displayValue = message.displayValue;
     }
+    if (message.machineDefaultValue !== "") {
+      obj.machineDefaultValue = message.machineDefaultValue;
+    }
     return obj;
   },
 
@@ -1582,6 +1608,7 @@ export const RequiredParamEntry: MessageFns<RequiredParamEntry> = {
     message.filledAt = object.filledAt ?? "";
     message.filledBy = object.filledBy ?? "";
     message.displayValue = object.displayValue ?? "";
+    message.machineDefaultValue = object.machineDefaultValue ?? "";
     return message;
   },
 };

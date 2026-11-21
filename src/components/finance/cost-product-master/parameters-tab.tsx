@@ -656,6 +656,25 @@ function renderValueInput(
   productSysId?: number,
   allDrafts?: Record<string, DraftValue>,
 ) {
+  if (entry.paramCategory === "CALCULATED" && entry.machineDefaultValue) {
+    return (
+      <div className="space-y-1">
+        <Input
+          type="number"
+          step="any"
+          aria-label={entry.paramName}
+          value={draft.valueNumeric}
+          placeholder={entry.machineDefaultValue}
+          onChange={(e) => onChange(entry.paramId, { valueNumeric: e.target.value })}
+          disabled={disabled}
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Machine default: {entry.machineDefaultValue} — formula skipped for this machine
+        </p>
+      </div>
+    )
+  }
+
   if (entry.paramCategory === "CALCULATED") {
     return (
       <div className="rounded border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
