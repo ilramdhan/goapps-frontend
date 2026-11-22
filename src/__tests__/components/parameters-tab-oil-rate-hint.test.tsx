@@ -9,7 +9,7 @@
  * value as before (no regression).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { screen } from "@testing-library/react"
+import { fireEvent, screen } from "@testing-library/react"
 import { render } from "../utils"
 import type { RequiredParamEntry } from "@/types/finance/cost-product-parameter"
 
@@ -58,6 +58,7 @@ function baseEntry(overrides: Partial<RequiredParamEntry>): RequiredParamEntry {
     filledAt: "",
     filledBy: "",
     displayValue: "",
+    machineDefaultValue: "",
     ...overrides,
   }
 }
@@ -187,5 +188,48 @@ describe("normalizeRequiredEntry displayValue", () => {
     expect(normalizeRequiredEntry({ displayValue: "A" }).displayValue).toBe("A")
     expect(normalizeRequiredEntry({ display_value: "B" }).displayValue).toBe("B")
     expect(normalizeRequiredEntry({}).displayValue).toBe("")
+  })
+})
+
+describe("ProductParametersTab — CALCULATED with machine default", () => {
+  const CALC = baseEntry({
+    paramId: "p-calc",
+    paramCode: "STEAM_COST_CNG",
+    paramName: "Steam Cost CNG",
+    paramCategory: "CALCULATED",
+  })
+
+  it("renders a number input with the machine default as placeholder", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [{ ...CALC, machineDefaultValue: "42.5" }],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    render(<ProductParametersTab productSysId={1} />)
+    expect(screen.getByPlaceholderText("42.5")).toBeInTheDocument()
+    expect(screen.getByText(/formula skipped/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Calculated by engine/i)).not.toBeInTheDocument()
+  })
+
+  it("resets an edited value back to the machine default", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [{ ...CALC, machineDefaultValue: "0.019", valueNumeric: "0" }],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    render(<ProductParametersTab productSysId={1} />)
+    fireEvent.click(screen.getByRole("button", { name: /reset to default/i }))
+    expect(screen.getByLabelText("Steam Cost CNG")).toHaveValue(0.019)
+    expect(screen.queryByRole("button", { name: /reset to default/i })).not.toBeInTheDocument()
+  })
+
+  it("keeps the engine box without a machine default", () => {
+    vi.mocked(useProductRequiredParams).mockReturnValue({
+      data: [CALC],
+      isLoading: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    render(<ProductParametersTab productSysId={1} />)
+    expect(screen.getByText(/Calculated by engine/i)).toBeInTheDocument()
   })
 })

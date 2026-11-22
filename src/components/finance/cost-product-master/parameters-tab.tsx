@@ -656,6 +656,39 @@ function renderValueInput(
   productSysId?: number,
   allDrafts?: Record<string, DraftValue>,
 ) {
+  if (entry.paramCategory === "CALCULATED" && entry.machineDefaultValue) {
+    return (
+      <div className="space-y-1">
+        <Input
+          type="number"
+          step="any"
+          aria-label={entry.paramName}
+          value={draft.valueNumeric}
+          placeholder={entry.machineDefaultValue}
+          onChange={(e) => onChange(entry.paramId, { valueNumeric: e.target.value })}
+          disabled={disabled}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] text-muted-foreground">
+            Machine default: {entry.machineDefaultValue} — formula skipped for this machine
+          </p>
+          {draft.valueNumeric !== entry.machineDefaultValue && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-[10px]"
+              onClick={() => onChange(entry.paramId, { valueNumeric: entry.machineDefaultValue })}
+              disabled={disabled}
+            >
+              Reset to default
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (entry.paramCategory === "CALCULATED") {
     return (
       <div className="rounded border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

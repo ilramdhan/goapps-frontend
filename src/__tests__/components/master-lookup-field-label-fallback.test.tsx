@@ -70,6 +70,7 @@ const ENTRY: RequiredParamEntry = {
   filledAt: "",
   filledBy: "",
   displayValue: "",
+  machineDefaultValue: "",
 }
 
 function draftWithValue(valueText: string): DraftValue {

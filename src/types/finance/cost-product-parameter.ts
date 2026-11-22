@@ -43,6 +43,9 @@ export interface RequiredParamEntry {
   // MB_SP_DYE on SUPERBA products). Empty = none. Never stored, never part of
   // the draft/dirty state.
   displayValue: string
+  // Non-empty = saved machine has an initial value for this CALCULATED param;
+  // the engine skips the formula and uses the stored value (fallback: this).
+  machineDefaultValue: string
 }
 
 // MBSpinCandidate is one possible mst_mb_spin match behind an ambiguous
@@ -154,6 +157,8 @@ interface RawRequiredParamEntry {
   filled_by?: string
   displayValue?: string
   display_value?: string
+  machineDefaultValue?: string
+  machine_default_value?: string
 }
 
 // Boolean("false") === true in JS, so string-shaped booleans must be parsed
@@ -209,6 +214,7 @@ export function normalizeRequiredEntry(raw: RawRequiredParamEntry): RequiredPara
     filledAt: raw.filledAt ?? raw.filled_at ?? "",
     filledBy: raw.filledBy ?? raw.filled_by ?? "",
     displayValue: raw.displayValue ?? raw.display_value ?? "",
+    machineDefaultValue: raw.machineDefaultValue ?? raw.machine_default_value ?? "",
   }
 }
 
