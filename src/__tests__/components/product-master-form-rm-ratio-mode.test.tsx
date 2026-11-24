@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const updateMutate = vi.fn().mockResolvedValue({})
@@ -37,5 +37,38 @@ describe("ProductMasterFormDialog Mode Rasio RM", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }))
     await waitFor(() => expect(updateMutate).toHaveBeenCalled())
     expect(updateMutate.mock.calls[0][0].rmRatioModeOverride).toBe("DENIER")
+  })
+})
+
+describe("ProductMasterFormDialog fixcost min threshold", () => {
+  beforeEach(() => updateMutate.mockClear())
+  const label = "Min Fixed Cost Threshold (/kg)"
+  const save = () => screen.getByRole("button", { name: "Save changes" })
+
+  it("is not sent when unchanged", async () => {
+    const user = userEvent.setup()
+    render(<ProductMasterFormDialog open onOpenChange={() => {}} product={product} />)
+    await user.click(save())
+    await waitFor(() => expect(updateMutate).toHaveBeenCalled())
+    expect(updateMutate.mock.calls[0][0]).not.toHaveProperty("fixcostMinThreshold")
+  })
+
+  it("is sent when changed", async () => {
+    const user = userEvent.setup()
+    render(<ProductMasterFormDialog open onOpenChange={() => {}} product={product} />)
+    await user.type(screen.getByLabelText(label), "0.05")
+    await user.click(save())
+    await waitFor(() => expect(updateMutate).toHaveBeenCalled())
+    expect(updateMutate.mock.calls[0][0].fixcostMinThreshold).toBe(0.05)
+  })
+
+  it("rejects out-of-range", async () => {
+    const user = userEvent.setup()
+    render(<ProductMasterFormDialog open onOpenChange={() => {}} product={product} />)
+    const input = screen.getByLabelText(label)
+    await user.type(input, "2")
+    fireEvent.submit(input.closest("form")!) // bypass native max validation
+    expect(await screen.findByText("Must be between 0 and 1")).toBeInTheDocument()
+    expect(updateMutate).not.toHaveBeenCalled()
   })
 })

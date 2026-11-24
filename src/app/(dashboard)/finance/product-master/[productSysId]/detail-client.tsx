@@ -200,6 +200,10 @@ export default function ProductMasterDetailClient({ productSysId, initialTab, hi
                 </Badge>
               </div>
             </div>
+            <Field
+              label="Min Fixed Cost Threshold (/kg)"
+              value={product.fixcostMinThreshold == null ? "Auto" : String(Number(product.fixcostMinThreshold.toFixed(4)))}
+            />
             {product.description && (
               <div className="col-span-full">
                 <Field label="Description" value={product.description} />

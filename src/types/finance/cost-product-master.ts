@@ -25,6 +25,8 @@ export interface CostProductMaster {
   rmRatioModeOverride: RmRatioModeOverride
   /** Effective mode (override else type default); "" when backend did not send it. */
   effectiveRmRatioMode: string
+  /** Min fixed-cost floor per kg; null = Auto (machine default), 0 = off. */
+  fixcostMinThreshold: number | null
   isActive: boolean
   source: string
   isLocked: boolean
@@ -80,6 +82,8 @@ export interface UpdateCostProductMasterPayload {
   erpPrdPerDay?: string
   /** "" clears the override (follow product type). Omit to leave unchanged. */
   rmRatioModeOverride?: RmRatioModeOverride
+  /** 0..1; omit to leave unchanged (no reset-to-auto path). */
+  fixcostMinThreshold?: number
 }
 
 type Raw = Record<string, unknown> & {
@@ -97,6 +101,12 @@ const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0))
 function normalizeRmOverride(v: unknown): RmRatioModeOverride {
   const s = str(v).toUpperCase()
   return s === "INPUT" || s === "DENIER" ? s : ""
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 }
 
 export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
@@ -122,6 +132,7 @@ export function normalizeCostProductMaster(raw: Raw): CostProductMaster {
     erpPrdPerDay: str(raw.erpPrdPerDay ?? raw.erp_prd_per_day),
     rmRatioModeOverride: normalizeRmOverride(raw.rmRatioModeOverride ?? raw.rm_ratio_mode_override),
     effectiveRmRatioMode: str(raw.effectiveRmRatioMode ?? raw.effective_rm_ratio_mode),
+    fixcostMinThreshold: numOrNull(raw.fixcostMinThreshold ?? raw.fixcost_min_threshold),
     isActive: (raw.isActive ?? raw.is_active ?? true) as boolean,
     source: str(raw.source),
     isLocked: (raw.isLocked ?? raw.is_locked ?? false) as boolean,
