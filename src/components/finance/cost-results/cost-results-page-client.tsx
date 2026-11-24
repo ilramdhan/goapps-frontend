@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Calculator, CheckCircle2, FileSpreadsheet, Layers, ListChecks, X } from "lucide-react"
 
@@ -10,6 +10,7 @@ import { KpiCard, KpiGrid } from "@/components/common"
 import { StatusBadge } from "@/components/common/status-badge"
 import { UserName } from "@/components/common/user-name"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -40,6 +41,7 @@ import { CALC_TYPE_LABELS, formatNumeric } from "./format"
 import { EXPORT_LAYOUT_OPTIONS } from "@/lib/finance/export-layout"
 import { ExportCostSheetButton } from "./export-cost-sheet-button"
 import { RecentExportsPopover } from "./recent-exports-popover"
+import { CostResultBulkActions } from "./cost-result-bulk-actions"
 
 // Compact "Raw Material" cell: shows the top RM line + a "+N" badge for the
 // rest, with a hover tooltip listing every rmDetails line (now correctly
@@ -140,6 +142,9 @@ const CALC_TYPE_OPTIONS = [
 
 const STATUSES = ["CALCULATED", "VERIFIED", "APPROVED", "SUPERSEDED"] as const
 
+// Only rows a bulk verify/approve can still move are selectable.
+const isBulkSelectable = (r: CostResult) => r.status === "CALCULATED" || r.status === "VERIFIED"
+
 // Shared with the DataTable instance below — must match so the externally
 // rendered ColumnVisibilityMenu reads/writes the same localStorage-backed
 // visibility state as the table itself.
@@ -226,6 +231,35 @@ export function CostResultsPageClient() {
   }, [items, totalItems])
 
   const selectedTypeCount = filters.productTypeIds?.length ?? 0
+
+  // Selection survives paging but resets whenever a list filter changes, so a
+  // bulk action never runs on rows the user can no longer see.
+  const filterKey = JSON.stringify([
+    filters.period, filters.calcType, filters.status, filters.search,
+    filters.productTypeIds, filters.shadeCodes, filters.rmGroupCodes,
+  ])
+  const [selection, setSelection] = useState(() => ({ key: filterKey, ids: new Set<number>() }))
+  const selected = selection.key === filterKey ? selection.ids : new Set<number>()
+  const setSelected = (update: (prev: Set<number>) => Set<number>) =>
+    setSelection((prev) => ({ key: filterKey, ids: update(prev.key === filterKey ? prev.ids : new Set()) }))
+  const toggleRow = (id: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  const pageSelectable = items.filter(isBulkSelectable)
+  const pageAllSelected = pageSelectable.length > 0 && pageSelectable.every((r) => selected.has(r.costId))
+  const togglePage = (on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const r of pageSelectable) {
+        if (on) next.add(r.costId)
+        else next.delete(r.costId)
+      }
+      return next
+    })
 
   // Shared payload for both the bulk button and the per-row action. `period`
   // stays raw: the export requires a concrete YYYYMM, and the button/action
@@ -420,6 +454,24 @@ export function CostResultsPageClient() {
     ],
     [],
   )
+  // The checkbox column reads live selection state, so it stays outside the memo.
+  const tableColumns: ColumnDef<CostResult>[] = [
+    {
+      id: "select",
+      header: "",
+      canHide: false,
+      width: "w-[36px]",
+      cell: (r) => (
+        <Checkbox
+          aria-label={`Select ${r.productCode || r.costId}`}
+          checked={selected.has(r.costId)}
+          disabled={!isBulkSelectable(r)}
+          onCheckedChange={(v) => toggleRow(r.costId, v === true)}
+        />
+      ),
+    },
+    ...columns,
+  ]
 
   const { visibility, toggle, setAll, reset } = useColumnVisibility(TABLE_ID, columns)
 
@@ -573,15 +625,38 @@ export function CostResultsPageClient() {
             </Select>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              {pageSelectable.length > 0 && (
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    aria-label="Select all verifiable/approvable rows on this page"
+                    checked={pageAllSelected}
+                    onCheckedChange={(v) => togglePage(v === true)}
+                  />
+                  Select page
+                </label>
+              )}
               {selectedTypeCount > 0 && (
                 <span>
                   Filtering by {selectedTypeCount} {selectedTypeCount === 1 ? "product type" : "product types"}.
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CostResultBulkActions
+                selectedIds={[...selected]}
+                filter={{
+                  period: filters.period,
+                  calculationType: filters.calcType || undefined,
+                  search: filters.search || undefined,
+                  productTypeIds: filters.productTypeIds,
+                  shadeCodes: filters.shadeCodes,
+                  rmGroupCodes: filters.rmGroupCodes,
+                }}
+                totalMatching={totalItems}
+                onClearSelection={() => setSelected(() => new Set())}
+              />
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-8">
                   <X className="mr-1 h-4 w-4" />
@@ -601,7 +676,7 @@ export function CostResultsPageClient() {
           <div className="overflow-x-auto rounded-md border">
             <DataTable
               data={items}
-              columns={columns}
+              columns={tableColumns}
               actions={rowActions}
               keyField="costId"
               isLoading={isLoading}

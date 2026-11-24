@@ -904,4 +904,65 @@ export function useApproveCost() {
   })
 }
 
+// ---------- bulk verify / approve ----------
+
+/** Rows by explicit ids, or (ids empty) every row matching the filter in the
+ * transition's source status. Server cap: 2000 rows. */
+export interface CostResultBulkSelectionInput {
+  costIds?: number[]
+  period?: string
+  calculationType?: string
+  search?: string
+  productTypeIds?: number[]
+  shadeCodes?: string[]
+  rmGroupCodes?: string[]
+}
+
+export interface CostResultBulkFailure {
+  costId: number
+  productCode: string
+  reason: string
+}
+
+export interface CostResultBulkOutcome {
+  okCount: number
+  failedCount: number
+  failures: CostResultBulkFailure[]
+}
+
+export function normalizeBulkOutcome(raw: Record<string, unknown> | undefined): CostResultBulkOutcome {
+  const r = raw ?? {}
+  const list = (r.failures ?? []) as Record<string, unknown>[]
+  return {
+    okCount: Number(r.okCount ?? r.ok_count ?? 0),
+    failedCount: Number(r.failedCount ?? r.failed_count ?? 0),
+    failures: list.map((f) => ({
+      costId: Number(f.costId ?? f.cost_id ?? 0),
+      productCode: String(f.productCode ?? f.product_code ?? ""),
+      reason: String(f.reason ?? ""),
+    })),
+  }
+}
+
+function useBulkCostTransition(action: "verify" | "approve") {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (selection: CostResultBulkSelectionInput): Promise<CostResultBulkOutcome> => {
+      const res = await fetch(`/api/v1/finance/cost-results/bulk-${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selection),
+      })
+      const json = (await res.json()) as BFFResponse<Record<string, unknown>>
+      return normalizeBulkOutcome(ensureOK(json))
+    },
+    // Partial success still changed rows, so always refresh.
+    onSettled: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onError: (err: Error) => toast.error(err.message),
+  })
+}
+
+export const useBulkVerifyCosts = () => useBulkCostTransition("verify")
+export const useBulkApproveCosts = () => useBulkCostTransition("approve")
+
 export const costCalcKeys = KEYS

@@ -24,18 +24,18 @@ describe("CoverageTab create product", () => {
   })
   it("shows for a yarn NO_MAPPING gap", () => {
     rows = [line("POY100")]
-    render(<CoverageTab batchId={1} />)
+    render(<CoverageTab batchId={1} period="202608" />)
     expect(screen.getByRole("button", { name: "Create product" })).toBeTruthy()
   })
   it("hides for MB lines", () => {
     rows = [line("CMB100")]
-    render(<CoverageTab batchId={1} />)
+    render(<CoverageTab batchId={1} period="202608" />)
     expect(screen.queryByRole("button", { name: "Create product" })).toBeNull()
   })
   it("hides without permission", () => {
     allowed = false
     rows = [line("POY100")]
-    render(<CoverageTab batchId={1} />)
+    render(<CoverageTab batchId={1} period="202608" />)
     expect(screen.queryByRole("button", { name: "Create product" })).toBeNull()
   })
 })

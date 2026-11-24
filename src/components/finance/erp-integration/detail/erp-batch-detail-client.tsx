@@ -81,7 +81,7 @@ export function ErpBatchDetailClient({ batchId }: { batchId: number }) {
           <TabsTrigger value="calls">Oracle calls</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-4"><OverviewTab batch={batch} /></TabsContent>
-        <TabsContent value="coverage" className="mt-4"><CoverageTab batchId={batchId} /></TabsContent>
+        <TabsContent value="coverage" className="mt-4"><CoverageTab batchId={batchId} period={batch.period} /></TabsContent>
         <TabsContent value="std-cost" className="mt-4"><StdCostTab batchId={batchId} /></TabsContent>
         <TabsContent value="push" className="mt-4"><PushTab batch={batch} onJobStarted={setActiveJobId} /></TabsContent>
         <TabsContent value="adj" className="mt-4"><AdjValuationTab batch={batch} onJobStarted={setActiveJobId} /></TabsContent>

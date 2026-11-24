@@ -12,7 +12,12 @@ import { usePermission } from "@/lib/hooks/use-permission"
 // Values mirror ErpCoverageStatus (enum name without prefix).
 const FILTERS = ["", "OK", "NO_MAPPING", "DUP_MAPPING", "NO_COST", "NOT_APPROVED", "NOT_USD", "INVALID"]
 
-export function CoverageTab({ batchId }: { batchId: number }) {
+interface CoverageTabProps {
+  batchId: number
+  period: string
+}
+
+export function CoverageTab({ batchId, period }: CoverageTabProps) {
   const { hasPermission } = usePermission()
   const [status, setStatus] = useState("")
   const params = status ? { status } : undefined
@@ -24,10 +29,13 @@ export function CoverageTab({ batchId }: { batchId: number }) {
   const rows = data?.items ?? []
   const linkRows = link.data?.items ?? []
   const count = (c: string) => linkRows.filter((r) => r.category === c).length
+  const notApproved = rows.filter((r) => r.status === "NOT_APPROVED").length
+  // Verify/approve lives on the Cost Result page (bulk select there); this is a link only.
+  const costResultsHref = `/finance/cost-results?period=${encodeURIComponent(period)}&calcType=ACTUAL&status=CALCULATED`
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <Button key={f || "all"} size="sm" variant={status === f ? "default" : "outline"} onClick={() => setStatus(f)}>
             {f || "All"}
@@ -39,6 +47,14 @@ export function CoverageTab({ batchId }: { batchId: number }) {
           </Button>
         )}
       </div>
+      {notApproved > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {notApproved} row(s) wait for an approved ACTUAL cost.{" "}
+          <Link className="underline" href={costResultsHref}>
+            Open in Cost Result to verify / approve
+          </Link>
+        </p>
+      )}
       <Card>
         <Table>
           <TableHeader>
