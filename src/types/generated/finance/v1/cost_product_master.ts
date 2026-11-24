@@ -48,6 +48,8 @@ export interface CostProductMaster {
   rmRatioModeOverride: string;
   /** COALESCE(product override, product type mode); read-only. */
   effectiveRmRatioMode: string;
+  /** Fixed-cost floor per kg (migration 000615): unset = auto (machine default), 0 = off, > 0 = floor. */
+  fixcostMinThreshold?: number | undefined;
 }
 
 export interface CreateCostProductMasterRequest {
@@ -116,7 +118,11 @@ export interface UpdateCostProductMasterRequest {
   /** decimal string */
   erpPrdPerDay: string;
   /** Per-product RM ratio mode override. Absent = unchanged; "" = clear (follow product type). */
-  rmRatioModeOverride?: string | undefined;
+  rmRatioModeOverride?:
+    | string
+    | undefined;
+  /** Fixed-cost floor per kg. Absent = unchanged; 0 = floor off; no reset-to-auto path. */
+  fixcostMinThreshold?: number | undefined;
 }
 
 export interface UpdateCostProductMasterResponse {
@@ -449,6 +455,7 @@ function createBaseCostProductMaster(): CostProductMaster {
     erpPrdPerDay: "",
     rmRatioModeOverride: "",
     effectiveRmRatioMode: "",
+    fixcostMinThreshold: undefined,
   };
 }
 
@@ -540,6 +547,9 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     }
     if (message.effectiveRmRatioMode !== "") {
       writer.uint32(234).string(message.effectiveRmRatioMode);
+    }
+    if (message.fixcostMinThreshold !== undefined) {
+      writer.uint32(241).double(message.fixcostMinThreshold);
     }
     return writer;
   },
@@ -783,6 +793,14 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
           message.effectiveRmRatioMode = reader.string();
           continue;
         }
+        case 30: {
+          if (tag !== 241) {
+            break;
+          }
+
+          message.fixcostMinThreshold = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -927,6 +945,11 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
         : isSet(object.effective_rm_ratio_mode)
         ? globalThis.String(object.effective_rm_ratio_mode)
         : "",
+      fixcostMinThreshold: isSet(object.fixcostMinThreshold)
+        ? globalThis.Number(object.fixcostMinThreshold)
+        : isSet(object.fixcost_min_threshold)
+        ? globalThis.Number(object.fixcost_min_threshold)
+        : undefined,
     };
   },
 
@@ -1019,6 +1042,9 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     if (message.effectiveRmRatioMode !== "") {
       obj.effectiveRmRatioMode = message.effectiveRmRatioMode;
     }
+    if (message.fixcostMinThreshold !== undefined) {
+      obj.fixcostMinThreshold = message.fixcostMinThreshold;
+    }
     return obj;
   },
 
@@ -1058,6 +1084,7 @@ export const CostProductMaster: MessageFns<CostProductMaster> = {
     message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     message.rmRatioModeOverride = object.rmRatioModeOverride ?? "";
     message.effectiveRmRatioMode = object.effectiveRmRatioMode ?? "";
+    message.fixcostMinThreshold = object.fixcostMinThreshold ?? undefined;
     return message;
   },
 };
@@ -1781,6 +1808,7 @@ function createBaseUpdateCostProductMasterRequest(): UpdateCostProductMasterRequ
     erpItemType: "",
     erpPrdPerDay: "",
     rmRatioModeOverride: undefined,
+    fixcostMinThreshold: undefined,
   };
 }
 
@@ -1827,6 +1855,9 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     }
     if (message.rmRatioModeOverride !== undefined) {
       writer.uint32(114).string(message.rmRatioModeOverride);
+    }
+    if (message.fixcostMinThreshold !== undefined) {
+      writer.uint32(121).double(message.fixcostMinThreshold);
     }
     return writer;
   },
@@ -1950,6 +1981,14 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
           message.rmRatioModeOverride = reader.string();
           continue;
         }
+        case 15: {
+          if (tag !== 121) {
+            break;
+          }
+
+          message.fixcostMinThreshold = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2027,6 +2066,11 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
         : isSet(object.rm_ratio_mode_override)
         ? globalThis.String(object.rm_ratio_mode_override)
         : undefined,
+      fixcostMinThreshold: isSet(object.fixcostMinThreshold)
+        ? globalThis.Number(object.fixcostMinThreshold)
+        : isSet(object.fixcost_min_threshold)
+        ? globalThis.Number(object.fixcost_min_threshold)
+        : undefined,
     };
   },
 
@@ -2074,6 +2118,9 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     if (message.rmRatioModeOverride !== undefined) {
       obj.rmRatioModeOverride = message.rmRatioModeOverride;
     }
+    if (message.fixcostMinThreshold !== undefined) {
+      obj.fixcostMinThreshold = message.fixcostMinThreshold;
+    }
     return obj;
   },
 
@@ -2096,6 +2143,7 @@ export const UpdateCostProductMasterRequest: MessageFns<UpdateCostProductMasterR
     message.erpItemType = object.erpItemType ?? "";
     message.erpPrdPerDay = object.erpPrdPerDay ?? "";
     message.rmRatioModeOverride = object.rmRatioModeOverride ?? undefined;
+    message.fixcostMinThreshold = object.fixcostMinThreshold ?? undefined;
     return message;
   },
 };
