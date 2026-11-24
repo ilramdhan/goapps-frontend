@@ -1359,6 +1359,80 @@ export interface ApproveCostResultResponse {
 }
 
 /**
+ * CostResultBulkSelection picks the rows of a bulk verify / approve. When
+ * cost_ids is non-empty only those rows are processed and the filter fields
+ * are ignored; otherwise the filter (period required) selects every active
+ * row in the transition's source status (CALCULATED for verify, VERIFIED for
+ * approve), capped server-side at 2000 rows.
+ */
+export interface CostResultBulkSelection {
+  /** Explicit cost ids (max 2000). Non-empty = id mode. */
+  costIds: number[];
+  /** Filter mode: period YYYYMM (required when cost_ids is empty). */
+  period: string;
+  /** Filter mode: calculation type (UNSPECIFIED = all types). */
+  calculationType: CalculationType;
+  /** Filter mode: product code/name search. */
+  search: string;
+  /** Filter mode: product type ids. */
+  productTypeIds: number[];
+  /** Filter mode: shade codes. */
+  shadeCodes: string[];
+  /** Filter mode: RM group codes. */
+  rmGroupCodes: string[];
+}
+
+/** CostResultBulkFailure is one row a bulk transition could not apply. */
+export interface CostResultBulkFailure {
+  /** Cost id of the failed row. */
+  costId: number;
+  /** Product code (empty when the row could not be resolved). */
+  productCode: string;
+  /** Human-readable reason (e.g. wrong status, locked period, MB row). */
+  reason: string;
+}
+
+/** BulkVerifyCostResultsRequest verifies many CALCULATED results at once. */
+export interface BulkVerifyCostResultsRequest {
+  /** Rows to verify. */
+  selection: CostResultBulkSelection | undefined;
+}
+
+/** BulkVerifyCostResultsResponse summarizes a bulk verify. */
+export interface BulkVerifyCostResultsResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Rows verified. */
+  okCount: number;
+  /** Rows refused. */
+  failedCount: number;
+  /** Per-row refusals. */
+  failures: CostResultBulkFailure[];
+}
+
+/** BulkApproveCostResultsRequest approves many VERIFIED results at once. */
+export interface BulkApproveCostResultsRequest {
+  /** Rows to approve. */
+  selection: CostResultBulkSelection | undefined;
+}
+
+/** BulkApproveCostResultsResponse summarizes a bulk approve. */
+export interface BulkApproveCostResultsResponse {
+  /** Standard response envelope. */
+  base:
+    | BaseResponse
+    | undefined;
+  /** Rows approved. */
+  okCount: number;
+  /** Rows refused. */
+  failedCount: number;
+  /** Per-row refusals. */
+  failures: CostResultBulkFailure[];
+}
+
+/**
  * ProcessChunkInternalRequest carries the data the worker needs to compute
  * one chunk of products. Internal RPC: only finance-cost-worker invokes it.
  */
@@ -9064,6 +9138,670 @@ export const ApproveCostResultResponse: MessageFns<ApproveCostResultResponse> = 
   },
 };
 
+function createBaseCostResultBulkSelection(): CostResultBulkSelection {
+  return {
+    costIds: [],
+    period: "",
+    calculationType: 0,
+    search: "",
+    productTypeIds: [],
+    shadeCodes: [],
+    rmGroupCodes: [],
+  };
+}
+
+export const CostResultBulkSelection: MessageFns<CostResultBulkSelection> = {
+  encode(message: CostResultBulkSelection, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.costIds) {
+      writer.uint32(8).int64(v!);
+    }
+    if (message.period !== "") {
+      writer.uint32(18).string(message.period);
+    }
+    if (message.calculationType !== 0) {
+      writer.uint32(24).int32(message.calculationType);
+    }
+    if (message.search !== "") {
+      writer.uint32(34).string(message.search);
+    }
+    for (const v of message.productTypeIds) {
+      writer.uint32(40).int32(v!);
+    }
+    for (const v of message.shadeCodes) {
+      writer.uint32(50).string(v!);
+    }
+    for (const v of message.rmGroupCodes) {
+      writer.uint32(58).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CostResultBulkSelection {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCostResultBulkSelection();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag === 8) {
+            message.costIds.push(longToNumber(reader.int64()));
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.costIds.push(longToNumber(reader.int64()));
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.period = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.calculationType = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag === 40) {
+            message.productTypeIds.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 42) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.productTypeIds.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.shadeCodes.push(reader.string());
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.rmGroupCodes.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CostResultBulkSelection {
+    return {
+      costIds: globalThis.Array.isArray(object?.costIds)
+        ? object.costIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.cost_ids)
+        ? object.cost_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      period: isSet(object.period) ? globalThis.String(object.period) : "",
+      calculationType: isSet(object.calculationType)
+        ? calculationTypeFromJSON(object.calculationType)
+        : isSet(object.calculation_type)
+        ? calculationTypeFromJSON(object.calculation_type)
+        : 0,
+      search: isSet(object.search) ? globalThis.String(object.search) : "",
+      productTypeIds: globalThis.Array.isArray(object?.productTypeIds)
+        ? object.productTypeIds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.product_type_ids)
+        ? object.product_type_ids.map((e: any) => globalThis.Number(e))
+        : [],
+      shadeCodes: globalThis.Array.isArray(object?.shadeCodes)
+        ? object.shadeCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.shade_codes)
+        ? object.shade_codes.map((e: any) => globalThis.String(e))
+        : [],
+      rmGroupCodes: globalThis.Array.isArray(object?.rmGroupCodes)
+        ? object.rmGroupCodes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.rm_group_codes)
+        ? object.rm_group_codes.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CostResultBulkSelection): unknown {
+    const obj: any = {};
+    if (message.costIds?.length) {
+      obj.costIds = message.costIds.map((e) => Math.round(e));
+    }
+    if (message.period !== "") {
+      obj.period = message.period;
+    }
+    if (message.calculationType !== 0) {
+      obj.calculationType = calculationTypeToJSON(message.calculationType);
+    }
+    if (message.search !== "") {
+      obj.search = message.search;
+    }
+    if (message.productTypeIds?.length) {
+      obj.productTypeIds = message.productTypeIds.map((e) => Math.round(e));
+    }
+    if (message.shadeCodes?.length) {
+      obj.shadeCodes = message.shadeCodes;
+    }
+    if (message.rmGroupCodes?.length) {
+      obj.rmGroupCodes = message.rmGroupCodes;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CostResultBulkSelection>): CostResultBulkSelection {
+    return CostResultBulkSelection.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CostResultBulkSelection>): CostResultBulkSelection {
+    const message = createBaseCostResultBulkSelection();
+    message.costIds = object.costIds?.map((e) => e) || [];
+    message.period = object.period ?? "";
+    message.calculationType = object.calculationType ?? 0;
+    message.search = object.search ?? "";
+    message.productTypeIds = object.productTypeIds?.map((e) => e) || [];
+    message.shadeCodes = object.shadeCodes?.map((e) => e) || [];
+    message.rmGroupCodes = object.rmGroupCodes?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseCostResultBulkFailure(): CostResultBulkFailure {
+  return { costId: 0, productCode: "", reason: "" };
+}
+
+export const CostResultBulkFailure: MessageFns<CostResultBulkFailure> = {
+  encode(message: CostResultBulkFailure, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.costId !== 0) {
+      writer.uint32(8).int64(message.costId);
+    }
+    if (message.productCode !== "") {
+      writer.uint32(18).string(message.productCode);
+    }
+    if (message.reason !== "") {
+      writer.uint32(26).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CostResultBulkFailure {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCostResultBulkFailure();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.costId = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.productCode = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.reason = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CostResultBulkFailure {
+    return {
+      costId: isSet(object.costId)
+        ? globalThis.Number(object.costId)
+        : isSet(object.cost_id)
+        ? globalThis.Number(object.cost_id)
+        : 0,
+      productCode: isSet(object.productCode)
+        ? globalThis.String(object.productCode)
+        : isSet(object.product_code)
+        ? globalThis.String(object.product_code)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: CostResultBulkFailure): unknown {
+    const obj: any = {};
+    if (message.costId !== 0) {
+      obj.costId = Math.round(message.costId);
+    }
+    if (message.productCode !== "") {
+      obj.productCode = message.productCode;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CostResultBulkFailure>): CostResultBulkFailure {
+    return CostResultBulkFailure.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CostResultBulkFailure>): CostResultBulkFailure {
+    const message = createBaseCostResultBulkFailure();
+    message.costId = object.costId ?? 0;
+    message.productCode = object.productCode ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseBulkVerifyCostResultsRequest(): BulkVerifyCostResultsRequest {
+  return { selection: undefined };
+}
+
+export const BulkVerifyCostResultsRequest: MessageFns<BulkVerifyCostResultsRequest> = {
+  encode(message: BulkVerifyCostResultsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.selection !== undefined) {
+      CostResultBulkSelection.encode(message.selection, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkVerifyCostResultsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkVerifyCostResultsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.selection = CostResultBulkSelection.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkVerifyCostResultsRequest {
+    return { selection: isSet(object.selection) ? CostResultBulkSelection.fromJSON(object.selection) : undefined };
+  },
+
+  toJSON(message: BulkVerifyCostResultsRequest): unknown {
+    const obj: any = {};
+    if (message.selection !== undefined) {
+      obj.selection = CostResultBulkSelection.toJSON(message.selection);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkVerifyCostResultsRequest>): BulkVerifyCostResultsRequest {
+    return BulkVerifyCostResultsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkVerifyCostResultsRequest>): BulkVerifyCostResultsRequest {
+    const message = createBaseBulkVerifyCostResultsRequest();
+    message.selection = (object.selection !== undefined && object.selection !== null)
+      ? CostResultBulkSelection.fromPartial(object.selection)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkVerifyCostResultsResponse(): BulkVerifyCostResultsResponse {
+  return { base: undefined, okCount: 0, failedCount: 0, failures: [] };
+}
+
+export const BulkVerifyCostResultsResponse: MessageFns<BulkVerifyCostResultsResponse> = {
+  encode(message: BulkVerifyCostResultsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.okCount !== 0) {
+      writer.uint32(16).int32(message.okCount);
+    }
+    if (message.failedCount !== 0) {
+      writer.uint32(24).int32(message.failedCount);
+    }
+    for (const v of message.failures) {
+      CostResultBulkFailure.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkVerifyCostResultsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkVerifyCostResultsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.okCount = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.failedCount = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.failures.push(CostResultBulkFailure.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkVerifyCostResultsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      okCount: isSet(object.okCount)
+        ? globalThis.Number(object.okCount)
+        : isSet(object.ok_count)
+        ? globalThis.Number(object.ok_count)
+        : 0,
+      failedCount: isSet(object.failedCount)
+        ? globalThis.Number(object.failedCount)
+        : isSet(object.failed_count)
+        ? globalThis.Number(object.failed_count)
+        : 0,
+      failures: globalThis.Array.isArray(object?.failures)
+        ? object.failures.map((e: any) => CostResultBulkFailure.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BulkVerifyCostResultsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.okCount !== 0) {
+      obj.okCount = Math.round(message.okCount);
+    }
+    if (message.failedCount !== 0) {
+      obj.failedCount = Math.round(message.failedCount);
+    }
+    if (message.failures?.length) {
+      obj.failures = message.failures.map((e) => CostResultBulkFailure.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkVerifyCostResultsResponse>): BulkVerifyCostResultsResponse {
+    return BulkVerifyCostResultsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkVerifyCostResultsResponse>): BulkVerifyCostResultsResponse {
+    const message = createBaseBulkVerifyCostResultsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.okCount = object.okCount ?? 0;
+    message.failedCount = object.failedCount ?? 0;
+    message.failures = object.failures?.map((e) => CostResultBulkFailure.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBulkApproveCostResultsRequest(): BulkApproveCostResultsRequest {
+  return { selection: undefined };
+}
+
+export const BulkApproveCostResultsRequest: MessageFns<BulkApproveCostResultsRequest> = {
+  encode(message: BulkApproveCostResultsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.selection !== undefined) {
+      CostResultBulkSelection.encode(message.selection, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkApproveCostResultsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkApproveCostResultsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.selection = CostResultBulkSelection.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkApproveCostResultsRequest {
+    return { selection: isSet(object.selection) ? CostResultBulkSelection.fromJSON(object.selection) : undefined };
+  },
+
+  toJSON(message: BulkApproveCostResultsRequest): unknown {
+    const obj: any = {};
+    if (message.selection !== undefined) {
+      obj.selection = CostResultBulkSelection.toJSON(message.selection);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkApproveCostResultsRequest>): BulkApproveCostResultsRequest {
+    return BulkApproveCostResultsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkApproveCostResultsRequest>): BulkApproveCostResultsRequest {
+    const message = createBaseBulkApproveCostResultsRequest();
+    message.selection = (object.selection !== undefined && object.selection !== null)
+      ? CostResultBulkSelection.fromPartial(object.selection)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBulkApproveCostResultsResponse(): BulkApproveCostResultsResponse {
+  return { base: undefined, okCount: 0, failedCount: 0, failures: [] };
+}
+
+export const BulkApproveCostResultsResponse: MessageFns<BulkApproveCostResultsResponse> = {
+  encode(message: BulkApproveCostResultsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.base !== undefined) {
+      BaseResponse.encode(message.base, writer.uint32(10).fork()).join();
+    }
+    if (message.okCount !== 0) {
+      writer.uint32(16).int32(message.okCount);
+    }
+    if (message.failedCount !== 0) {
+      writer.uint32(24).int32(message.failedCount);
+    }
+    for (const v of message.failures) {
+      CostResultBulkFailure.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BulkApproveCostResultsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBulkApproveCostResultsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.base = BaseResponse.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.okCount = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.failedCount = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.failures.push(CostResultBulkFailure.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BulkApproveCostResultsResponse {
+    return {
+      base: isSet(object.base) ? BaseResponse.fromJSON(object.base) : undefined,
+      okCount: isSet(object.okCount)
+        ? globalThis.Number(object.okCount)
+        : isSet(object.ok_count)
+        ? globalThis.Number(object.ok_count)
+        : 0,
+      failedCount: isSet(object.failedCount)
+        ? globalThis.Number(object.failedCount)
+        : isSet(object.failed_count)
+        ? globalThis.Number(object.failed_count)
+        : 0,
+      failures: globalThis.Array.isArray(object?.failures)
+        ? object.failures.map((e: any) => CostResultBulkFailure.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BulkApproveCostResultsResponse): unknown {
+    const obj: any = {};
+    if (message.base !== undefined) {
+      obj.base = BaseResponse.toJSON(message.base);
+    }
+    if (message.okCount !== 0) {
+      obj.okCount = Math.round(message.okCount);
+    }
+    if (message.failedCount !== 0) {
+      obj.failedCount = Math.round(message.failedCount);
+    }
+    if (message.failures?.length) {
+      obj.failures = message.failures.map((e) => CostResultBulkFailure.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BulkApproveCostResultsResponse>): BulkApproveCostResultsResponse {
+    return BulkApproveCostResultsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BulkApproveCostResultsResponse>): BulkApproveCostResultsResponse {
+    const message = createBaseBulkApproveCostResultsResponse();
+    message.base = (object.base !== undefined && object.base !== null)
+      ? BaseResponse.fromPartial(object.base)
+      : undefined;
+    message.okCount = object.okCount ?? 0;
+    message.failedCount = object.failedCount ?? 0;
+    message.failures = object.failures?.map((e) => CostResultBulkFailure.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseProcessChunkInternalRequest(): ProcessChunkInternalRequest {
   return { jobId: 0, chunkId: 0, period: "", calculationType: 0, productIds: [], actor: "" };
 }
@@ -10263,6 +11001,32 @@ export const CostCalcServiceDefinition = {
       requestType: ApproveCostResultRequest,
       requestStream: false,
       responseType: ApproveCostResultResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * BulkVerifyCostResults verifies many CALCULATED results; each row runs the
+     * single-row rules in its own transaction, failures don't abort the rest.
+     * Required permission: finance.cost.result.verify.
+     */
+    bulkVerifyCostResults: {
+      name: "BulkVerifyCostResults",
+      requestType: BulkVerifyCostResultsRequest,
+      requestStream: false,
+      responseType: BulkVerifyCostResultsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * BulkApproveCostResults approves many VERIFIED results; same semantics as
+     * BulkVerifyCostResults.
+     * Required permission: finance.cost.result.approve.
+     */
+    bulkApproveCostResults: {
+      name: "BulkApproveCostResults",
+      requestType: BulkApproveCostResultsRequest,
+      requestStream: false,
+      responseType: BulkApproveCostResultsResponse,
       responseStream: false,
       options: {},
     },
