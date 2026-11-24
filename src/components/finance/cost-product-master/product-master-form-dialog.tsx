@@ -31,6 +31,11 @@ const schema = z.object({
   flex02: z.string().max(100, "Max 100 chars"),
   flex03: z.string().max(100, "Max 100 chars"),
   rmRatioModeOverride: z.enum(["", "INPUT", "DENIER"]).optional(),
+  fixcostMinThreshold: z
+    .string()
+    .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1), "Must be between 0 and 1")
+    .refine((v) => !v || /^\d*(\.\d{0,6})?$/.test(v.trim()), "Max 6 decimal places")
+    .optional(),
   erpFgType: z.string().max(15, "Max 15 chars").optional(),
   erpChpItemCode: z.string().max(50, "Max 50 chars").optional(),
   erpMsBatchItem: z.string().max(12, "Max 12 chars").optional(),
@@ -61,7 +66,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
       productTypeId: 0, productName: "", shadeCode: "", gradeCode: "AX", description: "",
       flex01: "", flex02: "", flex03: "",
       erpFgType: "", erpChpItemCode: "", erpMsBatchItem: "", erpItemType: "", erpPrdPerDay: "",
-      rmRatioModeOverride: "",
+      rmRatioModeOverride: "", fixcostMinThreshold: "",
     },
   })
 
@@ -82,6 +87,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
         erpItemType: product?.erpItemType ?? "",
         erpPrdPerDay: product?.erpPrdPerDay ?? "",
         rmRatioModeOverride: product?.rmRatioModeOverride ?? "",
+        fixcostMinThreshold: product?.fixcostMinThreshold == null ? "" : String(product.fixcostMinThreshold),
       })
     }
   }, [open, product, form])
@@ -104,6 +110,9 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
           erpItemType: values.erpItemType,
           erpPrdPerDay: values.erpPrdPerDay,
           rmRatioModeOverride: values.rmRatioModeOverride ?? "",
+          ...(values.fixcostMinThreshold && Number(values.fixcostMinThreshold) !== product.fixcostMinThreshold
+            ? { fixcostMinThreshold: Number(values.fixcostMinThreshold) }
+            : {}),
         })
       } else {
         await createMutation.mutateAsync({
@@ -254,6 +263,30 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
                     <FormDescription>
                       Khusus product ini. &quot;Ikut tipe product&quot; memakai mode bawaan tipe product.
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="fixcostMinThreshold"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Min Fixed Cost Threshold (/kg)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.000001}
+                        placeholder="Auto (by machine)"
+                      />
+                    </FormControl>
+                    <FormDescription>0 = off. Empty = Auto (machine default).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

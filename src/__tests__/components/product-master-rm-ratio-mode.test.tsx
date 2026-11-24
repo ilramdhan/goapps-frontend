@@ -17,3 +17,11 @@ describe("normalizeCostProductMaster rm ratio mode", () => {
     expect(normalizeCostProductMaster({ rmRatioModeOverride: "BOGUS" }).rmRatioModeOverride).toBe("")
   })
 })
+
+describe("normalizeCostProductMaster fixcostMinThreshold", () => {
+  it("reads camel/snake, keeps 0, unset -> null", () => {
+    expect(normalizeCostProductMaster({ fixcostMinThreshold: 0.05 }).fixcostMinThreshold).toBe(0.05)
+    expect(normalizeCostProductMaster({ fixcost_min_threshold: 0 }).fixcostMinThreshold).toBe(0)
+    expect(normalizeCostProductMaster({}).fixcostMinThreshold).toBeNull()
+  })
+})
