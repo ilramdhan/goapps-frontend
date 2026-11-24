@@ -34,6 +34,7 @@ const schema = z.object({
   fixcostMinThreshold: z
     .string()
     .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1), "Must be between 0 and 1")
+    .refine((v) => !v || /^\d*(\.\d{0,6})?$/.test(v.trim()), "Max 6 decimal places")
     .optional(),
   erpFgType: z.string().max(15, "Max 15 chars").optional(),
   erpChpItemCode: z.string().max(50, "Max 50 chars").optional(),
@@ -281,7 +282,7 @@ export function ProductMasterFormDialog({ open, onOpenChange, product, onSuccess
                         type="number"
                         min={0}
                         max={1}
-                        step={0.0001}
+                        step={0.000001}
                         placeholder="Auto (by machine)"
                       />
                     </FormControl>

@@ -71,4 +71,23 @@ describe("ProductMasterFormDialog fixcost min threshold", () => {
     expect(await screen.findByText("Must be between 0 and 1")).toBeInTheDocument()
     expect(updateMutate).not.toHaveBeenCalled()
   })
+
+  it("accepts 6 decimals", async () => {
+    const user = userEvent.setup()
+    render(<ProductMasterFormDialog open onOpenChange={() => {}} product={product} />)
+    await user.type(screen.getByLabelText(label), "0.050125")
+    await user.click(save())
+    await waitFor(() => expect(updateMutate).toHaveBeenCalled())
+    expect(updateMutate.mock.calls[0][0].fixcostMinThreshold).toBe(0.050125)
+  })
+
+  it("rejects more than 6 decimals", async () => {
+    const user = userEvent.setup()
+    render(<ProductMasterFormDialog open onOpenChange={() => {}} product={product} />)
+    const input = screen.getByLabelText(label)
+    await user.type(input, "0.0501251")
+    fireEvent.submit(input.closest("form")!)
+    expect(await screen.findByText("Max 6 decimal places")).toBeInTheDocument()
+    expect(updateMutate).not.toHaveBeenCalled()
+  })
 })
