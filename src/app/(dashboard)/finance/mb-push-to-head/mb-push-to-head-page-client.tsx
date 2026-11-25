@@ -6,6 +6,7 @@ import { Loader2, PlayCircle } from "lucide-react"
 import { PageHeader } from "@/components/common/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog/confirm-dialog"
@@ -77,6 +78,31 @@ export default function MbPushToHeadPageClient() {
           )}
         </CardContent>
       </Card>
+
+      {triggerBatch.data && triggerBatch.data.errors.length > 0 && (
+        <Card role="alert">
+          <Collapsible defaultOpen>
+            <CardHeader>
+              <CollapsibleTrigger className="text-left">
+                <CardTitle className="text-sm font-semibold text-destructive">
+                  {triggerBatch.data.errors.length} MB head(s) failed in period {triggerBatch.data.period}
+                </CardTitle>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <ul aria-label="MB batch errors" className="list-disc space-y-1 pl-5 text-sm">
+                  {triggerBatch.data.errors.map((e, i) => (
+                    <li key={`${e.mbhId}-${i}`} className="break-words">
+                      {e.error}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={confirmOpen}

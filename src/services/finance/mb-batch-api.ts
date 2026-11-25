@@ -1,5 +1,6 @@
 // MB Batch API service — trigger the MB_BATCH cost compute engine for a period
 
+import { normalizeMbBatchErrors } from "@/types/finance/mb-batch"
 import type { MbBatchError } from "@/types/finance/mb-batch"
 
 interface BFFEnvelope<T> {
@@ -28,5 +29,6 @@ export async function triggerMbBatch(period: string): Promise<TriggerMbBatchResu
   if (json.base?.isSuccess === false) {
     throw new Error(json.base.message || "Failed to trigger MB batch")
   }
-  return json.data as TriggerMbBatchResult
+  const d = (json.data ?? {}) as TriggerMbBatchResult
+  return { ...d, errors: normalizeMbBatchErrors(d.errors) }
 }
