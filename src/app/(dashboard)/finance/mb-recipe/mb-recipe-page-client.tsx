@@ -29,6 +29,7 @@ import {
   MbRecipeBulkJobProgressDialog,
   BULK_REGENERATE_ELIGIBLE_STATUSES,
 } from "@/components/finance/mb-recipe"
+import { MbCostCalcExportDialog } from "@/components/finance/mb-recipe/mb-cost-calc-export-dialog"
 import { MBHeadImportDialog } from "@/components/finance/mb-head"
 import { ColumnVisibilityMenu, DataTablePagination } from "@/components/shared"
 import {
@@ -84,6 +85,7 @@ export default function MbRecipePageClient() {
   const { columns, visibility, toggle, setAll, reset } = useMbRecipeTableColumns()
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [costCalcExportOpen, setCostCalcExportOpen] = useState(false)
   const exportMutation = useExportMBHeads()
   const exportFullMutation = useExportMBRecipeFull()
   const exportCostCalcDetailMutation = useExportMBCostCalcDetail()
@@ -241,7 +243,7 @@ export default function MbRecipePageClient() {
                 "Export Full Recipe (with Cost)" stays byte-for-byte unchanged.
               */}
               <DropdownMenuItem
-                onClick={() => exportCostCalcDetailMutation.mutate({ activeFilter: filters.activeFilter })}
+                onClick={() => setCostCalcExportOpen(true)}
                 disabled={exportCostCalcDetailMutation.isPending}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -331,6 +333,15 @@ export default function MbRecipePageClient() {
 
       <MBRecipeFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       <MBHeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      <MbCostCalcExportDialog
+        open={costCalcExportOpen}
+        onOpenChange={setCostCalcExportOpen}
+        isPending={exportCostCalcDetailMutation.isPending}
+        onConfirm={(period) => {
+          exportCostCalcDetailMutation.mutate({ activeFilter: filters.activeFilter, period })
+          setCostCalcExportOpen(false)
+        }}
+      />
       <MbRecipeBulkJobProgressDialog
         open={bulkProgressOpen}
         onOpenChange={setBulkProgressOpen}
