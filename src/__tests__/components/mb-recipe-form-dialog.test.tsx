@@ -719,3 +719,31 @@ describe("MBRecipeFormDialog — P7-R7 FG cleared when shade changes on edit", (
     expect(screen.getByTestId("fg-input")).toHaveValue("5")
   })
 })
+
+// ============================================================================
+// MB name = costing — the single input drives both fields
+// ============================================================================
+
+describe("MBRecipeFormDialog — MB name equals costing", () => {
+  it("create sends mbhMgtName equal to mbhMbCosting", async () => {
+    renderDialog()
+    fillRequiredForCreate()
+    await submit()
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1))
+    const payload = createMutateAsync.mock.calls[0][0]
+    expect(payload.mbhMbCosting).toBe("MBH-NEW-1")
+    expect(payload.mbhMgtName).toBe(payload.mbhMbCosting)
+  })
+
+  it("update sends mbhMgtName equal to mbhMbCosting, even when the costing code is renamed", async () => {
+    renderDialog(BASE_ROW)
+    setField(/mb costing code/i, "MBH-RENAMED-7")
+    await submit()
+
+    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledTimes(1))
+    const data = updateMutateAsync.mock.calls[0][0].data
+    expect(data.mbhMbCosting).toBe("MBH-RENAMED-7")
+    expect(data.mbhMgtName).toBe(data.mbhMbCosting)
+  })
+})
