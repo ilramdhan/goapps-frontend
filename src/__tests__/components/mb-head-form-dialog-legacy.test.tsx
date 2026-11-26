@@ -130,7 +130,6 @@ const CREATE_FIELD_NAMES = [
   "mbhLdrPrsn",
   "mbhLustureCode",
   "mbhMbCosting",
-  "mbhMgtName",
   "mbhOracleSysId",
   "mbhRunLdrPct",
   "mbhShadeCode",
@@ -257,7 +256,7 @@ describe("MBHeadFormDialogLegacy — payload shape", () => {
     expect(createMutateAsync.mock.calls[0][0]).toEqual({
       mbhMbCosting: "MBH-NEW-1",
       mbhOracleSysId: undefined,
-      mbhMgtName: undefined,
+      mbhMgtName: "MBH-NEW-1",
       mbhDenier: undefined,
       mbhFilament: undefined,
       mbhDozing: 0, // see the D30 test above — frozen quirk, not a target value
@@ -289,7 +288,6 @@ describe("MBHeadFormDialogLegacy — payload shape", () => {
     renderDialog(EXISTING_ROW)
 
     expect(input(/mb costing code/i).value).toBe("MBH-2024-001")
-    expect(input(/mgt name/i).value).toBe("Mgt One")
     expect(input(/denier/i).value).toBe("150.5")
     expect(input(/ldr rencana/i).value).toBe("1.25")
     expect(input(/ldr aktual/i).value).toBe("3.55")

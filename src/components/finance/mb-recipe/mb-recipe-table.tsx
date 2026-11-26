@@ -34,14 +34,13 @@ export const BULK_REGENERATE_ELIGIBLE_STATUSES: ReadonlySet<string> = new Set<MB
 // Only columns whose id is in this set get a clickable SortableHeader — every other column
 // renders as a plain, non-sortable TableHead so clicking it can't silently mis-sort the list
 // (the repository falls back to mbh_mb_costing for any unrecognized sort key without erroring).
-const BACKEND_SORTABLE_KEYS = new Set(["mbh_mb_costing", "mbh_mgt_name", "mbh_denier", "created_at"])
+const BACKEND_SORTABLE_KEYS = new Set(["mbh_mb_costing", "mbh_denier", "created_at"])
 
 // Column ids double as backend sort keys (proto ListMBHeadsRequest sort_by values) where supported.
 export const MB_RECIPE_COLUMNS: ColumnDef<MBHead>[] = [
   { id: "dev_code", header: "Dev No", canHide: false },
   { id: "shade_code", header: "Shade Code" },
   { id: "shade_name", header: "Shade Name" },
-  { id: "mbh_mgt_name", header: "MB Name", defaultHidden: true },
   { id: "mbh_denier", header: "Denier", defaultHidden: true },
   { id: "mbh_status", header: "Status", defaultHidden: true },
   { id: "mbh_final_product", header: "Final Product", defaultHidden: true },
@@ -183,16 +182,15 @@ export function MbRecipeTable({
               {show("dev_code") && renderHeader(MB_RECIPE_COLUMNS[0], selectable ? "w-32" : "w-32 pl-4")}
               {show("shade_code") && renderHeader(MB_RECIPE_COLUMNS[1], "w-28")}
               {show("shade_name") && renderHeader(MB_RECIPE_COLUMNS[2])}
-              {show("mbh_mgt_name") && renderHeader(MB_RECIPE_COLUMNS[3])}
-              {show("mbh_denier") && renderHeader(MB_RECIPE_COLUMNS[4], "w-24")}
-              {show("mbh_status") && renderHeader(MB_RECIPE_COLUMNS[5], "w-28")}
-              {show("mbh_final_product") && renderHeader(MB_RECIPE_COLUMNS[6])}
-              {show("mbh_cross_section") && renderHeader(MB_RECIPE_COLUMNS[7])}
-              {show("mbh_lusture_code") && renderHeader(MB_RECIPE_COLUMNS[8], "w-24")}
-              {show("is_boughtout") && renderHeader(MB_RECIPE_COLUMNS[9], "w-28")}
-              {show("entry_status") && renderHeader(MB_RECIPE_COLUMNS[10], "w-32")}
-              {show("current_version") && renderHeader(MB_RECIPE_COLUMNS[11], "w-24")}
-              {show("mbh_orion_item_code") && renderHeader(MB_RECIPE_COLUMNS[12], "pr-4")}
+              {show("mbh_denier") && renderHeader(MB_RECIPE_COLUMNS[3], "w-24")}
+              {show("mbh_status") && renderHeader(MB_RECIPE_COLUMNS[4], "w-28")}
+              {show("mbh_final_product") && renderHeader(MB_RECIPE_COLUMNS[5])}
+              {show("mbh_cross_section") && renderHeader(MB_RECIPE_COLUMNS[6])}
+              {show("mbh_lusture_code") && renderHeader(MB_RECIPE_COLUMNS[7], "w-24")}
+              {show("is_boughtout") && renderHeader(MB_RECIPE_COLUMNS[8], "w-28")}
+              {show("entry_status") && renderHeader(MB_RECIPE_COLUMNS[9], "w-32")}
+              {show("current_version") && renderHeader(MB_RECIPE_COLUMNS[10], "w-24")}
+              {show("mbh_orion_item_code") && renderHeader(MB_RECIPE_COLUMNS[11], "pr-4")}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -207,7 +205,6 @@ export function MbRecipeTable({
                   )}
                   {show("shade_code") && <TableCell><Skeleton className="h-4 w-20" /></TableCell>}
                   {show("shade_name") && <TableCell><Skeleton className="h-4 w-40" /></TableCell>}
-                  {show("mbh_mgt_name") && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
                   {show("mbh_denier") && <TableCell><Skeleton className="h-4 w-12" /></TableCell>}
                   {show("mbh_status") && <TableCell><Skeleton className="h-4 w-20" /></TableCell>}
                   {show("mbh_final_product") && <TableCell><Skeleton className="h-4 w-28" /></TableCell>}
@@ -267,7 +264,6 @@ export function MbRecipeTable({
                 )}
                 {show("shade_code") && <TableCell className="font-mono text-xs">{mb.shadeCode || "—"}</TableCell>}
                 {show("shade_name") && <TableCell>{mb.shadeName || "—"}</TableCell>}
-                {show("mbh_mgt_name") && <TableCell>{mb.mbhMgtName || "—"}</TableCell>}
                 {show("mbh_denier") && <TableCell>{mb.mbhDenier ?? "—"}</TableCell>}
                 {show("mbh_status") && <TableCell>{mb.mbhStatus || "—"}</TableCell>}
                 {show("mbh_final_product") && <TableCell>{mb.mbhFinalProduct || "—"}</TableCell>}

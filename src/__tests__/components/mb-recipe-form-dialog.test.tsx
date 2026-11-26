@@ -254,7 +254,6 @@ function setField(label: RegExp, value: string) {
  */
 function fillRequiredForCreate(vsNumber = "71125") {
   setField(/mb costing code/i, "MBH-NEW-1")
-  setField(/mb name/i, "New MB")
   setField(/dev no/i, "DEV-9")
   setField(/vs number/i, vsNumber)
   setField(/^shade code/i, "SC-9")

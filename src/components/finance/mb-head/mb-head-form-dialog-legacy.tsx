@@ -42,9 +42,8 @@ import type { MBHead } from "@/types/finance/mb-head"
 import { useCreateMBHead, useUpdateMBHead } from "@/hooks/finance/use-mb-head"
 
 const formSchema = z.object({
-  mbhMbCosting: z.string().min(1, "MB Costing code is required").max(50),
+  mbhMbCosting: z.string().min(1, "MB Costing code is required").max(100),
   mbhOracleSysId: z.string().max(100).optional(),
-  mbhMgtName: z.string().max(100).optional(),
   mbhDenier: z.coerce.number().positive().optional().or(z.literal("")),
   mbhFilament: z.coerce.number().int().positive().optional().or(z.literal("")),
   // D30: mbhDozing is a retired, contaminated legacy column — kept in the schema so the
@@ -85,7 +84,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as never,
     defaultValues: {
-      mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "",
+      mbhMbCosting: "", mbhOracleSysId: "",
       mbhDenier: "", mbhFilament: "", mbhDozing: "",
       mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
       mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
@@ -101,7 +100,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
           ? {
               mbhMbCosting: mbHead.mbhMbCosting,
               mbhOracleSysId: mbHead.mbhOracleSysId || "",
-              mbhMgtName: mbHead.mbhMgtName || "",
               mbhDenier: mbHead.mbhDenier ?? "",
               mbhFilament: mbHead.mbhFilament ?? "",
               mbhDozing: mbHead.mbhDozing ?? "",
@@ -120,7 +118,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
               mbhIsActive: mbHead.mbhIsActive ?? true,
             }
           : {
-              mbhMbCosting: "", mbhOracleSysId: "", mbhMgtName: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
+              mbhMbCosting: "", mbhOracleSysId: "", mbhDenier: "", mbhFilament: "", mbhDozing: "",
               mbhStatus: "", mbhLdrPrsn: null, mbhRunLdrPct: null, mbhFinalProduct: "", mbhCode: "",
               mbhIsBoughtout: false, mbhDevCode: "", mbhShadeCode: "", mbhShadeName: "",
               mbhCrossSection: "", mbhLustureCode: "", mbhMachineId: "",
@@ -139,7 +137,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
           data: {
             mbhId: mbHead.mbhId,
             mbhMbCosting: values.mbhMbCosting,
-            mbhMgtName: values.mbhMgtName || undefined,
+            mbhMgtName: values.mbhMbCosting, // name = costing
             mbhDenier: toOptNum(values.mbhDenier),
             mbhFilament: toOptNum(values.mbhFilament),
             mbhDozing: toOptNum(values.mbhDozing),
@@ -162,7 +160,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
         await createMutation.mutateAsync({
           mbhMbCosting: values.mbhMbCosting,
           mbhOracleSysId: values.mbhOracleSysId || undefined,
-          mbhMgtName: values.mbhMgtName || undefined,
+          mbhMgtName: values.mbhMbCosting, // name = costing
           mbhDenier: toOptNum(values.mbhDenier),
           mbhFilament: toOptNum(values.mbhFilament),
           mbhDozing: toOptNum(values.mbhDozing),
@@ -212,7 +210,7 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
                   <FormControl>
                     <Input {...field} placeholder="MBH-2024-001" disabled={isEditing || isPending} />
                   </FormControl>
-                  <FormDescription>Unique batch cost identifier</FormDescription>
+                  <FormDescription>Unique batch cost identifier (also used as MB Name)</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -227,19 +225,6 @@ export function MBHeadFormDialogLegacy({ open, onOpenChange, mbHead, onSuccess }
                     <FormLabel>Oracle SYS ID</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Optional" disabled={isEditing || isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mbhMgtName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mgt Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Management display name" disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

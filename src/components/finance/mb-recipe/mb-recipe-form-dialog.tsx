@@ -81,12 +81,11 @@ const shadeRowSchema = z.object({
 })
 
 const formSchema = z.object({
-  mbhMbCosting: z.string().min(1, "MB Costing code is required").max(50),
+  mbhMbCosting: z.string().min(1, "MB Costing code is required").max(100),
   // G9: proto caps mbh_oracle_sys_id at 30. The old max(100) let the FE accept
   // values the backend would reject.
   mbhOracleSysId: z.string().max(30).optional(),
   mbhOrionItemCode: z.string().max(200).optional(),
-  mbhMgtName: z.string().min(1, "MB Name is required").max(100),
   mbhDenier: z.coerce.number().positive("POY Denier is required"),
   mbhFilament: z.coerce.number().int().positive("POY Filament is required"),
   // D30: mbhDozing is a retired, contaminated legacy column — kept in the schema so the
@@ -128,7 +127,7 @@ type FormValues = z.infer<typeof formSchema>
 // ─── Tab wiring ──────────────────────────────────────────────────────────────
 
 const TAB_FIELDS = {
-  identitas: ["mbhMbCosting", "mbhMgtName", "mbhOracleSysId", "mbhOrionItemCode", "mbhDevCode", "mbhVsNumber"],
+  identitas: ["mbhMbCosting", "mbhOracleSysId", "mbhOrionItemCode", "mbhDevCode", "mbhVsNumber"],
   spesifikasi: [
     "mbhNoOfProcess",
     "mbhCode",
@@ -164,7 +163,6 @@ const EMPTY_VALUES: FormValues = {
   mbhMbCosting: "",
   mbhOracleSysId: "",
   mbhOrionItemCode: "",
-  mbhMgtName: "",
   mbhDenier: "" as unknown as number,
   mbhFilament: "" as unknown as number,
   mbhDozing: "",
@@ -229,7 +227,6 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
             mbhMbCosting: mbHead.mbhMbCosting,
             mbhOracleSysId: mbHead.mbhOracleSysId || "",
             mbhOrionItemCode: mbHead.mbhOrionItemCode || "",
-            mbhMgtName: mbHead.mbhMgtName || "",
             mbhDenier: (mbHead.mbhDenier ?? "") as unknown as number,
             mbhFilament: (mbHead.mbhFilament ?? "") as unknown as number,
             mbhDozing: mbHead.mbhDozing ?? "",
@@ -323,7 +320,7 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
             mbhMbCosting: values.mbhMbCosting,
             // "" clears the code on update (undefined would leave it unchanged).
             mbhOrionItemCode: (values.mbhOrionItemCode ?? "").trim(),
-            mbhMgtName: values.mbhMgtName,
+            mbhMgtName: values.mbhMbCosting, // name = costing (single input)
             mbhDenier: toOptNum(values.mbhDenier),
             mbhFilament: toOptNum(values.mbhFilament),
             mbhDozing: toOptNum(values.mbhDozing),
@@ -356,7 +353,7 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
           mbhMbCosting: values.mbhMbCosting,
           mbhOracleSysId: toOptStr(values.mbhOracleSysId),
           mbhOrionItemCode: toOptStr(values.mbhOrionItemCode),
-          mbhMgtName: values.mbhMgtName,
+          mbhMgtName: values.mbhMbCosting, // name = costing (single input)
           mbhDenier: toOptNum(values.mbhDenier),
           mbhFilament: toOptNum(values.mbhFilament),
           mbhDozing: toOptNum(values.mbhDozing),
@@ -451,7 +448,7 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                           <Input {...field} placeholder="MBH-2024-001" disabled={isPending} />
                         </FormControl>
                         <FormDescription>
-                          Unique batch cost identifier
+                          Unique batch cost identifier (also used as MB Name)
                           {isEditing ? ". Changing it renames the MB product in Product Master and its spins." : ""}
                         </FormDescription>
                         <FormMessage />
@@ -459,21 +456,6 @@ export function MBRecipeFormDialog({ open, onOpenChange, mbHead, onSuccess }: MB
                     )}
                   />
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="mbhMgtName"
-                      render={({ field }) => (
-                        <FormItem className="flex h-full flex-col">
-                          <FormLabel>
-                            MB Name <span className="text-destructive">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="MB display name" disabled={isPending} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                     <FormField
                       control={form.control}
                       name="mbhOracleSysId"
