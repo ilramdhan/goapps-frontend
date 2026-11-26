@@ -2839,6 +2839,13 @@ export interface DuplicateMBSpinRequest {
     | undefined;
   /** FG product link for the clone (cost_product_master id). 0 = no FG link (the source FG is never copied; it would collide on shade+FG). */
   fgProductId: number;
+  /**
+   * Optional LDR for the clone, strictly greater than zero. When set the clone
+   * gets run_ldr = ldr_calculated = this value, adjustment NULL and the LDR is
+   * locked as actual (immune to the parent's LDR cascade). Absent means the
+   * source LDR values are copied as before.
+   */
+  mbsRunLdrPct?: number | undefined;
 }
 
 /**
@@ -24644,7 +24651,15 @@ export const DownloadMBSpinTemplateResponse: MessageFns<DownloadMBSpinTemplateRe
 };
 
 function createBaseDuplicateMBSpinRequest(): DuplicateMBSpinRequest {
-  return { mbhId: "", mbsId: "", mbsMgtName: undefined, mbsDenier: undefined, mbsFilament: undefined, fgProductId: 0 };
+  return {
+    mbhId: "",
+    mbsId: "",
+    mbsMgtName: undefined,
+    mbsDenier: undefined,
+    mbsFilament: undefined,
+    fgProductId: 0,
+    mbsRunLdrPct: undefined,
+  };
 }
 
 export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
@@ -24666,6 +24681,9 @@ export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
     }
     if (message.fgProductId !== 0) {
       writer.uint32(48).int64(message.fgProductId);
+    }
+    if (message.mbsRunLdrPct !== undefined) {
+      writer.uint32(57).double(message.mbsRunLdrPct);
     }
     return writer;
   },
@@ -24725,6 +24743,14 @@ export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
           message.fgProductId = longToNumber(reader.int64());
           continue;
         }
+        case 7: {
+          if (tag !== 57) {
+            break;
+          }
+
+          message.mbsRunLdrPct = reader.double();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -24766,6 +24792,11 @@ export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
         : isSet(object.fg_product_id)
         ? globalThis.Number(object.fg_product_id)
         : 0,
+      mbsRunLdrPct: isSet(object.mbsRunLdrPct)
+        ? globalThis.Number(object.mbsRunLdrPct)
+        : isSet(object.mbs_run_ldr_pct)
+        ? globalThis.Number(object.mbs_run_ldr_pct)
+        : undefined,
     };
   },
 
@@ -24789,6 +24820,9 @@ export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
     if (message.fgProductId !== 0) {
       obj.fgProductId = Math.round(message.fgProductId);
     }
+    if (message.mbsRunLdrPct !== undefined) {
+      obj.mbsRunLdrPct = message.mbsRunLdrPct;
+    }
     return obj;
   },
 
@@ -24803,6 +24837,7 @@ export const DuplicateMBSpinRequest: MessageFns<DuplicateMBSpinRequest> = {
     message.mbsDenier = object.mbsDenier ?? undefined;
     message.mbsFilament = object.mbsFilament ?? undefined;
     message.fgProductId = object.fgProductId ?? 0;
+    message.mbsRunLdrPct = object.mbsRunLdrPct ?? undefined;
     return message;
   },
 };
