@@ -1,6 +1,7 @@
 // Finance MBHead routes - List and Create
 
 import { NextRequest, NextResponse } from "next/server"
+import { parseEntryStatuses } from "./entry-statuses"
 import { getMBHeadClient, createMetadataFromRequest, isGrpcError, handleGrpcError } from "@/lib/grpc"
 
 // GET /api/v1/finance/mb-heads - List MB Heads with filters
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
                 // ⭐ DIPERBARUI 2026-08-26 (R16) — optional reverse-lookup filter by linked
                 // cost product (mst_mb_head.mbh_cost_product_id). 0/absent means no filter.
                 costProductId: Number(searchParams.get("costProductId") || searchParams.get("cost_product_id")) || 0,
+                entryStatuses: parseEntryStatuses(searchParams),
             },
             metadata
         )

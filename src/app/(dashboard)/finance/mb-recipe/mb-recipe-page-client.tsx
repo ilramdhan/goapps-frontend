@@ -70,9 +70,20 @@ const CHECK_STATUS_CALC_EXPORT_OPTIONS: MBRecipeFullCheckStatusCalc[] = [
   "Rejected",
 ]
 
+const ENTRY_STATUS_FILTER_OPTIONS: { value: MBHeadEntryStatus; label: string }[] = [
+  { value: "DRAFT", label: "Draft" },
+  { value: "SUBMITTED", label: "Submitted" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "VALIDATED", label: "Validated" },
+  { value: "UN_APPROVED", label: "Un-approved" },
+  { value: "REVOKED", label: "Revoked" },
+  { value: "REJECTED", label: "Rejected" },
+]
+
 const defaultFilters: ListMBHeadsParams = {
   search: "",
   activeFilter: ActiveFilter.ACTIVE_FILTER_UNSPECIFIED,
+  entryStatuses: undefined,
   sortBy: "",
   sortOrder: "",
   page: 1,
@@ -269,7 +280,7 @@ export default function MbRecipePageClient() {
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_170px_auto] lg:items-center">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_170px_170px_auto] lg:items-center">
         <DebouncedSearchInput
           value={filters.search || ""}
           onValueChange={(search) => setFilters({ ...filters, search, page: 1 })}
@@ -287,6 +298,22 @@ export default function MbRecipePageClient() {
           <SelectContent>
             {ACTIVE_FILTER_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.entryStatuses?.[0] ?? "ALL"}
+          onValueChange={(v) =>
+            setFilters({ ...filters, entryStatuses: v === "ALL" ? undefined : [v as MBHeadEntryStatus], page: 1 })
+          }
+        >
+          <SelectTrigger className="h-9" aria-label="Entry status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All entry status</SelectItem>
+            {ENTRY_STATUS_FILTER_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

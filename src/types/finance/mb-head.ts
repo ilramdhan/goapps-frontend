@@ -118,6 +118,8 @@ export interface ListMBHeadsParams {
    * by this filter.
    */
   costProductId?: number
+  /** Filter by entry status (OR-ed). Undefined/empty means no filter. */
+  entryStatuses?: MBHeadEntryStatus[]
 }
 
 export interface ExportMBHeadsParams {

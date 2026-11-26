@@ -1823,6 +1823,11 @@ export interface ListMBHeadsRequest {
    * VALIDATED (mb_autogen_repository.go), so a still-DRAFT head will not be found by this filter.
    */
   costProductId: number;
+  /**
+   * Filter by entry status (mbh_entry_status). Empty = no filter (backward compatible).
+   * Multiple values are OR-ed. Allowed: DRAFT, SUBMITTED, APPROVED, VALIDATED, UN_APPROVED, REVOKED, REJECTED.
+   */
+  entryStatuses: string[];
 }
 
 /** ListMBHeadsResponse is the response for listing MB Head records. */
@@ -17344,7 +17349,16 @@ export const DeleteMBHeadResponse: MessageFns<DeleteMBHeadResponse> = {
 };
 
 function createBaseListMBHeadsRequest(): ListMBHeadsRequest {
-  return { page: 0, pageSize: 0, search: "", activeFilter: 0, sortBy: "", sortOrder: "", costProductId: 0 };
+  return {
+    page: 0,
+    pageSize: 0,
+    search: "",
+    activeFilter: 0,
+    sortBy: "",
+    sortOrder: "",
+    costProductId: 0,
+    entryStatuses: [],
+  };
 }
 
 export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
@@ -17369,6 +17383,9 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     }
     if (message.costProductId !== 0) {
       writer.uint32(56).int64(message.costProductId);
+    }
+    for (const v of message.entryStatuses) {
+      writer.uint32(66).string(v!);
     }
     return writer;
   },
@@ -17436,6 +17453,14 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
           message.costProductId = longToNumber(reader.int64());
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.entryStatuses.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17474,6 +17499,11 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
         : isSet(object.cost_product_id)
         ? globalThis.Number(object.cost_product_id)
         : 0,
+      entryStatuses: globalThis.Array.isArray(object?.entryStatuses)
+        ? object.entryStatuses.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.entry_statuses)
+        ? object.entry_statuses.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -17500,6 +17530,9 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     if (message.costProductId !== 0) {
       obj.costProductId = Math.round(message.costProductId);
     }
+    if (message.entryStatuses?.length) {
+      obj.entryStatuses = message.entryStatuses;
+    }
     return obj;
   },
 
@@ -17515,6 +17548,7 @@ export const ListMBHeadsRequest: MessageFns<ListMBHeadsRequest> = {
     message.sortBy = object.sortBy ?? "";
     message.sortOrder = object.sortOrder ?? "";
     message.costProductId = object.costProductId ?? 0;
+    message.entryStatuses = object.entryStatuses?.map((e) => e) || [];
     return message;
   },
 };
