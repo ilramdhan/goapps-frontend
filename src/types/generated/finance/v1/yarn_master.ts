@@ -2468,6 +2468,11 @@ export interface MBSpin {
    * (link source RECIPE, or root spin of a recipe that has an FG). Read-only.
    */
   fgFollowsRecipe: boolean;
+  /**
+   * UUID of the spin this one was duplicated from (empty = root spin). Child
+   * spins (non-empty) cannot be duplicated again.
+   */
+  parentSpinId: string;
 }
 
 /** CreateMBSpinRequest is the request for creating an MB Spin record. */
@@ -21517,6 +21522,7 @@ function createBaseMBSpin(): MBSpin {
     supersededAt: "",
     supersededBySpinCode: "",
     fgFollowsRecipe: false,
+    parentSpinId: "",
   };
 }
 
@@ -21629,6 +21635,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     }
     if (message.fgFollowsRecipe !== false) {
       writer.uint32(288).bool(message.fgFollowsRecipe);
+    }
+    if (message.parentSpinId !== "") {
+      writer.uint32(298).string(message.parentSpinId);
     }
     return writer;
   },
@@ -21928,6 +21937,14 @@ export const MBSpin: MessageFns<MBSpin> = {
           message.fgFollowsRecipe = reader.bool();
           continue;
         }
+        case 37: {
+          if (tag !== 298) {
+            break;
+          }
+
+          message.parentSpinId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -22115,6 +22132,11 @@ export const MBSpin: MessageFns<MBSpin> = {
         : isSet(object.fg_follows_recipe)
         ? globalThis.Boolean(object.fg_follows_recipe)
         : false,
+      parentSpinId: isSet(object.parentSpinId)
+        ? globalThis.String(object.parentSpinId)
+        : isSet(object.parent_spin_id)
+        ? globalThis.String(object.parent_spin_id)
+        : "",
     };
   },
 
@@ -22228,6 +22250,9 @@ export const MBSpin: MessageFns<MBSpin> = {
     if (message.fgFollowsRecipe !== false) {
       obj.fgFollowsRecipe = message.fgFollowsRecipe;
     }
+    if (message.parentSpinId !== "") {
+      obj.parentSpinId = message.parentSpinId;
+    }
     return obj;
   },
 
@@ -22274,6 +22299,7 @@ export const MBSpin: MessageFns<MBSpin> = {
     message.supersededAt = object.supersededAt ?? "";
     message.supersededBySpinCode = object.supersededBySpinCode ?? "";
     message.fgFollowsRecipe = object.fgFollowsRecipe ?? false;
+    message.parentSpinId = object.parentSpinId ?? "";
     return message;
   },
 };
