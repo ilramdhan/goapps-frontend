@@ -120,7 +120,7 @@ export default function MbSpinDetailClient({ id }: Props) {
               Edit
             </Button>
           )}
-          {canDuplicate && (
+          {canDuplicate && !mbSpin.parentSpinId && (
             <Button size="sm" variant="outline" onClick={() => setDuplicateOpen(true)}>
               <Copy className="h-4 w-4 mr-1" />
               Duplicate

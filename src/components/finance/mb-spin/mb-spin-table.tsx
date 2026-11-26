@@ -152,6 +152,8 @@ export function MBSpinTable({ data, isLoading, onEdit, onDelete, onDuplicate }: 
       label: "Duplicate",
       icon: <Copy className="h-4 w-4" />,
       onClick: onDuplicate!,
+      // A child spin (parent set) cannot be duplicated again (backend depth cap).
+      hidden: (row) => !!row.parentSpinId,
     })
   }
   if (onDelete) {

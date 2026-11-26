@@ -44,6 +44,14 @@ const formSchema = z.object({
   mbsFilament: z.coerce.number().int().positive("Filament must be greater than zero"),
   // P7: FG (POY) is required on duplicate; shade is locked to the source spin.
   fgProductId: z.number().int().min(1, "FG Product (POY) is required"),
+  // Optional own LDR for the clone: empty = copy the source LDR; > 0 (max 4dp)
+  // = clone gets this LDR, locked as actual.
+  mbsRunLdrPct: z.string().optional().superRefine((v, ctx) => {
+    const t = (v ?? "").trim()
+    if (t === "") return
+    if (!(Number(t) > 0)) ctx.addIssue({ code: "custom", message: "LDR must be greater than zero" })
+    else if (!/^\d+(\.\d{1,4})?$/.test(t)) ctx.addIssue({ code: "custom", message: "LDR allows at most 4 decimals" })
+  }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -71,7 +79,7 @@ export function MBSpinDuplicateDialog({ open, onOpenChange, mbSpin, onSuccess }:
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as never,
-    defaultValues: { mbsMgtName: "", mbsDenier: 0, mbsFilament: 0, fgProductId: 0 },
+    defaultValues: { mbsMgtName: "", mbsDenier: 0, mbsFilament: 0, fgProductId: 0, mbsRunLdrPct: "" },
   })
 
   // ⭐ DIPERBARUI 2026-08-31 (P7-T3) — live LDR preview while the user edits
@@ -147,6 +155,7 @@ export function MBSpinDuplicateDialog({ open, onOpenChange, mbSpin, onSuccess }:
         mbsMgtName: `${mbSpin.mbsMgtName} (copy)`,
         mbsDenier: mbSpin.mbsDenier ?? 0,
         mbsFilament: mbSpin.mbsFilament ?? 0,
+        mbsRunLdrPct: "",
         fgProductId: 0, // must be picked on purpose: same shade + source FG is a guaranteed 409
       })
       setImpactSummary(null)
@@ -163,6 +172,7 @@ export function MBSpinDuplicateDialog({ open, onOpenChange, mbSpin, onSuccess }:
         mbsDenier: values.mbsDenier,
         mbsFilament: values.mbsFilament,
         fgProductId: values.fgProductId,
+        mbsRunLdrPct: values.mbsRunLdrPct?.trim() ? Number(values.mbsRunLdrPct) : undefined,
       })
       onSuccess?.()
 
@@ -232,6 +242,23 @@ export function MBSpinDuplicateDialog({ open, onOpenChange, mbSpin, onSuccess }:
                     <FormControl>
                       <Input type="number" step="1" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="mbsRunLdrPct"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>LDR (optional)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="any" placeholder="Copy from source" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <p className="text-muted-foreground text-xs">
+                      If set, the copy gets this LDR and is locked as Actual (parent changes will not overwrite it).
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

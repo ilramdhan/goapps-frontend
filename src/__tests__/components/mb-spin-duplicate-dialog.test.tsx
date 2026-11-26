@@ -139,6 +139,41 @@ describe("MBSpinDuplicateDialog — P4-T5 editable name/denier/filament override
   })
 })
 
+describe("MBSpinDuplicateDialog — optional LDR", () => {
+  async function submitWithLdr(ldr?: string) {
+    const user = userEvent.setup()
+    render(<MBSpinDuplicateDialog open onOpenChange={() => {}} mbSpin={spin} />)
+    await user.clear(screen.getByTestId("fg-input"))
+    await user.type(screen.getByTestId("fg-input"), "42")
+    if (ldr !== undefined) await user.type(screen.getByLabelText(/ldr \(optional\)/i), ldr)
+    await user.click(screen.getByRole("button", { name: /^duplicate$/i }))
+  }
+
+  it("omits mbsRunLdrPct when the LDR field is empty", async () => {
+    await submitWithLdr()
+    await waitFor(() => expect(duplicateMutateAsync).toHaveBeenCalledTimes(1))
+    expect(duplicateMutateAsync.mock.calls[0][0].mbsRunLdrPct).toBeUndefined()
+  })
+
+  it("sends the LDR as a number when set", async () => {
+    await submitWithLdr("0.1234")
+    await waitFor(() => expect(duplicateMutateAsync).toHaveBeenCalledTimes(1))
+    expect(duplicateMutateAsync.mock.calls[0][0].mbsRunLdrPct).toBe(0.1234)
+  })
+
+  it("rejects zero and more than 4 decimals", async () => {
+    await submitWithLdr("0")
+    expect(await screen.findByText(/greater than zero/i, { selector: "p" })).toBeInTheDocument()
+    expect(duplicateMutateAsync).not.toHaveBeenCalled()
+  })
+
+  it("rejects 5 decimals", async () => {
+    await submitWithLdr("0.12345")
+    await waitFor(() => expect(document.body.textContent).toMatch(/at most 4 decimals/i))
+    expect(duplicateMutateAsync).not.toHaveBeenCalled()
+  })
+})
+
 // P7-T6: the duplicate RPC also returns a recalc-impact PREVIEW (skipped
 // children, affected products). The dialog must surface it when present and
 // stay quiet (no extra UI) when it's absent/empty — this pins both halves.

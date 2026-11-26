@@ -295,6 +295,7 @@ function RowActions<TData>({
   row: TData
   actions: RowAction<TData>[]
 }) {
+  actions = actions.filter((a) => !a.hidden?.(row))
   return (
     <>
       <div className="hidden items-center justify-end gap-1 sm:flex">

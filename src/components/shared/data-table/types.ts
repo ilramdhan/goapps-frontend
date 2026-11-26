@@ -76,6 +76,8 @@ export interface RowAction<TData> {
   variant?: "default" | "destructive"
   /** Whether the action is disabled */
   disabled?: (row: TData) => boolean
+  /** Hide the action for this row */
+  hidden?: (row: TData) => boolean
 }
 
 /**

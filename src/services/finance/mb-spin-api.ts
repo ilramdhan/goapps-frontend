@@ -38,6 +38,8 @@ export interface DuplicateMBSpinInput {
   mbsFilament?: number
   // P7 — FG (POY) link for the clone. Optional; 0 / absent = inherit/none.
   fgProductId?: number
+  // Optional own LDR for the clone (> 0); sent as mbsRunLdrPct.
+  mbsRunLdrPct?: number
 }
 
 // Clones mbsId into a fresh "R and D" draft child under mbhId. mbsMgtName/
@@ -51,12 +53,13 @@ export async function duplicateMBSpin({
   mbsDenier,
   mbsFilament,
   fgProductId,
+  mbsRunLdrPct,
 }: DuplicateMBSpinInput): Promise<DuplicateMBSpinResult> {
   const res = await fetch(`/api/v1/finance/mb-spins/${mbsId}/duplicate`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mbhId, mbsMgtName, mbsDenier, mbsFilament, fgProductId }),
+    body: JSON.stringify({ mbhId, mbsMgtName, mbsDenier, mbsFilament, fgProductId, mbsRunLdrPct }),
   })
   const json = (await res.json()) as BFFEnvelope<MBSpin> & RawMBSpinDuplicateImpact
   if (json.base?.isSuccess === false) {
